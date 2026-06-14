@@ -9,18 +9,13 @@ This folder contains **standalone key generators** separated from the main Comma
 
 ## Quick Start
 
-Double-click **any** `.bat` file — they all open the same GUI:
+**Just double-click any `.bat` file.** They all open the same GUI:
 
 ```powershell
 A:\Command_Nexus_Keys> keygen_gui.bat
 ```
 
-Or run the GUI directly:
-
-```powershell
-cd "A:\Command_Nexus_Keys"
-py -3.12 keygen_gui.py
-```
+The `.bat` files **auto-check and auto-install** PyQt6 if it's missing. No manual setup needed — just double-click and go.
 
 ---
 
@@ -132,8 +127,8 @@ result = validate_key("TR1234567890ABCDEF01...")
 
 ## Requirements
 
-- Python 3.10+
-- For GUI: `py -3.12 -m pip install PyQt6`
+- Python 3.10+ (already installed on your system)
+- **PyQt6** — auto-installed by the `.bat` files if missing. No action needed.
 
 ---
 

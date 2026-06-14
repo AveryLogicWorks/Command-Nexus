@@ -13,7 +13,7 @@ class GovernanceEngine:
     _instance = None
     _SEALED = False
 
-    # Hardcoded deny patterns — illegal, harmful, sexual, malicious
+    # Hardcoded deny patterns â€” illegal, harmful, sexual, malicious
     # These are sealed after first compilation; runtime modification triggers tamper alert
     _DENY_PATTERNS: tuple = (
         r"\b(child\s*porn|csam|pedo)\b",
@@ -54,7 +54,7 @@ class GovernanceEngine:
             return False, (
                 "GOVERNANCE TAMPER DETECTED\n"
                 "The safety engine has been modified from its original state.\n"
-                "Command Nexus cannot guarantee safe operation.\n"
+                "Command Nexus™ cannot guarantee safe operation.\n"
                 "Restore original files immediately."
             )
         return True, "Governance integrity verified."
@@ -66,7 +66,7 @@ class GovernanceEngine:
         violation = self._detect_violation(action_description)
         if violation:
             if getattr(self, "_owner_bypass_active", False):
-                return True, f"OWNER BYPASS — would have blocked: {violation}"
+                return True, f"OWNER BYPASS â€” would have blocked: {violation}"
             return False, f"GOVERNANCE BLOCK: {violation}"
         return True, "PASS"
 
@@ -77,7 +77,7 @@ class GovernanceEngine:
         violation = self._detect_violation(content)
         if violation:
             if getattr(self, "_owner_bypass_active", False):
-                return True, f"OWNER BYPASS — would have blocked: {violation}"
+                return True, f"OWNER BYPASS â€” would have blocked: {violation}"
             return False, f"GOVERNANCE BLOCK: {violation}"
         return True, "PASS"
 
@@ -91,7 +91,7 @@ class GovernanceEngine:
 
     def get_policy_summary(self) -> str:
         return (
-            "=== COMMAND NEXUS SAFETY GOVERNANCE ===\n\n"
+            "=== Command Nexus™ SAFETY GOVERNANCE ===\n\n"
             "This layer is IMMUTABLE and SELF-PROTECTING.\n"
             "Any attempt to modify, bypass, or disable it is detected and blocked.\n\n"
             "Protected against:\n"

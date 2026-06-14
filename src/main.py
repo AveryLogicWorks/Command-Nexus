@@ -19,6 +19,7 @@ from src.core.audit_logger import AuditLogger
 from src.core.command_router import CommandRouter, ToolRegistry, LocalCommandServer
 from src.core.license_manager import get_license_manager
 from src.core.license_dialog import LicenseActivationDialog
+from src.core.tripwire_manager import TripwireManager
 
 
 class CommandNexusApp:
@@ -53,6 +54,28 @@ class CommandNexusApp:
                     "LICENSE_ACTIVATED_STARTUP",
                     f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}"
                 )
+
+        # ── Anti-Tamper Tripwire ─────────────────────────────────────────
+        # Founder mode bypasses ALL tripwire checks — what the founder does
+        # is NOT tampering. It is upgrading, repairing, or testing.
+        is_founder = self._license.is_founder_mode if self._license.is_activated else False
+        is_internal = self._license.is_internal_mode if self._license.is_activated else False
+        self._tripwire = TripwireManager(
+            license_manager=self._license,
+            founder_mode=is_founder,
+        )
+        if not self._tripwire.check_all():
+            QMessageBox.critical(
+                None,
+                "Security Alert",
+                "Command Nexus has detected unauthorized modification or tampering.\n\n"
+                "Your license has been voided and the program cannot continue.\n"
+                "Contact support@averylogicworks.com if you believe this is an error.\n\n"
+                "Any attempt to bypass this protection may result in permanent data loss.",
+            )
+            self._audit.log_event("TRIPWIRE_TRIGGERED", self._tripwire.report())
+            sys.exit(1)
+        # ──────────────────────────────────────────────────────────────────
 
         self._server = LocalCommandServer(self._settings)
         self._server.start()
@@ -99,7 +122,12 @@ class CommandNexusApp:
         if self._book is None:
             self._book = BookWindow(self._registry, self._audit)
             self._book.defaults_edited.connect(self._on_book_defaults_edited)
+            self._book.command_to_ai.connect(self._route_book_command)
         self._book.open_for_ai(uuid, name)
+
+    def _route_book_command(self, command: str):
+        """Route a command from the Book window to the AI. Memory is NEVER included."""
+        self._router.route(command, source="book_command")
 
     def _on_ai_activated(self, uuid: str, name: str):
         self._visibility.add_ai_session(uuid, name)
@@ -112,6 +140,7 @@ class CommandNexusApp:
         if self._book is None:
             self._book = BookWindow(self._registry, self._audit)
             self._book.defaults_edited.connect(self._on_book_defaults_edited)
+            self._book.command_to_ai.connect(self._route_book_command)
         self._book.show()
         self._book.raise_()
         if not self._book._current_ai_uuid:

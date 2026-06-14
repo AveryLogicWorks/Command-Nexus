@@ -1,11 +1,13 @@
 import sys
 import time
+import json
 import random
 from datetime import datetime
 from pathlib import Path
 
 import io
 import threading
+import queue
 
 try:
     import mss
@@ -15,12 +17,19 @@ except ImportError:
     from PIL import ImageGrab
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
+
+try:
+    import pyttsx3
+    HAS_TTS = True
+except ImportError:
+    HAS_TTS = False
 from PyQt6.QtGui import QImage, QPixmap, QKeyEvent, QTextCursor, QFont
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QLabel, QTextEdit, QPushButton, QComboBox, QFrame,
     QFileDialog, QMessageBox, QSizePolicy, QGroupBox,
-    QGridLayout, QScrollArea, QListWidget, QListWidgetItem, QLineEdit
+    QGridLayout, QScrollArea, QListWidget, QListWidgetItem, QLineEdit,
+    QDialog, QCheckBox, QInputDialog
 )
 from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
 
@@ -33,6 +42,34 @@ from ...core.constants import (
     SpeedLevel, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
     AUDIT_PANE_MAX_LINES, PresenceState
 )
+
+# ---------------------------------------------------------------------------
+# Book Encryption helpers (mirrored from forge_window for local access)
+# ---------------------------------------------------------------------------
+from hashlib import sha256
+
+_BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
+
+
+def _derive_book_key(uuid: str) -> bytes:
+    return sha256(_BOOK_CIPHER_KEY + uuid.encode()).digest()
+
+
+def _decrypt_book(data: bytes, uuid: str) -> str:
+    key = _derive_book_key(uuid)
+    plain = bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+    return plain.decode("utf-8")
+
+
+def _read_book_file(book_path: str | Path, uuid: str) -> str:
+    """Read an encrypted .nbk file, falling back to legacy .md plaintext."""
+    path = Path(book_path)
+    nbk = path.with_suffix(".nbk")
+    if nbk.exists():
+        return _decrypt_book(nbk.read_bytes(), uuid)
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return ""
 
 
 class AuditSimulator(QObject):
@@ -60,14 +97,14 @@ class AuditSimulator(QObject):
     ]
 
     TRAJECTORIES = [
-        "Next: verify search results → extract relevant link → open target page",
-        "Next: read document summary → identify key metrics → compile into table",
-        "Next: draft email body → attach required files → send to distribution list",
-        "Next: cross-check data against source → flag anomalies → generate alert",
-        "Next: summarize findings → format per template → queue for review",
-        "Next: open IDE → create new module → scaffold class structure",
-        "Next: run test suite → capture output → compare against baseline",
-        "Next: scan inbox → categorize by priority → auto-respond to low-priority"
+        "Next: verify search results â†’ extract relevant link â†’ open target page",
+        "Next: read document summary â†’ identify key metrics â†’ compile into table",
+        "Next: draft email body â†’ attach required files â†’ send to distribution list",
+        "Next: cross-check data against source â†’ flag anomalies â†’ generate alert",
+        "Next: summarize findings â†’ format per template â†’ queue for review",
+        "Next: open IDE â†’ create new module â†’ scaffold class structure",
+        "Next: run test suite â†’ capture output â†’ compare against baseline",
+        "Next: scan inbox â†’ categorize by priority â†’ auto-respond to low-priority"
     ]
 
     def __init__(self):
@@ -110,7 +147,7 @@ class ViewportWidget(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setMinimumSize(400, 300)
-        self._label = QLabel("AI Vision Stream — standby. No active AI mission.")
+        self._label = QLabel("AI Vision Stream â€” standby. No active AI mission.")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setStyleSheet("background-color: #1a1a1a; color: #888888; font-size: 14px;")
         layout = QVBoxLayout(self)
@@ -136,15 +173,15 @@ class ViewportWidget(QFrame):
         self._mode = mode
         self._running = True
         self._timer.start(int(1000 / self._fps))
-        label = "AI Vision Stream — Screen capture active"
+        label = "AI Vision Stream â€” Screen capture active"
         if mode == "DEMO":
-            label = "AI Vision Stream — DEMO MODE (screen capture)"
+            label = "AI Vision Stream â€” DEMO MODE (screen capture)"
         elif mode == "MISSION":
-            label = "AI Vision Stream — Live mission (screen capture)"
+            label = "AI Vision Stream â€” Live mission (screen capture)"
         self._label.setText(label)
         self._label.setStyleSheet("background-color: #0d1117; color: #c9d1d9; font-size: 14px;")
 
-    def stop_stream(self, standby_text: str = "AI Vision Stream — standby. No active AI mission."):
+    def stop_stream(self, standby_text: str = "AI Vision Stream â€” standby. No active AI mission."):
         self._running = False
         self._timer.stop()
         self._mode = "IDLE"
@@ -333,13 +370,125 @@ class ControlBar(QWidget):
                 break
 
 
+class VoiceController(QObject):
+    """
+    OS-integrated text-to-speech using pyttsx3.
+    Runs speech on a background thread so the UI stays responsive.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._enabled = False
+        self._queue: queue.Queue[str] = queue.Queue()
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+        if HAS_TTS:
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        self._enabled = value
+
+    def speak(self, text: str):
+        if not self._enabled or not HAS_TTS:
+            return
+        # Strip bracket prefixes for cleaner speech
+        clean = text
+        if "]" in clean:
+            clean = clean.split("]", 1)[-1]
+        clean = clean.strip()
+        if clean:
+            self._queue.put(clean)
+
+    def stop(self):
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=1.0)
+
+    def _run(self):
+        engine = pyttsx3.init()
+        engine.setProperty("rate", 175)
+        engine.setProperty("volume", 1.0)
+        while not self._stop_event.is_set():
+            try:
+                text = self._queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            engine.say(text)
+            engine.runAndWait()
+
+
+class SpeechRecognizer(QObject):
+    """
+    Speech-to-text using speech_recognition with the system microphone.
+    Runs on a background thread so the UI never blocks.
+    """
+    text_ready = pyqtSignal(str)
+    listening_changed = pyqtSignal(bool)
+    error_occurred = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+        self._has_sr = False
+        try:
+            import speech_recognition as sr
+            self._sr = sr
+            self._recognizer = sr.Recognizer()
+            self._microphone = sr.Microphone()
+            # Calibrate for ambient noise once
+            with self._microphone as source:
+                self._recognizer.adjust_for_ambient_noise(source, duration=0.5)
+            self._has_sr = True
+        except Exception:
+            self._sr = None
+            self._recognizer = None
+            self._microphone = None
+
+    @property
+    def available(self) -> bool:
+        return self._has_sr
+
+    def listen_once(self):
+        if not self._has_sr or (self._thread and self._thread.is_alive()):
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._listen_worker, daemon=True)
+        self._thread.start()
+
+    def _listen_worker(self):
+        self.listening_changed.emit(True)
+        try:
+            with self._microphone as source:
+                audio = self._recognizer.listen(source, timeout=5, phrase_time_limit=10)
+            text = self._recognizer.recognize_google(audio)
+            self.text_ready.emit(text)
+        except self._sr.WaitTimeoutError:
+            self.error_occurred.emit("No speech detected.")
+        except self._sr.UnknownValueError:
+            self.error_occurred.emit("Could not understand audio.")
+        except self._sr.RequestError as e:
+            self.error_occurred.emit(f"Speech service error: {e}")
+        except Exception as e:
+            self.error_occurred.emit(f"Mic error: {e}")
+        finally:
+            self.listening_changed.emit(False)
+
+
 class NavigationBar(QWidget):
-    """Buttons to open each Part of Command Nexus + Governance."""
+    """Buttons to open each Part of Command Nexus™ + Governance."""
 
     open_forge = pyqtSignal()
     open_book = pyqtSignal()
     open_constraints = pyqtSignal()
     open_governance = pyqtSignal()
+    voice_toggled = pyqtSignal(bool)
+    mic_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -359,21 +508,42 @@ class NavigationBar(QWidget):
         btn_constraints.clicked.connect(self.open_constraints.emit)
         btn_governance.clicked.connect(self.open_governance.emit)
 
+        self._btn_voice = QPushButton("Voice: OFF")
+        self._btn_voice.setCheckable(True)
+        self._btn_voice.setStyleSheet("background-color: #30363d; color: #8b949e; font-weight: bold; min-width: 90px;")
+        self._btn_voice.clicked.connect(self._on_voice_toggle)
+
+        self._btn_mic = QPushButton("Mic")
+        self._btn_mic.setStyleSheet("background-color: #1f6feb; color: white; font-weight: bold; min-width: 60px;")
+        self._btn_mic.clicked.connect(self.mic_clicked.emit)
+
         layout = QHBoxLayout(self)
         layout.addWidget(QLabel("Navigate:"))
         layout.addWidget(btn_forge)
         layout.addWidget(btn_book)
         layout.addWidget(btn_constraints)
         layout.addWidget(btn_governance)
+        layout.addWidget(self._btn_voice)
+        layout.addWidget(self._btn_mic)
         layout.addStretch()
+
+    def _on_voice_toggle(self):
+        on = self._btn_voice.isChecked()
+        if on:
+            self._btn_voice.setText("Voice: ON")
+            self._btn_voice.setStyleSheet("background-color: #238636; color: white; font-weight: bold; min-width: 90px;")
+        else:
+            self._btn_voice.setText("Voice: OFF")
+            self._btn_voice.setStyleSheet("background-color: #30363d; color: #8b949e; font-weight: bold; min-width: 90px;")
+        self.voice_toggled.emit(on)
 
 
 class VisibilityWindow(QMainWindow):
-    """Command Nexus Part 1 — The Visibility Window."""
+    """Command Nexus™ Part 1 â€” The Visibility Window."""
 
     def __init__(self, router=None, registry=None, audit=None, approval=None):
         super().__init__()
-        self.setWindowTitle("Command Nexus — Visibility Window")
+        self.setWindowTitle("Command Nexus™ â€” Visibility Window")
         self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         self._governance = GovernanceEngine()
         self._router = router
@@ -391,6 +561,11 @@ class VisibilityWindow(QMainWindow):
         self._tasks: dict[str, Task] = {}
         self._task_counter = 0
 
+        self._voice = VoiceController(self)
+        self._mic = SpeechRecognizer(self)
+        self._mic.text_ready.connect(self._on_mic_text)
+        self._mic.listening_changed.connect(self._on_mic_listening)
+        self._mic.error_occurred.connect(self._on_mic_error)
         self._setup_ui()
         self._setup_simulator()
         self._setup_timers()
@@ -423,9 +598,11 @@ class VisibilityWindow(QMainWindow):
         left_layout.addWidget(self._controls, stretch=0)
 
         self._nav = NavigationBar()
+        self._nav.voice_toggled.connect(self._on_voice_toggled)
+        self._nav.mic_clicked.connect(self._on_mic_clicked)
         left_layout.addWidget(self._nav, stretch=0)
 
-        # Mission Control — AI session selector + task queue + status
+        # Mission Control â€” AI session selector + task queue + status
         mission_group = QGroupBox("Mission Control")
         mission_layout = QVBoxLayout(mission_group)
         mission_layout.setContentsMargins(8, 8, 8, 8)
@@ -483,7 +660,7 @@ class VisibilityWindow(QMainWindow):
 
         trust_layout.addSpacing(16)
 
-        self._watcher_trust_label = QLabel("🛡 TRUSTED")
+        self._watcher_trust_label = QLabel("ðŸ›¡ TRUSTED")
         self._watcher_trust_label.setStyleSheet(
             "color: #4caf50; font-weight: bold; font-size: 13px; "
             "padding: 2px 10px; background-color: #1b5e20; border-radius: 4px;"
@@ -543,6 +720,10 @@ class VisibilityWindow(QMainWindow):
         gov_menu = menu.addMenu("Governance")
         act_policy = gov_menu.addAction("View Policy")
         act_policy.triggered.connect(self._show_policy)
+        act_parental = gov_menu.addAction("Parental Controls")
+        act_parental.triggered.connect(self._show_parental_controls)
+        act_info = gov_menu.addAction("More Info")
+        act_info.triggered.connect(self._show_parental_info)
 
     def _setup_simulator(self):
         self._sim = AuditSimulator()
@@ -572,11 +753,13 @@ class VisibilityWindow(QMainWindow):
         if meta.get("abilities"):
             summary["abilities"] = meta.get("abilities", [])
         book_path = meta.get("ability_book_path")
-        if not book_path or not Path(book_path).exists():
+        if not book_path:
             return summary
         try:
-            text = Path(book_path).read_text(encoding="utf-8")
+            text = _read_book_file(book_path, uuid)
         except Exception:
+            return summary
+        if not text:
             return summary
         current_section = None
         for line in text.splitlines():
@@ -687,7 +870,7 @@ class VisibilityWindow(QMainWindow):
         self._mode = "DEMO"
         self._viewport.start_stream("DEMO")
         self._sim.start()
-        self._thought_pane.append("[SYSTEM] DEMO MODE — simulated AI vision/activity.")
+        self._thought_pane.append("[SYSTEM] DEMO MODE â€” simulated AI vision/activity.")
         self._action_pane.append("[SYSTEM] Demo stream running. Recording user actions for demonstration only.")
         self._trajectory_pane.append("[SYSTEM] Demo trajectory simulated.")
         self._audit_event("demo_start", msg="Demo mode activated")
@@ -791,6 +974,7 @@ class VisibilityWindow(QMainWindow):
             task.status = TaskStatus.CANCELLED
             session.status = AIStatus.IDLE
             self._thought_pane.append(f"[SYSTEM] Mission start blocked: {msg}")
+            self._speak(f"Mission start blocked: {msg}")
             self._refresh_task_queue()
             self._update_status_display(AIStatus.IDLE)
             self._audit_event("mission_start_denied", msg=msg)
@@ -813,14 +997,26 @@ class VisibilityWindow(QMainWindow):
         allowed = "; ".join(book.get("allowed", [])[:3]) or "draft, organize, summarize"
         approval = "; ".join(book.get("approval", [])[:3]) or "file changes, commands, outbound messages"
         context = "; ".join(book.get("context", [])[:2]) or "local governed scaffold"
-        placeholder = (
-            f"Hi, I'm {session.name}. I'm running in scaffold/runtime mode. "
-            f"Context: {context}. Abilities: {ability_list}. "
-            f"I can operate within: {allowed}. Approval needed for: {approval}. "
-            "Backend model may be limited; responses are governance-aware placeholders."
+
+        # Build a contextual greeting from the AI's actual book skills
+        # instead of a generic scaffold placeholder
+        skill_lines = []
+        if book.get("allowed"):
+            skill_lines.append(f"I can help with: {allowed}.")
+        if book.get("approval"):
+            skill_lines.append(f"I'll ask for approval before: {approval}.")
+        if abilities:
+            skill_lines.append(f"My configured abilities: {ability_list}.")
+
+        greeting = (
+            f"Hi, I'm {session.name}. "
+            f"I'm ready to assist using my pre-built skills from The Book. "
+            + " ".join(skill_lines)
+            + " Let's get started on your mission."
         )
-        self._action_pane.append("[SCAFFOLD RESPONSE] " + placeholder)
-        self._trajectory_pane.append("[SYSTEM] Trajectory awaiting real AI backend.")
+        self._action_pane.append("[READY] " + greeting)
+        self._speak(greeting)
+        self._trajectory_pane.append("[SYSTEM] Trajectory initialized from Book skills.")
         self._set_presence(PresenceState.RUNNING_MISSION, "Mission active")
 
         # Begin execution lifecycle
@@ -841,14 +1037,15 @@ class VisibilityWindow(QMainWindow):
         task = session.current_task
 
         if not self._registry:
-            # No backend connected — fail fast with clear message
+            # No backend connected â€” fail fast with clear message
             self._mission_timer.stop()
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now()
             session.current_task = None
             session.status = AIStatus.IDLE
-            self._thought_pane.append("[SYSTEM] Backend not connected — no AI runtime available to execute this mission.")
+            self._thought_pane.append("[SYSTEM] Backend not connected â€” no AI runtime available to execute this mission.")
             self._action_pane.append("[SYSTEM] Task failed. Deploy an AI from the Forge first, or connect a backend.")
+            self._speak("Backend not connected. Please deploy an AI from the Forge first, or connect a backend.")
             self._update_status_display(AIStatus.FAILED)
             self._set_presence(PresenceState.BACKEND_NOT_CONNECTED, "Backend not connected")
             self._refresh_task_queue()
@@ -865,6 +1062,7 @@ class VisibilityWindow(QMainWindow):
             session.current_task = None
             session.status = AIStatus.IDLE
             self._action_pane.append(f"[SYSTEM] Task '{task.name}' completed successfully.")
+            self._speak(f"Task {task.name} completed successfully.")
             self._update_status_display(AIStatus.IDLE)
             self._set_presence(PresenceState.IDLE, "Idle / ready")
             self._refresh_task_queue()
@@ -883,6 +1081,7 @@ class VisibilityWindow(QMainWindow):
             task.completed_at = datetime.now()
             self._thought_pane.append(f"[SYSTEM] Mission '{task.name}' cancelled by user.")
             self._action_pane.append(f"[SYSTEM] Task {task.id} aborted. AI returning to idle.")
+            self._speak(f"Mission {task.name} cancelled. AI returning to idle.")
             session.current_task = None
             session.status = AIStatus.IDLE
             self._mode = "IDLE"
@@ -937,20 +1136,21 @@ class VisibilityWindow(QMainWindow):
             return
 
         if trusted:
-            self._watcher_trust_label.setText("🛡 TRUSTED")
+            self._watcher_trust_label.setText("ðŸ›¡ TRUSTED")
             self._watcher_trust_label.setStyleSheet(
                 "color: #4caf50; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #1b5e20; border-radius: 4px;"
             )
             self._thought_pane.append("[WATCHER] All files verified. Trust restored.")
         else:
-            self._watcher_trust_label.setText("⚠ BREACH DETECTED")
+            self._watcher_trust_label.setText("âš  BREACH DETECTED")
             self._watcher_trust_label.setStyleSheet(
                 "color: #ffffff; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #c62828; border-radius: 4px;"
             )
             self._thought_pane.append("[WATCHER] SECURITY BREACH: Unauthorized file change detected!")
             self._action_pane.append("[WATCHER] Review alerts immediately. System may be compromised.")
+            self._speak("Security alert. Unauthorized file change detected. Please review immediately.")
 
     def _on_watcher_alert(self, alert):
         # Show critical/EMERGENCY alerts in audit panes
@@ -958,6 +1158,7 @@ class VisibilityWindow(QMainWindow):
             self._trajectory_pane.append(
                 f"[WATCHER {alert.severity.value}] {alert.description}"
             )
+            self._speak(f"Critical alert. {alert.description}")
 
     def _update_watcher_detail(self, watcher):
         state = watcher.get_state()
@@ -969,6 +1170,67 @@ class VisibilityWindow(QMainWindow):
             QMessageBox.critical(self, "GOVERNANCE ALERT", msg)
         else:
             QMessageBox.information(self, "Governance Policy", self._governance.get_policy_summary())
+
+    def _show_parental_controls(self):
+        settings = _load_parental_settings()
+        pwd, ok = QInputDialog.getText(
+            self,
+            "Parental Controls Locked",
+            "Enter password to access Parental Controls.\nHint: Default is 'Nexus'",
+            QLineEdit.EchoMode.Password,
+        )
+        if not ok:
+            return
+        if pwd != settings.get("password", "Nexus"):
+            QMessageBox.warning(self, "Access Denied", "Incorrect password.")
+            return
+        dlg = ParentalControlsDialog(self)
+        dlg.exec()
+
+    def _on_voice_toggled(self, enabled: bool):
+        self._voice.enabled = enabled
+        status = "ON" if enabled else "OFF"
+        self._thought_pane.append(f"[SYSTEM] Voice control {status}.")
+
+    def _speak(self, text: str):
+        """Speak text aloud if voice control is enabled."""
+        self._voice.speak(text)
+
+    def _on_mic_clicked(self):
+        if not self._mic.available:
+            QMessageBox.information(
+                self, "Microphone",
+                "Speech recognition is not available.\n"
+                "Install it with:  py -3.12 -m pip install SpeechRecognition pyaudio"
+            )
+            return
+        self._thought_pane.append("[SYSTEM] Listening...")
+        self._nav._btn_mic.setEnabled(False)
+        self._nav._btn_mic.setText("...")
+        self._mic.listen_once()
+
+    def _on_mic_text(self, text: str):
+        self._task_input.setText(text)
+        self._thought_pane.append(f"[USER] {text}")
+        self._speak(f"You said: {text}")
+        self._nav._btn_mic.setEnabled(True)
+        self._nav._btn_mic.setText("Mic")
+
+    def _on_mic_listening(self, listening: bool):
+        if not listening:
+            self._nav._btn_mic.setEnabled(True)
+            self._nav._btn_mic.setText("Mic")
+
+    def _on_mic_error(self, msg: str):
+        self._thought_pane.append(f"[MIC ERROR] {msg}")
+        self._speak(msg)
+        self._nav._btn_mic.setEnabled(True)
+        self._nav._btn_mic.setText("Mic")
+
+    def _show_parental_info(self):
+        dlg = ParentalControlsInfoDialog(self)
+        dlg.exec()
+
 
     def set_owner_console(self, console):
         """Wire the owner-only Aegis Console (hidden access)."""
@@ -988,9 +1250,309 @@ class VisibilityWindow(QMainWindow):
             return
         super().keyPressEvent(event)
 
+# ---------------------------------------------------------------------------
+# Parental Controls Helpers
+# ---------------------------------------------------------------------------
+def _load_parental_settings() -> dict:
+    path = Path.home() / ".command_nexus" / "parental_controls.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {
+        "enabled": False,
+        "block_mature_topics": True,
+        "block_violence": True,
+        "block_explicit_language": True,
+        "block_unsafe_web": True,
+        "require_approval_for_outbound": True,
+        "max_session_minutes": 120,
+        "log_all_conversations": True,
+        "password": "Nexus",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Parental Controls Dialog
+# ---------------------------------------------------------------------------
+class ParentalControlsDialog(QDialog):
+    """
+    Kid-safety content filter settings for Command Nexus.
+    Lets parents restrict what AIs can discuss, generate, or access.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Parental Controls â€” Kid Safety")
+        self.setMinimumSize(480, 520)
+        self._settings = {}
+        self._load_settings()
+        self._setup_ui()
+        self._apply_dark_theme()
+
+    def _load_settings(self):
+        path = Path.home() / ".command_nexus" / "parental_controls.json"
+        if path.exists():
+            try:
+                self._settings = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                self._settings = {}
+        else:
+            self._settings = {
+                "enabled": False,
+                "block_mature_topics": True,
+                "block_violence": True,
+                "block_explicit_language": True,
+                "block_unsafe_web": True,
+                "require_approval_for_outbound": True,
+                "max_session_minutes": 120,
+                "log_all_conversations": True,
+                "password": "Nexus",
+            }
+
+    def _save_settings(self):
+        base = Path.home() / ".command_nexus"
+        base.mkdir(parents=True, exist_ok=True)
+        path = base / "parental_controls.json"
+        path.write_text(json.dumps(self._settings, indent=2), encoding="utf-8")
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        header = QLabel("PARENTAL CONTROLS")
+        header.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        header.setStyleSheet("color: #58a6ff;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+
+        sub = QLabel("Keep kids safe by restricting what AIs can discuss, generate, or access.")
+        sub.setFont(QFont("Segoe UI", 9))
+        sub.setStyleSheet("color: #8b949e;")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setWordWrap(True)
+        layout.addWidget(sub)
+
+        # Master toggle
+        self._enabled = QPushButton("Parental Controls: OFF")
+        self._enabled.setCheckable(True)
+        self._enabled.setChecked(self._settings.get("enabled", False))
+        self._update_toggle_style()
+        self._enabled.clicked.connect(self._on_toggle)
+        layout.addWidget(self._enabled)
+
+        # Filter group
+        group = QGroupBox("Content Filters")
+        group.setStyleSheet("QGroupBox { color: #c9d1d9; border: 1px solid #30363d; }")
+        g_layout = QVBoxLayout(group)
+
+        self._mature = self._make_checkbox("Block mature topics (dating, substances, etc.)", "block_mature_topics")
+        self._violence = self._make_checkbox("Block violence and weapons discussions", "block_violence")
+        self._explicit = self._make_checkbox("Block explicit / inappropriate language", "block_explicit_language")
+        self._web = self._make_checkbox("Block unsafe web access", "block_unsafe_web")
+        self._approval = self._make_checkbox("Require approval for all outbound actions", "require_approval_for_outbound")
+
+        g_layout.addWidget(self._mature)
+        g_layout.addWidget(self._violence)
+        g_layout.addWidget(self._explicit)
+        g_layout.addWidget(self._web)
+        g_layout.addWidget(self._approval)
+        layout.addWidget(group)
+
+        # Session limit
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Max session length (minutes):"))
+        self._max_min = QLineEdit(str(self._settings.get("max_session_minutes", 120)))
+        self._max_min.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        row.addWidget(self._max_min)
+        layout.addLayout(row)
+
+        # Logging
+        self._logging = self._make_checkbox("Log all AI conversations for parent review", "log_all_conversations")
+        layout.addWidget(self._logging)
+
+        # Save button
+        save = QPushButton("SAVE SETTINGS")
+        save.setStyleSheet("background:#238636;color:#fff;border:none;border-radius:8px;padding:12px;font-weight:bold;")
+        save.clicked.connect(self._on_save)
+        layout.addWidget(save)
+
+        # Change Password
+        pwd_group = QGroupBox("Change Password")
+        pwd_group.setStyleSheet("QGroupBox { color: #c9d1d9; border: 1px solid #30363d; }")
+        pwd_layout = QVBoxLayout(pwd_group)
+        self._old_pwd = QLineEdit()
+        self._old_pwd.setPlaceholderText("Current password")
+        self._old_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self._old_pwd.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        self._new_pwd = QLineEdit()
+        self._new_pwd.setPlaceholderText("New password")
+        self._new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self._new_pwd.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        self._confirm_pwd = QLineEdit()
+        self._confirm_pwd.setPlaceholderText("Confirm new password")
+        self._confirm_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self._confirm_pwd.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        pwd_layout.addWidget(self._old_pwd)
+        pwd_layout.addWidget(self._new_pwd)
+        pwd_layout.addWidget(self._confirm_pwd)
+        btn_change = QPushButton("UPDATE PASSWORD")
+        btn_change.setStyleSheet("background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;")
+        btn_change.clicked.connect(self._on_change_password)
+        pwd_layout.addWidget(btn_change)
+        layout.addWidget(pwd_group)
+
+        # Warning
+        warn = QLabel("These settings apply to ALL AI sessions on this computer.")
+        warn.setStyleSheet("color: #d29922; font-size: 0.8rem;")
+        warn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        warn.setWordWrap(True)
+        layout.addWidget(warn)
+
+        layout.addStretch()
+
+    def _make_checkbox(self, label: str, key: str) -> QCheckBox:
+        cb = QCheckBox(label)
+        cb.setChecked(self._settings.get(key, True))
+        cb.setStyleSheet("color: #c9d1d9;")
+        cb.stateChanged.connect(lambda state, k=key: self._settings.update({k: bool(state)}))
+        return cb
+
+    def _update_toggle_style(self):
+        if self._enabled.isChecked():
+            self._enabled.setText("Parental Controls: ON")
+            self._enabled.setStyleSheet("background:#238636;color:#fff;border:none;border-radius:8px;padding:12px;font-weight:bold;")
+        else:
+            self._enabled.setText("Parental Controls: OFF")
+            self._enabled.setStyleSheet("background:#30363d;color:#8b949e;border:none;border-radius:8px;padding:12px;font-weight:bold;")
+
+    def _on_toggle(self):
+        self._settings["enabled"] = self._enabled.isChecked()
+        self._update_toggle_style()
+
+    def _on_change_password(self):
+        old = self._old_pwd.text()
+        new_p = self._new_pwd.text()
+        confirm = self._confirm_pwd.text()
+        if old != self._settings.get("password", "Nexus"):
+            QMessageBox.warning(self, "Error", "Current password is incorrect.")
+            return
+        if not new_p:
+            QMessageBox.warning(self, "Error", "New password cannot be empty.")
+            return
+        if new_p != confirm:
+            QMessageBox.warning(self, "Error", "New passwords do not match.")
+            return
+        self._settings["password"] = new_p
+        self._save_settings()
+        QMessageBox.information(self, "Saved", "Password updated successfully.")
+        self._old_pwd.clear()
+        self._new_pwd.clear()
+        self._confirm_pwd.clear()
+
+    def _on_save(self):
+        try:
+            self._settings["max_session_minutes"] = int(self._max_min.text())
+        except ValueError:
+            self._settings["max_session_minutes"] = 120
+        self._save_settings()
+        QMessageBox.information(self, "Saved", "Parental control settings saved.")
+        self.accept()
+
+    def _apply_dark_theme(self):
+        self.setStyleSheet("""
+            QDialog{background:#0d1117;color:#c9d1d9;}
+            QLabel{color:#c9d1d9;}
+            QCheckBox{color:#c9d1d9;}
+            QGroupBox{color:#c9d1d9;border:1px solid #30363d;border-radius:8px;margin-top:12px;padding-top:12px;}
+            QLineEdit{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
+        """)
+
+
+# ---------------------------------------------------------------------------
+# Parental Controls Info Dialog
+# ---------------------------------------------------------------------------
+class ParentalControlsInfoDialog(QDialog):
+    """
+    Informational dialog explaining the Parental Controls feature,
+    password system, and how to use it safely.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Parental Controls â€” More Info")
+        self.setMinimumSize(480, 420)
+        self._setup_ui()
+        self._apply_dark_theme()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        header = QLabel("PARENTAL CONTROLS")
+        header.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        header.setStyleSheet("color: #58a6ff;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+
+        sub = QLabel("Keeping kids safe with AI governance.")
+        sub.setFont(QFont("Segoe UI", 9))
+        sub.setStyleSheet("color: #8b949e;")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(sub)
+
+        info = QTextEdit()
+        info.setReadOnly(True)
+        info.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:12px;")
+        info.setHtml("""
+        <h3 style="color:#58a6ff;">What is Parental Controls?</h3>
+        <p>Parental Controls let parents restrict what AIs can discuss, generate, or access. This keeps children from accidentally (or intentionally) interacting with inappropriate content or performing unsafe actions.</p>
+
+        <h3 style="color:#58a6ff;">Password Protection</h3>
+        <p>By default, the Parental Controls settings are protected by a password. The default password is <b>Nexus</b>. This prevents kids from accidentally locking parents out or disabling safety filters.</p>
+
+        <h3 style="color:#58a6ff;">What You Can Restrict</h3>
+        <ul>
+            <li><b>Mature Topics:</b> Dating, substances, and other adult content.</li>
+            <li><b>Violence:</b> Discussions about weapons, fighting, or harm.</li>
+            <li><b>Explicit Language:</b> Inappropriate or offensive wording.</li>
+            <li><b>Unsafe Web Access:</b> Preventing the AI from browsing risky sites.</li>
+            <li><b>Outbound Actions:</b> Requiring approval before emails, messages, or file changes.</li>
+        </ul>
+
+        <h3 style="color:#58a6ff;">Session Limits & Logging</h3>
+        <p>You can set a maximum session length (in minutes) and choose to log all AI conversations for parent review later.</p>
+
+        <h3 style="color:#58a6ff;">Changing Your Password</h3>
+        <p>Inside the Parental Controls settings, scroll to <b>Change Password</b> to set your own custom password. Remember it â€” there is no recovery mechanism built into the app.</p>
+        """)
+        layout.addWidget(info)
+
+        close = QPushButton("CLOSE")
+        close.setStyleSheet("background:#30363d;color:#fff;border:none;border-radius:8px;padding:12px;font-weight:bold;")
+        close.clicked.connect(self.accept)
+        layout.addWidget(close)
+
+    def _apply_dark_theme(self):
+        self.setStyleSheet("""
+            QDialog{background:#0d1117;color:#c9d1d9;}
+            QLabel{color:#c9d1d9;}
+            QPushButton{background:#30363d;color:#fff;border:none;border-radius:8px;padding:12px;}
+        """)
+
+
+# ---------------------------------------------------------------------------
+# End Parental Controls Dialog
+# ---------------------------------------------------------------------------
+
     def closeEvent(self, event):
         self._viewport.stop_capture()
         self._sim.stop()
         if hasattr(self, '_watcher_poll'):
             self._watcher_poll.stop()
+        if hasattr(self, '_voice'):
+            self._voice.stop()
         event.accept()

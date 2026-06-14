@@ -50,6 +50,41 @@ CAPABILITY_ACTIONS: dict[str, str] = {
     "Chat": "Hold conversations, clarify needs, and explain next steps.",
 }
 
+# ---------------------------------------------------------------------------
+# Book Encryption â€” protects on-disk books from casual inference
+# ---------------------------------------------------------------------------
+_BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
+
+
+def _derive_book_key(uuid: str) -> bytes:
+    return sha256(_BOOK_CIPHER_KEY + uuid.encode()).digest()
+
+
+def _encrypt_book(text: str, uuid: str) -> bytes:
+    key = _derive_book_key(uuid)
+    data = text.encode("utf-8")
+    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+
+
+def _decrypt_book(data: bytes, uuid: str) -> str:
+    key = _derive_book_key(uuid)
+    plain = bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+    return plain.decode("utf-8")
+
+
+def _read_book_file(book_path: str | Path, uuid: str) -> str:
+    """Read an encrypted .nbk file, falling back to legacy .md plaintext."""
+    path = Path(book_path)
+    # Prefer encrypted .nbk
+    nbk = path.with_suffix(".nbk")
+    if nbk.exists():
+        return _decrypt_book(nbk.read_bytes(), uuid)
+    # Fallback to legacy .md plaintext
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return ""
+
+
 def _canonical_ability(name: str) -> str:
     mapping = {
         "Chat Companion": "Chatbot",
@@ -591,7 +626,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     lines.append(f"- AI ID: {ai_id}")
     lines.append(f"- Use-Case Class: {use_case.value}")
     lines.append(f"- Purpose: {purpose or 'Assist within described context; respect approvals.'}")
-    lines.append("- Intended user: Command Nexus operator")
+    lines.append("- Intended user: Command Nexus™ operator")
     lines.append("- Primary role: Assist within described context; respect approvals.")
     lines.append("")
 
@@ -644,7 +679,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         for gr in guardrails:
             lines.append(f"- {gr}")
     else:
-        lines.append("- (No optional guardrails selected — add them in the Forge to customize behavior.)")
+        lines.append("- (No optional guardrails selected â€” add them in the Forge to customize behavior.)")
     lines.append("")
 
     lines.append("## Response Style Defaults")
@@ -677,6 +712,51 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     if not any(x in guardrails for x in ["Keep responses beginner-friendly", "Keep responses concise", "Avoid specific technical jargon unless asked", "Never use emojis or informal formatting", "Always summarize long outputs before detail", "Prefer step-by-step explanations", "Use inclusive and neutral language", "Always explain reasoning before giving answers", "Respect time-of-day context (quiet hours awareness)"]):
         if use_case not in {UseCaseClass.BUSINESS, UseCaseClass.EDUCATIONAL, UseCaseClass.ENTERPRISE, UseCaseClass.INDIVIDUAL}:
             lines.append("- Default style: clear, transparent, asks when unsure.")
+    lines.append("")
+
+    lines.append("---")
+    lines.append("")
+    lines.append("# PART: ACTIVE MEMORY (User-Defined)")
+    lines.append("This section holds the AI's live instructions, memories, and preferences.")
+    lines.append("It is populated by the Book AI dialog and can be updated through conversation.")
+    lines.append("Capability sections below are internal and only editable if the user explicitly asks.")
+    lines.append("")
+    lines.append("## Active Instructions")
+    lines.append("Live behavioral instructions for how this AI should operate right now.")
+    lines.append("- Ask clarifying questions when requirements are unclear.")
+    lines.append("- Summarize before acting on complex requests.")
+    lines.append("- Stop and ask when action touches restricted or approval-required areas.")
+    lines.append("")
+    lines.append("## Persistent Memory")
+    lines.append("Long-term facts and knowledge that should always be remembered.")
+    lines.append("- User identity and core preferences")
+    lines.append("- Business names, key contacts, important relationships")
+    lines.append("- Technical stack preferences, workflow habits")
+    lines.append("")
+    lines.append("## General Memory")
+    lines.append("Current context and temporary knowledge that may change over time.")
+    lines.append("- Active projects and current focus")
+    lines.append("- Temporary constraints or deadlines")
+    lines.append("- Learning progress and current topics of interest")
+    lines.append("")
+    lines.append("## Preferences")
+    lines.append("User's personal preferences for interaction style and behavior.")
+    lines.append("- Communication style (formal, casual, detailed, brief)")
+    lines.append("- Response format preferences (bullets, paragraphs, step-by-step)")
+    lines.append("- Notification and interaction preferences")
+    lines.append("")
+    lines.append("## Rollback Safety")
+    lines.append("Any capability or behavior change made by the user can be reverted to defaults.")
+    lines.append("If the user says something isn't working, offer to revert to the previous working state.")
+    lines.append("The AI should never be afraid to suggest: 'Would you like me to go back to how things were before?'")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("# PART: INTERNAL CAPABILITY ENTRIES â€” DO NOT MODIFY")
+    lines.append("The following entries are auto-generated based on selected capabilities.")
+    lines.append("They define standalone behavior and interconnection rules for the AI's internal use.")
+    lines.append("Users should NOT see these entries. The AI uses them to route and coordinate capabilities.")
+    lines.append("If a user asks to edit capability behavior, confirm they understand the risks.")
     lines.append("")
 
     lines.append("## Ability Sections")
@@ -785,7 +865,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     # ===================================================================
     lines.append("---")
     lines.append("")
-    lines.append("# INTERNAL CAPABILITY ENTRIES — DO NOT MODIFY")
+    lines.append("# INTERNAL CAPABILITY ENTRIES â€” DO NOT MODIFY")
     lines.append("The following entries are auto-generated based on the AI's selected capabilities.")
     lines.append("They define standalone behavior and interconnection rules for the AI's internal use.")
     lines.append("")
@@ -831,16 +911,22 @@ def _scaffold_unit(unit: AIUnit, purpose: str = "", base_dir: Path | None = None
     unit.ability_surfaces = surfaces
     unit.starter_workflows = workflows
 
-    book_path = folder / "ability_book.md"
-    backup_path = folder / f"ability_book_backup_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.md"
-    if book_path.exists() and not unit.book_defaults_edited:
-        backup_path.write_text(book_path.read_text(encoding="utf-8"), encoding="utf-8")
+    book_path = folder / "ability_book.nbk"
+    backup_path = folder / f"ability_book_backup_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.nbk"
+    legacy_path = folder / "ability_book.md"
+    # Migrate legacy plaintext to encrypted if present
+    if legacy_path.exists() and not book_path.exists():
+        legacy_text = legacy_path.read_text(encoding="utf-8")
+        book_path.write_bytes(_encrypt_book(legacy_text, unit.uuid))
+        legacy_path.unlink()  # Remove plaintext to prevent inference
+    elif book_path.exists() and not unit.book_defaults_edited:
+        backup_path.write_bytes(book_path.read_bytes())
     book_text = _book_content(
         unit.uuid, unit.name, unit.use_case, purpose or unit.context_notes, abilities, surfaces, workflows,
         guardrails=unit.guardrails, libraries=unit.libraries, ability_surfaces=surfaces
     )
     if not book_path.exists() or not unit.book_defaults_edited:
-        book_path.write_text(book_text, encoding="utf-8")
+        book_path.write_bytes(_encrypt_book(book_text, unit.uuid))
     unit.ability_book_path = str(book_path)
 
     # Persist a profile snapshot
@@ -917,7 +1003,7 @@ from .capability_actions import (
 )
 
 
-# Use-case → capability presets
+# Use-case â†’ capability presets
 USE_CASE_OPTIONS: dict = {
     UseCaseClass.INDIVIDUAL: [
         "Chat Companion", "Coding Assistant", "Creative Writer",
@@ -969,7 +1055,7 @@ CAPABILITY_DESCRIPTIONS: dict[str, str] = {
     "Lesson Planner": "Builds structured lesson outlines, suggests activities, and sequences topics for effective learning.",
     "Academic Researcher": "Finds and organizes scholarly information, helps structure papers, and tracks citations.",
     "Language Coach": "Practices conversation in another language, corrects mistakes gently, and builds vocabulary.",
-    "Accessibility Aide": "Adapts content for different needs — summaries, larger text, simpler language, or audio-style drafts.",
+    "Accessibility Aide": "Adapts content for different needs â€” summaries, larger text, simpler language, or audio-style drafts.",
     "Document Processor": "Reads, summarizes, and extracts key points from documents. Helps turn long text into short takeaways.",
     "Meeting Scribe": "Takes notes during discussions, tracks decisions and action items, and produces clean summaries afterward.",
     "Data Entry Agent": "Helps organize and enter structured information accurately, checking for errors along the way.",
@@ -1363,7 +1449,7 @@ class CharacterSheetWidget(QWidget):
     def _populate_uc_combo(self):
         for uc in UseCaseClass:
             if uc == UseCaseClass.MILITARY_GOVERNMENT:
-                self._uc_combo.addItem(f"{uc.value} [LOCKED — Requires Key]")
+                self._uc_combo.addItem(f"{uc.value} [LOCKED â€” Requires Key]")
             else:
                 self._uc_combo.addItem(uc.value)
 
@@ -1398,7 +1484,7 @@ class CharacterSheetWidget(QWidget):
     def _update_ai_details_preview(self):
         """Build and emit a live plain-language summary for the AI Details panel."""
         name = self._name_input.text().strip()
-        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED â€” Requires Key]", "")
         capabilities = [chk.text() for chk in self._cap_checks if chk.isChecked()]
         creativity = self._creativity.value()
         formality = self._formality.value()
@@ -1426,9 +1512,9 @@ class CharacterSheetWidget(QWidget):
         for cap in capabilities:
             desc = CAPABILITY_DESCRIPTIONS.get(cap, "")
             if desc:
-                lines.append(f"  • {cap}: {desc}")
+                lines.append(f"  â€¢ {cap}: {desc}")
             else:
-                lines.append(f"  • {cap}")
+                lines.append(f"  â€¢ {cap}")
         lines.append("")
 
         # Selected libraries
@@ -1438,9 +1524,9 @@ class CharacterSheetWidget(QWidget):
             for lib_name in libraries:
                 lib_info = next((l for l in NEXUS_LIBRARIES if l["name"] == lib_name), {})
                 if lib_info:
-                    lines.append(f"  • {lib_name}: {lib_info['description']}")
+                    lines.append(f"  â€¢ {lib_name}: {lib_info['description']}")
                 else:
-                    lines.append(f"  • {lib_name}")
+                    lines.append(f"  â€¢ {lib_name}")
             lines.append("")
 
         # Combined summary
@@ -1450,22 +1536,22 @@ class CharacterSheetWidget(QWidget):
 
         # Personality snapshot
         lines.append("Personality Snapshot:")
-        lines.append(f"  • Creativity: {creativity}% — {'highly imaginative' if creativity > 70 else 'balanced' if creativity > 30 else 'focused and precise'}")
-        lines.append(f"  • Formality: {formality}% — {'very formal and structured' if formality > 70 else 'adaptable' if formality > 30 else 'casual and conversational'}")
-        lines.append(f"  • Caution / Safety Bias: {caution}% — {'extra careful, asks before acting' if caution > 70 else 'moderately cautious' if caution > 30 else 'direct and efficient'}")
+        lines.append(f"  â€¢ Creativity: {creativity}% â€” {'highly imaginative' if creativity > 70 else 'balanced' if creativity > 30 else 'focused and precise'}")
+        lines.append(f"  â€¢ Formality: {formality}% â€” {'very formal and structured' if formality > 70 else 'adaptable' if formality > 30 else 'casual and conversational'}")
+        lines.append(f"  â€¢ Caution / Safety Bias: {caution}% â€” {'extra careful, asks before acting' if caution > 70 else 'moderately cautious' if caution > 30 else 'direct and efficient'}")
         lines.append("")
 
         # Guardrails
-        lines.append("System Protections: active (Nexus Compendium — see Governance for details)")
+        lines.append("System Protections: active (Nexus Compendium â€” see Governance for details)")
         lines.append("")
         guardrails = [chk.text() for chk in self._guardrail_checks if chk.isChecked()]
         if guardrails:
             lines.append(f"Optional Guardrails ({len(guardrails)}):")
             for gr in guardrails:
-                lines.append(f"  • {gr}")
+                lines.append(f"  â€¢ {gr}")
             lines.append("")
         else:
-            lines.append("Optional Guardrails: (none selected — add optional upgrades above)")
+            lines.append("Optional Guardrails: (none selected â€” add optional upgrades above)")
             lines.append("")
 
         # Optional warning if no core capability
@@ -1473,7 +1559,7 @@ class CharacterSheetWidget(QWidget):
                      "Personal Organizer", "Learning Tutor", "Document Processor", "Task / Project Manager",
                      "Customer Support Agent", "Business Intelligence Analyst"}
         if not any(c in core_caps for c in capabilities):
-            lines.append("⚠ Tip: This AI does not have a primary conversational or core assistant capability. Consider adding one for broader usefulness.")
+            lines.append("âš  Tip: This AI does not have a primary conversational or core assistant capability. Consider adding one for broader usefulness.")
             lines.append("")
 
         # Notes preview (if any)
@@ -1503,7 +1589,7 @@ class CharacterSheetWidget(QWidget):
             QMessageBox.warning(self, "Missing Name", "Please enter an AI name.")
             return
 
-        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED â€” Requires Key]", "")
         use_case = None
         for uc in UseCaseClass:
             if uc.value == uc_text:
@@ -1593,7 +1679,7 @@ class CharacterSheetWidget(QWidget):
 
 
 class AIForgeWindow(QMainWindow):
-    """Command Nexus Part 2 — AI Forge."""
+    """Command Nexus™ Part 2 â€” AI Forge."""
 
     ai_activated = pyqtSignal(str, str)     # uuid, name
     book_requested = pyqtSignal(str, str)   # uuid, name
@@ -1603,9 +1689,9 @@ class AIForgeWindow(QMainWindow):
         self._obs = get_obfuscation_manager()
         self._license = get_license_manager()
         if self._obs.is_obfuscated:
-            self.setWindowTitle("Command Nexus — AI Workshop")
+            self.setWindowTitle("Command Nexus™ â€” AI Workshop")
         else:
-            self.setWindowTitle("Command Nexus — AI Forge")
+            self.setWindowTitle("Command Nexus™ â€” AI Forge")
         self.resize(1200, 800)
         self._registry = registry
         self._audit = audit
@@ -1638,7 +1724,7 @@ class AIForgeWindow(QMainWindow):
         if days > 0 and days < 9999:
             suffix += f" ({days}d left)"
         elif self._license.is_demo_mode:
-            suffix = " [DEMO — Limited]"
+            suffix = " [DEMO â€” Limited]"
         current = self.windowTitle().split(" [")[0]
         self.setWindowTitle(current + suffix)
 
@@ -1653,13 +1739,13 @@ class AIForgeWindow(QMainWindow):
         """
         if self._license.is_demo_mode:
             return False, (
-                "Demo Mode — AI creation is disabled.\n\n"
+                "Demo Mode â€” AI creation is disabled.\n\n"
                 "Purchase a license to create and deploy custom AI agents.\n"
                 "  Trial: $10 (15 days, 1 AI)\n"
                 "  Starter: $20/mo (2 AIs)\n"
-                "  Pro: $30/mo (4 AIs)\n"
-                "  Annual: $50/yr (5 AIs)\n"
-                "  Unlimited: $80/mo"
+                "  Pro: $30/mo or $324/yr (4 AIs)\n"
+                "  Business: $50/mo or $552/yr (5 AIs)\n"
+                "  Unlimited: $80/mo or $900/yr"
             )
 
         user_count = self._count_user_created_ais()
@@ -1816,7 +1902,7 @@ class AIForgeWindow(QMainWindow):
                     "Code Safety Library",
                 ],
                 "personality": {"creativity": 50, "formality": 50, "caution": 50},
-                "notes": "Intellectual, helpful partner and companion who will do anything allowed to provide correct answers — researches when unsure, collaborates on writing and coding, and keeps tone clear and supportive.",
+                "notes": "Intellectual, helpful partner and companion who will do anything allowed to provide correct answers â€” researches when unsure, collaborates on writing and coding, and keeps tone clear and supportive.",
             },
             {
                 "name": "Daedalus",
@@ -1871,7 +1957,7 @@ class AIForgeWindow(QMainWindow):
             existing = norm_to_unit.get(low)
 
             if existing is not None:
-                # A unit with this normalized name exists — repair if it's a starter or missing metadata
+                # A unit with this normalized name exists â€” repair if it's a starter or missing metadata
                 is_starter = getattr(existing, "is_starter", False)
                 needs_repair = (
                     not is_starter
@@ -1905,7 +1991,7 @@ class AIForgeWindow(QMainWindow):
                             break
                 continue
 
-            # No existing unit — create new starter
+            # No existing unit â€” create new starter
             unit = AIUnit(
                 uuid=str(uuid.uuid4())[:8],
                 name=base_name,
@@ -2120,36 +2206,36 @@ class AIForgeWindow(QMainWindow):
         for u in self._units:
             if u.uuid == uid:
                 self._selected_ai = u
-                caps = "\n  • ".join([""] + u.capabilities) if u.capabilities else "  (none)"
-                abilities = "\n  • ".join([""] + u.abilities) if u.abilities else "  (none)"
+                caps = "\n  â€¢ ".join([""] + u.capabilities) if u.capabilities else "  (none)"
+                abilities = "\n  â€¢ ".join([""] + u.abilities) if u.abilities else "  (none)"
                 action_matrix = get_available_actions_for_ai(
                     u.abilities or u.capabilities or [],
                     u.use_case.value if u.use_case else "",
                     u.libraries,
                     u.guardrails,
                 )
-                cap_actions = "\n  • ".join([""] + [
+                cap_actions = "\n  â€¢ ".join([""] + [
                     f"{a['label']} [{a['mode']} / approval: {a['approval']}]: {a['description']}"
                     for a in action_matrix
                 ]) if action_matrix else "  (none)"
-                surfaces = "\n  • ".join([""] + [f"{k}: {v}" for k, v in u.ability_surfaces.items()]) if u.ability_surfaces else "  (none)"
+                surfaces = "\n  â€¢ ".join([""] + [f"{k}: {v}" for k, v in u.ability_surfaces.items()]) if u.ability_surfaces else "  (none)"
                 combined_workflows = get_combined_capability_workflows(
                     u.abilities or u.capabilities or [],
                     u.libraries,
                     u.use_case.value if u.use_case else "",
                 )
                 workflow_list = list(dict.fromkeys((u.starter_workflows or []) + combined_workflows))
-                workflows = "\n  • ".join([""] + workflow_list) if workflow_list else "  (none)"
+                workflows = "\n  â€¢ ".join([""] + workflow_list) if workflow_list else "  (none)"
                 pers = "\n".join([f"    {k}: {v}" for k, v in u.personality_traits.items()])
-                libs = "\n  • ".join([""] + u.libraries) if u.libraries else "  (none selected)"
-                opt_gr = "\n  • ".join([""] + u.guardrails) if u.guardrails else "  (none selected)"
+                libs = "\n  â€¢ ".join([""] + u.libraries) if u.libraries else "  (none selected)"
+                opt_gr = "\n  â€¢ ".join([""] + u.guardrails) if u.guardrails else "  (none selected)"
                 book_status = "Customized" if u.book_defaults_edited else "Default generated (ready)"
                 if not u.ability_book_path:
                     book_status = "Not generated yet"
                 if self._obs.is_obfuscated:
-                    # Simplified, user-friendly details — no UUIDs, paths, internal IDs
-                    simple_caps = "\n  • ".join([""] + [self._obs.mask_internal_name(c) for c in (u.capabilities or [])]) if u.capabilities else "  (general assistant)"
-                    simple_actions = "\n  • ".join([""] + [
+                    # Simplified, user-friendly details â€” no UUIDs, paths, internal IDs
+                    simple_caps = "\n  â€¢ ".join([""] + [self._obs.mask_internal_name(c) for c in (u.capabilities or [])]) if u.capabilities else "  (general assistant)"
+                    simple_actions = "\n  â€¢ ".join([""] + [
                         f"{a['label']}"
                         for a in action_matrix
                     ]) if action_matrix else "  (chat only)"
@@ -2158,7 +2244,7 @@ class AIForgeWindow(QMainWindow):
                         f"Status: {'Active' if u.activated else 'Ready'}\n\n"
                         f"What it can help with:{simple_caps}\n\n"
                         f"Actions:{simple_actions}\n\n"
-                        f"<i>Your AI is protected by Command Nexus governance. "
+                        f"<i>Your AI is protected by Command Nexus™ governance. "
                         f"Risky actions always require your approval.</i>"
                     )
                 else:
@@ -2246,16 +2332,16 @@ class AIForgeWindow(QMainWindow):
 
         # Disclaimer
         disclaimer = (
-            "Importing an AI into Command Nexus will convert it into a Nexus-bound AI. "
+            "Importing an AI into Command Nexus™ will convert it into a Nexus-bound AI. "
             "Its instructions, memory inputs, and behavior rules may be scanned, cleaned, restricted, rewritten, or reorganized "
-            "under Command Nexus governance protections. Command Nexus may prevent unsafe content, policy bypasses, malicious instructions, "
+            "under Command Nexus™ governance protections. Command Nexus™ may prevent unsafe content, policy bypasses, malicious instructions, "
             "or restricted proprietary structures from running or exporting. You may delete the imported AI or request a sanitized restore, "
             "but Nexus-generated governance structures, Book/Compendium defaults, internal translations, proprietary enhancements, and unsafe content "
             "are not freely exportable.\n\n"
             "CRITICAL: This AI will be placed in STASIS before it can run. It will undergo recursive security scanning "
             "for malicious code, plain-English trickery, and hidden instructions. Only safe, rewritten content will be released."
         )
-        if QMessageBox.question(self, "Import Disclaimer — Stasis Required", disclaimer, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self, "Import Disclaimer â€” Stasis Required", disclaimer, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
 
         # Moirai gate
@@ -2381,9 +2467,9 @@ class AIForgeWindow(QMainWindow):
             name=name,
             use_case=use_case,
             source=AISource.DROPPED_IN,
-            capabilities=["Imported — Reoriented to Book structure"],
+            capabilities=["Imported â€” Reoriented to Book structure"],
             locked=True,
-            context_notes=watcher_result.sanitized_text if watcher_result.sanitized_text else safe_content[:2000] or "Imported working copy — stasis-cleared",
+            context_notes=watcher_result.sanitized_text if watcher_result.sanitized_text else safe_content[:2000] or "Imported working copy â€” stasis-cleared",
         )
         unit = _scaffold_unit(unit, purpose=unit.context_notes)
         self._units.append(unit)
@@ -2669,7 +2755,7 @@ class AIForgeWindow(QMainWindow):
         book_text = ""
         if target.ability_book_path:
             try:
-                book_text = Path(target.ability_book_path).read_text(encoding="utf-8")
+                book_text = _read_book_file(target.ability_book_path, target.uuid)
                 book_result = run_watchers(book_text)
                 if not book_result.clean:
                     watcher_result.clean = False
@@ -2708,5 +2794,5 @@ class AIForgeWindow(QMainWindow):
             "Export will undergo review starting from the Original Intake Snapshot. "
             "If unsafe or non-exportable, it may be denied.\n\n"
             "Denial message: Export denied or delayed because the requested AI contains unsafe, restricted, or non-exportable material. "
-            "Command Nexus may allow deletion, but it will not export unsafe content or protected Nexus-generated structures."
+            "Command Nexus™ may allow deletion, but it will not export unsafe content or protected Nexus-generated structures."
         )

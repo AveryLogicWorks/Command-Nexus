@@ -1,5 +1,6 @@
 import uuid
 import re
+import copy
 from pathlib import Path
 from datetime import datetime
 
@@ -337,20 +338,17 @@ class GoalDiscoveryDialog(QDialog):
 
 
 class BookWindow(QMainWindow):
-    """Command Nexus Part 3 — The Book (Compendium of Truth)."""
+    """Command Nexus™ Part 3 — The Book (Compendium of Truth)."""
 
     book_saved = pyqtSignal(str, str)  # ai_uuid, ai_name
     defaults_edited = pyqtSignal(str, bool)  # ai_uuid, edited
+    command_to_ai = pyqtSignal(str)  # command text — routed to AI, memory NEVER included
 
     def __init__(self, registry=None, audit=None):
         super().__init__()
         self._obs = get_obfuscation_manager()
-        if self._obs.is_obfuscated:
-            self.setWindowTitle("Command Nexus — AI Guidance")
-            self.resize(700, 650)
-        else:
-            self.setWindowTitle("Command Nexus — The Book (Compendium of Truth)")
-            self.resize(1400, 900)
+        self.setWindowTitle("Command Nexus™ — AI Book")
+        self.resize(1200, 800)
         self._registry = registry
         self._audit = audit
         self._governance = GovernanceEngine()
@@ -371,14 +369,25 @@ class BookWindow(QMainWindow):
 
     def open_for_ai(self, ai_uuid: str, ai_name: str):
         """Open or create The Book for a specific AI."""
+        # If cached book exists but name mismatch, regenerate to avoid stale data
+        existing = self._books.get(ai_uuid)
+        if existing is not None and existing.ai_name != ai_name:
+            del self._books[ai_uuid]
+            existing = None
         self._current_ai_uuid = ai_uuid
-        if ai_uuid not in self._books:
+        if existing is None:
             self._books[ai_uuid] = self._create_book_for_ai(ai_uuid, ai_name)
-        self._book_title.setText(f"Book: {ai_name} ({ai_uuid})")
+        self._book_title.setText(f"Book: {ai_name}")
         self._refresh_tree()
         self._clear_editor()
-        self._default_status.setText("[Default Generated — Edit with caution]")
-        self._default_warning.setVisible(True)
+        if hasattr(self, "_default_status"):
+            self._default_status.setText("[Default Generated — Edit with caution]")
+        if hasattr(self, "_default_warning"):
+            self._default_warning.setVisible(True)
+        # Update layered UI
+        if hasattr(self, "_avatar_name"):
+            self._avatar_name.setText(ai_name)
+        self._refresh_running_memory()
         self.show()
         self.raise_()
 
@@ -405,42 +414,300 @@ class BookWindow(QMainWindow):
         self._book_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #58a6ff;")
         toolbar.addWidget(self._book_title)
 
-        if not self._obs.is_obfuscated:
-            btn_new = QPushButton("New Book")
-            btn_new.clicked.connect(self._new_book)
-            toolbar.addWidget(btn_new)
-
-            btn_save = QPushButton("Save Book")
-            btn_save.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
-            btn_save.clicked.connect(self._save_book)
-            toolbar.addWidget(btn_save)
-
-            btn_export_py = QPushButton("Export Python")
-            btn_export_py.clicked.connect(self._export_python)
-            toolbar.addWidget(btn_export_py)
-
-            btn_add_node = QPushButton("+ Add Node")
-            btn_add_node.clicked.connect(self._add_node_dialog)
-            toolbar.addWidget(btn_add_node)
-
-            btn_del_node = QPushButton("- Delete Node")
-            btn_del_node.clicked.connect(self._delete_node)
-            toolbar.addWidget(btn_del_node)
+        btn_save = QPushButton("Save Book")
+        btn_save.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
+        btn_save.clicked.connect(self._save_book)
+        toolbar.addWidget(btn_save)
 
         btn_book_ai = QPushButton("Talk to Book Keeper")
         btn_book_ai.setStyleSheet("background-color: #5e35b1; color: white; font-weight: bold;")
         btn_book_ai.clicked.connect(self._open_book_ai_dialog)
         toolbar.addWidget(btn_book_ai)
 
+        # Founder/internal mode: expose legacy editor
+        btn_legacy = QPushButton("Legacy Editor")
+        btn_legacy.setStyleSheet("background-color: #30363d; color: #8b949e;")
+        btn_legacy.clicked.connect(self._toggle_legacy_editor)
+        toolbar.addWidget(btn_legacy)
+
         toolbar.addStretch()
         main_layout.addLayout(toolbar)
 
-        if self._obs.is_obfuscated:
-            # Obfuscated mode: hide all internal structure, show friendly guidance panel
-            self._setup_obfuscated_ui(main_layout)
+        # SECURE LAYERED UI — default for all users
+        self._setup_secure_layered_ui(main_layout)
+
+    def _toggle_legacy_editor(self):
+        """Toggle between secure layered view and legacy full editor."""
+        if hasattr(self, "_legacy_widget") and self._legacy_widget.isVisible():
+            self._legacy_widget.hide()
+            self._layered_widget.show()
         else:
-            # Normal mode: full tree + editor + references
-            self._setup_full_editor_ui(main_layout)
+            if not hasattr(self, "_legacy_widget"):
+                self._legacy_widget = QWidget()
+                legacy_layout = QVBoxLayout(self._legacy_widget)
+                self._setup_full_editor_ui(legacy_layout)
+                self._central_layout.addWidget(self._legacy_widget)
+            self._layered_widget.hide()
+            self._legacy_widget.show()
+
+    def _setup_secure_layered_ui(self, main_layout):
+        """
+        INFERENCE LAYER — SECURE BOOK UI
+        ==================================
+        The AI is the inference engine. It reads the raw Book internally
+        but NEVER exposes the internal structure. What the user sees is
+        a distilled summary — the AI's "Running Memory".
+
+        Left  = Running Memory (AI-summarized from Book, visible to user)
+        Center = AI Avatar / Inference Engine
+        Right = Persistent Memory (user private, NEVER to AI)
+        Bottom = Two restricted inputs only
+
+        GUARDRAILS:
+        - Raw book structure is NEVER shown to user or AI surface
+        - AI summarizes book into Running Memory (human-readable)
+        - Memory content is NEVER included in AI chat context
+        - AI cannot infer raw book structure from memory
+        """
+        self._central_layout = main_layout
+        self._layered_widget = QWidget()
+        layered_layout = QVBoxLayout(self._layered_widget)
+        layered_layout.setContentsMargins(0, 0, 0, 0)
+        layered_layout.setSpacing(6)
+
+        # ── Three-column splitter: Running Memory | Avatar | Persistent Memory ──
+        top_splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # ── LEFT: Running Memory (AI-Summarized) ──
+        running_widget = QWidget()
+        running_layout = QVBoxLayout(running_widget)
+        running_layout.setContentsMargins(4, 4, 4, 4)
+        running_hdr = QLabel("RUNNING MEMORY — AI Summarized")
+        running_hdr.setStyleSheet("font-size: 12px; font-weight: bold; color: #58a6ff; padding: 4px;")
+        running_layout.addWidget(running_hdr)
+
+        running_sub = QLabel("The AI reads the Book internally and distills what it knows here. Raw structure is hidden.")
+        running_sub.setStyleSheet("font-size: 10px; color: #8b949e; padding-bottom: 4px;")
+        running_sub.setWordWrap(True)
+        running_layout.addWidget(running_sub)
+
+        self._running_memory = QTextEdit()
+        self._running_memory.setReadOnly(True)
+        self._running_memory.setPlaceholderText(
+            "AI will summarize what it knows from the Book here.\n"
+            "No raw rules, no internal structure — only what the AI distilled for you."
+        )
+        self._running_memory.setStyleSheet(
+            "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
+        )
+        running_layout.addWidget(self._running_memory)
+        top_splitter.addWidget(running_widget)
+
+        # ── CENTER: AI Avatar / Inference Engine ──
+        avatar_widget = QWidget()
+        avatar_layout = QVBoxLayout(avatar_widget)
+        avatar_layout.setContentsMargins(4, 4, 4, 4)
+        avatar_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._avatar_label = QLabel("◉")
+        self._avatar_label.setStyleSheet(
+            "font-size: 64px; color: #58a6ff; background: #161b22; border-radius: 50%; padding: 20px;"
+        )
+        self._avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar_layout.addWidget(self._avatar_label)
+
+        self._avatar_name = QLabel("Inference Engine")
+        self._avatar_name.setStyleSheet("font-size: 14px; font-weight: bold; color: #c9d1d9;")
+        self._avatar_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar_layout.addWidget(self._avatar_name)
+
+        avatar_desc = QLabel("Reads Book → Summarizes → Two lanes")
+        avatar_desc.setStyleSheet("font-size: 10px; color: #8b949e; padding: 4px;")
+        avatar_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar_layout.addWidget(avatar_desc)
+
+        avatar_guard = QLabel("🔒 Raw Book Structure Hidden")
+        avatar_guard.setStyleSheet("font-size: 10px; color: #3fb950; padding: 4px;")
+        avatar_guard.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar_layout.addWidget(avatar_guard)
+        avatar_layout.addStretch()
+        top_splitter.addWidget(avatar_widget)
+
+        # ── RIGHT: Persistent Memory (Private) ──
+        memory_widget = QWidget()
+        memory_layout = QVBoxLayout(memory_widget)
+        memory_layout.setContentsMargins(4, 4, 4, 4)
+        memory_hdr = QLabel("PERSISTENT MEMORY — Private")
+        memory_hdr.setStyleSheet("font-size: 12px; font-weight: bold; color: #d29922; padding: 4px;")
+        memory_layout.addWidget(memory_hdr)
+
+        memory_sub = QLabel("Never sent to AI. For your notes, reminders, and instructions.")
+        memory_sub.setStyleSheet("font-size: 10px; color: #8b949e; padding-bottom: 4px;")
+        memory_sub.setWordWrap(True)
+        memory_layout.addWidget(memory_sub)
+
+        self._memory_edit = QTextEdit()
+        self._memory_edit.setPlaceholderText(
+            "Type persistent memory here...\n"
+            "e.g., 'Always remind me to check email at 9am'\n"
+            "This memory is PRIVATE and never exposed to the AI."
+        )
+        self._memory_edit.setStyleSheet(
+            "background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
+        )
+        memory_layout.addWidget(self._memory_edit)
+
+        self._memory_status = QLabel("🔒 Memory is PRIVATE — AI cannot access")
+        self._memory_status.setStyleSheet("font-size: 10px; color: #3fb950; padding: 4px;")
+        memory_layout.addWidget(self._memory_status)
+        top_splitter.addWidget(memory_widget)
+
+        # Set splitter proportions: running 40%, avatar 20%, memory 40%
+        top_splitter.setSizes([480, 240, 480])
+        layered_layout.addWidget(top_splitter, stretch=1)
+
+        # ── BOTTOM: Two Inputs Only ──
+        input_frame = QWidget()
+        input_frame.setStyleSheet("background: #161b22; border-top: 1px solid #30363d; padding: 8px;")
+        input_layout = QVBoxLayout(input_frame)
+        input_layout.setContentsMargins(8, 8, 8, 8)
+        input_layout.setSpacing(6)
+
+        # Input 1: Memory Entry
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("Memory Entry:"))
+        self._memory_input = QLineEdit()
+        self._memory_input.setPlaceholderText("Quick memory note (press Enter to add to persistent memory)...")
+        self._memory_input.returnPressed.connect(self._add_quick_memory)
+        row1.addWidget(self._memory_input)
+        input_layout.addLayout(row1)
+
+        # Input 2: Command to AI
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("Command to AI:"))
+        self._command_input = QLineEdit()
+        self._command_input.setPlaceholderText("Type command here — this is what the AI sees and responds to...")
+        self._command_input.returnPressed.connect(self._send_command_to_ai)
+        row2.addWidget(self._command_input)
+        input_layout.addLayout(row2)
+
+        # Guardrail banner
+        guard_banner = QLabel(
+            "🔒 GUARDRAIL: AI receives ONLY the 'Command to AI' text. Memory is NEVER sent. Raw Book is NEVER exposed."
+        )
+        guard_banner.setStyleSheet("font-size: 10px; color: #3fb950; padding-top: 4px;")
+        guard_banner.setWordWrap(True)
+        input_layout.addWidget(guard_banner)
+
+        layered_layout.addWidget(input_frame)
+        main_layout.addWidget(self._layered_widget, stretch=1)
+
+    def _add_quick_memory(self):
+        """Add a quick note from the input line to persistent memory."""
+        text = self._memory_input.text().strip()
+        if not text:
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        self._memory_edit.append(f"[{timestamp}] {text}")
+        self._memory_input.clear()
+        # Audit log the memory addition (private, not sent to AI)
+        if self._audit:
+            self._audit.log_event("BOOK_MEMORY_ADDED", f"Private memory entry added for AI {self._current_ai_uuid}")
+
+    def _send_command_to_ai(self):
+        """
+        Send command to AI.
+        ONLY the command_input text is sent. Memory is NEVER included.
+        GUARDRAIL: This signal is connected in main.py to the router.
+        Memory content is NEVER attached to the command.
+        """
+        command = self._command_input.text().strip()
+        if not command:
+            return
+        # Audit: log command sent (without memory content)
+        if self._audit:
+            self._audit.log_event("BOOK_COMMAND_SENT", f"AI: {self._current_ai_uuid}")
+        # Emit signal — main.py connects this to the AI router
+        # Memory is NEVER included. Only the command text.
+        self.command_to_ai.emit(command)
+        self._command_input.clear()
+
+    def _refresh_running_memory(self):
+        """
+        INFERENCE LAYER: Generate AI-summarized Running Memory from the raw Book.
+        The AI reads the book internally and distills it into human-readable summary.
+        Raw book structure (nodes, IDs, guardrails, restricted actions) is NEVER exposed.
+        """
+        if not self._current_book:
+            self._running_memory.setPlainText("No book loaded. Open an AI from the Forge.")
+            return
+
+        # Build a distilled summary — the "inference" of what the AI knows
+        # WITHOUT exposing internal structure, guardrails, or raw content
+        lines = []
+        lines.append(f"🧠 {self._current_book.title_page.ai_name}")
+        lines.append(f"Purpose: {self._current_book.title_page.purpose}")
+        lines.append("")
+
+        # Extract surface-level themes from the book (no internal IDs, no raw rules)
+        # This is what the AI distilled for the user — not the raw book
+        themes = []
+        has_restrictions = False
+        for node in self._current_book.get_all_nodes():
+            title_lower = node.title.lower()
+            if "restricted" in title_lower or "approval" in title_lower or "guardrail" in title_lower:
+                has_restrictions = True
+                continue  # Skip raw guardrails — AI summarizes these as "careful about X"
+            if "allowed" in title_lower:
+                if node.content:
+                    for line in node.content.splitlines():
+                        clean = line.lstrip("-• ").strip()
+                        if clean and len(clean) > 3:
+                            themes.append(f"✓ Can help with: {clean}")
+            elif "workflow" in title_lower or "quickstart" in title_lower:
+                if node.content:
+                    for line in node.content.splitlines():
+                        clean = line.lstrip("-• 0123456789). ").strip()
+                        if clean and len(clean) > 3:
+                            themes.append(f"→ Approach: {clean}")
+            elif "capability" in title_lower:
+                if node.content:
+                    for line in node.content.splitlines():
+                        clean = line.lstrip("-• ").strip()
+                        if clean and len(clean) > 3:
+                            themes.append(f"📌 Skill: {clean}")
+
+        # Summarize restrictions into a single line (no raw detail)
+        if has_restrictions:
+            lines.append("⚠️  This AI has safety boundaries. It will ask before risky actions.")
+            lines.append("")
+
+        # Show distilled themes (no raw rules, no internal IDs)
+        if themes:
+            lines.append("What I know how to do:")
+            for t in themes[:12]:  # Cap at 12 to avoid info overload
+                lines.append(f"  {t}")
+        else:
+            lines.append("I'm a general-purpose assistant. Ask me anything within my scope.")
+
+        lines.append("")
+        lines.append("💡 Tip: Use the 'Command to AI' box below to give me tasks.")
+
+        self._running_memory.setPlainText("\n".join(lines))
+
+    def _node_depth(self, target_node: BookNode, current=None, depth=0) -> int:
+        """Find depth of a node in the book tree."""
+        if current is None:
+            if not self._current_book:
+                return 0
+            current = self._current_book.root
+        if current.id == target_node.id:
+            return depth
+        for child in current.children:
+            result = self._node_depth(target_node, child, depth + 1)
+            if result > 0:
+                return result
+        return 0
 
     def _setup_obfuscated_ui(self, main_layout):
         """When obfuscation is on, show only a friendly guidance surface."""
@@ -636,7 +903,7 @@ class BookWindow(QMainWindow):
 
     def _create_book_for_ai(self, ai_uuid: str, ai_name: str) -> BookInstance:
         """Create a default Book structure for a specific AI using metadata from the registry."""
-        meta = self._registry.get(ai_uuid) if self._registry else {}
+        meta = (self._registry.get(ai_uuid) if self._registry else {}) or {}
         abilities = meta.get("abilities", [])
         libraries = meta.get("libraries", [])
         use_case = meta.get("use_case", "Individual")
@@ -783,9 +1050,10 @@ class BookWindow(QMainWindow):
             content=f"Identify yourself as '{ai_name}' when asked.",
             tags=["default_generated"]
         ))
+        purpose_text = context_notes if context_notes else "Assist within described context; respect approvals."
         ch1.children.append(BookNode(
             id="ch1s2", node_type=BookNodeType.SECTION, title="Section 2: Purpose",
-            content=f"Use-Case Class: {use_case}\nPurpose: Assist within described context; respect approvals.",
+            content=f"Use-Case Class: {use_case}\nAI Name: {ai_name}\nPurpose: {purpose_text}",
             tags=["default_generated"]
         ))
         if libraries:
@@ -1150,32 +1418,64 @@ class BookWindow(QMainWindow):
         if not book:
             return
 
-        # Find or create a "User Intent" chapter to hold the conversational data
-        user_intent_ch = None
+        # Store a snapshot of current state for rollback capability
+        self._store_book_snapshot(ai_uuid, book)
+
+        # Find or create the "Active Memory" part to hold user-defined content
+        active_memory_part = None
         for child in book.root.children:
-            if child.title == "User Intent (Book AI)":
-                user_intent_ch = child
+            if child.title == "Part: Active Memory (User-Defined)":
+                active_memory_part = child
                 break
 
-        if not user_intent_ch:
-            user_intent_ch = BookNode(
-                id="user_intent", node_type=BookNodeType.CHAPTER,
-                title="User Intent (Book AI)",
+        if not active_memory_part:
+            active_memory_part = BookNode(
+                id="active_memory", node_type=BookNodeType.PART,
+                title="Part: Active Memory (User-Defined)",
             )
-            book.root.children.append(user_intent_ch)
+            book.root.children.append(active_memory_part)
 
-        user_intent_ch.children.clear()
+        # Clear existing user-defined sections and rebuild with proper structure
+        active_memory_part.children.clear()
+
+        # Map content keys to human-friendly chapter titles
+        chapter_map = {
+            "active_instructions": ("Chapter: Active Instructions", "How this AI should behave when running. These are live instructions."),
+            "persistent_memory": ("Chapter: Persistent Memory", "Long-term facts and knowledge that should always be remembered."),
+            "general_memory": ("Chapter: General Memory", "Current context and temporary knowledge that may change over time."),
+            "preferences": ("Chapter: Preferences", "User's personal preferences for interaction style and behavior."),
+            "guardrails": ("Chapter: Boundaries", "Hard rules and things this AI must never do."),
+            "purpose": ("Chapter: Purpose & Role", "The primary purpose and intended role of this AI."),
+            "audience": ("Chapter: Audience", "Who this AI is designed to help and work with."),
+        }
+
         for key, value in content.items():
-            if value:
-                sec = BookNode(
-                    id=f"user_intent_{key}",
-                    node_type=BookNodeType.SECTION,
-                    title=key.capitalize(),
-                    content=value,
-                    tags=["book_ai_generated"],
-                )
-                user_intent_ch.children.append(sec)
+            if not value:
+                continue
+            title, description = chapter_map.get(key, (f"Chapter: {key.capitalize()}", ""))
+            ch = BookNode(
+                id=f"active_{key}",
+                node_type=BookNodeType.CHAPTER,
+                title=title,
+                tags=["book_ai_generated", "user_editable"],
+            )
+            ch.children.append(BookNode(
+                id=f"active_{key}_desc",
+                node_type=BookNodeType.SECTION,
+                title="Description",
+                content=description,
+                tags=["book_ai_generated"],
+            ))
+            ch.children.append(BookNode(
+                id=f"active_{key}_content",
+                node_type=BookNodeType.SECTION,
+                title="Content",
+                content=value,
+                tags=["book_ai_generated", "user_editable"],
+            ))
+            active_memory_part.children.append(ch)
 
+        # Update title page purpose
         if book.title_page and content.get("purpose"):
             book.title_page.purpose = content["purpose"]
 
@@ -1184,12 +1484,19 @@ class BookWindow(QMainWindow):
         # If obfuscated, populate the friendly summary panel
         if self._obs.is_obfuscated and hasattr(self, "_obfuscation_summary"):
             summary_lines = [f"<b>{ai_name}</b> — AI Guidance Summary\n"]
-            for key, value in content.items():
-                if value:
-                    summary_lines.append(f"<b>{key.capitalize()}:</b> {value}")
+            if content.get("purpose"):
+                summary_lines.append(f"<b>What I'm for:</b> {content['purpose']}")
+            if content.get("active_instructions"):
+                summary_lines.append(f"<b>How I should behave:</b> {content['active_instructions']}")
+            if content.get("persistent_memory"):
+                summary_lines.append(f"<b>What I always remember:</b> {content['persistent_memory']}")
+            if content.get("preferences"):
+                summary_lines.append(f"<b>How you like to work:</b> {content['preferences']}")
+            if content.get("guardrails"):
+                summary_lines.append(f"<b>My boundaries:</b> {content['guardrails']}")
             summary_lines.append(
-                "\n<i>The Book Keeper has written these rules into the AI's guidance document. "
-                "The internal structure is hidden for your protection.</i>"
+                "\n<i>The Book Keeper has written these into my memory. "
+                "You can always ask me to go back to how things were before any changes.</i>"
             )
             self._obfuscation_summary.setHtml("<br>".join(summary_lines))
 
@@ -1197,8 +1504,29 @@ class BookWindow(QMainWindow):
         QMessageBox.information(
             self, "Book Updated",
             f"The Book Keeper has written {len([v for v in content.values() if v])} sections into the Book for {ai_name}.\n\n"
-            f"The internal structure remains hidden. The AI will follow these rules."
+            f"Your AI now has active instructions, persistent memory, and preferences.\n"
+            f"The internal structure remains hidden. The AI will follow these rules.\n\n"
+            f"If anything doesn't work right, just ask your AI to revert to defaults."
         )
+
+    def _store_book_snapshot(self, ai_uuid: str, book):
+        """Store a snapshot of the book before user edits, for rollback capability."""
+        if not hasattr(self, '_book_snapshots'):
+            self._book_snapshots = {}
+        # Only store if we haven't stored one yet (first snapshot is the default)
+        if ai_uuid not in self._book_snapshots:
+            import copy
+            self._book_snapshots[ai_uuid] = copy.deepcopy(book)
+
+    def _revert_book_to_defaults(self, ai_uuid: str) -> bool:
+        """Revert a book to its original default snapshot. Returns True if successful."""
+        if not hasattr(self, '_book_snapshots') or ai_uuid not in self._book_snapshots:
+            return False
+        import copy
+        self._books[ai_uuid] = copy.deepcopy(self._book_snapshots[ai_uuid])
+        self._refresh_tree()
+        self._audit_event("book_reverted_to_defaults", msg=f"ai_uuid={ai_uuid}")
+        return True
 
     def _audit_event(self, action: str, msg: str = ""):
         if self._audit:

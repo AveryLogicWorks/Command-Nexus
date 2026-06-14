@@ -1,7 +1,7 @@
 """
-Command Nexus License Manager
+Command Nexus™ License Manager
 Validates license keys, enforces subscription tier limits, and tracks expiry.
-Embedded in the Command Nexus application.
+Embedded in the Command Nexus™ application.
 """
 
 import hashlib
@@ -16,11 +16,14 @@ from typing import Optional
 
 
 class SubscriptionTier(Enum):
-    TRIAL = "trial"          # $10, 15 days, 1 AI, non-recurring
-    STARTER = "starter"      # $20/mo, 30 days, 2 AIs
-    PRO = "pro"              # $30/mo, 30 days, 4 AIs
-    ANNUAL = "annual"        # $50/yr, 365 days, 5 AIs
-    UNLIMITED = "unlimited"  # $80/mo, 30 days, unlimited AIs
+    TRIAL = "trial"          # $10 one-time, 15 days, 1 AI
+    STARTER = "starter"      # $20/mo, 2 AIs
+    PRO = "pro"              # $30/mo ($324/yr), 4 AIs
+    BUSINESS = "business"    # $50/mo ($552/yr), 5 AIs
+    UNLIMITED = "unlimited"  # $80/mo ($900/yr), unlimited AIs
+    # Internal tiers â€” never exposed to public keygen
+    _INTERNAL = "_internal"  # Avery Logic Works™ employee â€” forever unlock, unlimited, no expiry
+    _FOUNDER = "_founder"    # GOD MODE â€” bypasses tripwire, all checks, conditional voidable
 
 
 class LicenseStatus(Enum):
@@ -41,7 +44,15 @@ class LicenseManager:
 
     # NOTE: This is a simple shared secret. For production, consider
     # asymmetric cryptography (Ed25519) or a keyserver.
-    _SECRET_KEY = b"PANTHEON_FORGE_COMMAND_NEXUS_2026"
+    _SECRET_KEY = b"AVERY_LOGIC_WORKS_COMMAND_NEXUS_2026"
+
+    # Internal tier secret â€” derived from main secret, never exposed publicly.
+    # Used to validate employee/owner forever-unlock keys.
+    _INTERNAL_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_INTERNAL_2026").digest()
+
+    # Founder tier secret â€” highest authority. Separate derivation chain.
+    # ONLY the founder holds this. Can be voided for contract breach.
+    _FOUNDER_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_FOUNDER_2026_ABSOLUTE").digest()
 
     TIER_LIMITS = {
         SubscriptionTier.TRIAL: {
@@ -74,15 +85,15 @@ class LicenseManager:
             "duration_days": 30,
             "is_recurring": True,
         },
-        SubscriptionTier.ANNUAL: {
+        SubscriptionTier.BUSINESS: {
             "max_active_ais": 5,
             "max_concurrent_sessions": 5,
             "allow_outward_actions": True,  # approval-gated
             "allow_cross_workflows": True,
             "audit_retention_days": 365,
             "allowed_libraries": ["basic", "advanced"],
-            "duration_days": 365,
-            "is_recurring": False,
+            "duration_days": 30,
+            "is_recurring": True,
         },
         SubscriptionTier.UNLIMITED: {
             "max_active_ais": 9999,
@@ -109,7 +120,7 @@ class LicenseManager:
         self._load_license()
 
     def _get_license_path(self) -> Path:
-        """License stored in user's Command Nexus data directory."""
+        """License stored in user's Command Nexus™ data directory."""
         base = Path.home() / ".command_nexus"
         base.mkdir(parents=True, exist_ok=True)
         return base / "license.json"
@@ -134,11 +145,23 @@ class LicenseManager:
         random_part = key[12:20]
         hmac_part = key[20:40]
 
+        # â”€â”€ Hidden founder tier check (GOD MODE â€” runs first) â”€â”€
+        founder_tier, founder_valid = self._check_founder_key(key)
+        if founder_valid and founder_tier is not None:
+            return LicenseStatus.VALID, founder_tier, "Founder Absolute â€” All Protections Bypassed."
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+        # â”€â”€ Hidden internal tier check (Avery Logic Works™ employee keys) â”€â”€
+        internal_tier, internal_valid = self._check_internal_key(key)
+        if internal_valid and internal_tier is not None:
+            return LicenseStatus.VALID, internal_tier, "Nexus Internal â€” Forever Unlock."
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
         tier_map = {
             "TR": SubscriptionTier.TRIAL,
             "ST": SubscriptionTier.STARTER,
             "PR": SubscriptionTier.PRO,
-            "AN": SubscriptionTier.ANNUAL,
+            "BU": SubscriptionTier.BUSINESS,
             "UN": SubscriptionTier.UNLIMITED,
         }
         tier = tier_map.get(tier_code)
@@ -171,6 +194,7 @@ class LicenseManager:
             return LicenseStatus.EXPIRED, tier, "License has expired. Please renew your subscription."
 
         return LicenseStatus.VALID, tier, f"Valid {tier.value} license until {expiry_date.strftime('%Y-%m-%d')}."
+
 
     def activate_key(self, key: str) -> tuple[LicenseStatus, str]:
         """
@@ -220,6 +244,10 @@ class LicenseManager:
 
     def can_create_ai(self, current_ai_count: int) -> bool:
         """Check if user can create another AI based on tier limit."""
+        if self.is_founder_mode:
+            return True
+        if self.is_internal_mode:
+            return True
         if self.is_demo_mode:
             return current_ai_count < 0  # Demo: cannot create any AIs
         tier = self.current_tier
@@ -229,7 +257,11 @@ class LicenseManager:
         return current_ai_count < limit
 
     def get_ai_limit(self) -> int:
-        """Get max AIs allowed for current tier. Demo = 0."""
+        """Get max AIs allowed for current tier. Demo = 0. Founder = unlimited. Internal = 9999."""
+        if self.is_founder_mode:
+            return 999999
+        if self.is_internal_mode:
+            return 9999
         if self.is_demo_mode:
             return 0
         tier = self.current_tier
@@ -238,7 +270,11 @@ class LicenseManager:
         return self.TIER_LIMITS[tier]["max_active_ais"]
 
     def get_days_remaining(self) -> int:
-        """Days until license expires. Returns -1 for demo/unlimited."""
+        """Days until license expires. Returns -1 for demo/unlimited. Returns 99999 for founder."""
+        if self.is_founder_mode:
+            return 99999
+        if self.is_internal_mode:
+            return 9999
         if self.is_demo_mode or self._license_data is None:
             return -1
         key = self._license_data.get("key", "")
@@ -254,6 +290,10 @@ class LicenseManager:
 
     def allows_outward_actions(self) -> bool:
         """Can this tier perform file writes, exports, etc.?"""
+        if self.is_founder_mode:
+            return True
+        if self.is_internal_mode:
+            return True
         if self.is_demo_mode:
             return False
         tier = self.current_tier
@@ -263,12 +303,28 @@ class LicenseManager:
 
     def allows_cross_workflows(self) -> bool:
         """Can this tier run multi-AI workflows?"""
+        if self.is_founder_mode:
+            return True
+        if self.is_internal_mode:
+            return True
         if self.is_demo_mode:
             return False
         tier = self.current_tier
         if tier is None:
             return False
         return self.TIER_LIMITS[tier]["allow_cross_workflows"]
+
+    @property
+    def is_internal_mode(self) -> bool:
+        """Avery Logic Works™ employee forever-unlock mode."""
+        return self.current_tier == SubscriptionTier._INTERNAL
+
+    @property
+    def is_founder_mode(self) -> bool:
+        """Founder absolute mode â€” bypasses ALL protections, tripwire, etc.
+        This is the highest authority. What the founder does is NOT tampering.
+        It is upgrading, repairing, or testing."""
+        return self.current_tier == SubscriptionTier._FOUNDER
 
     def get_tier_label(self) -> str:
         """Human-readable tier name for UI display."""
@@ -277,11 +333,15 @@ class LicenseManager:
         tier = self.current_tier
         if tier is None:
             return "Not Activated"
+        if tier == SubscriptionTier._FOUNDER:
+            return "Founder Absolute"
+        if tier == SubscriptionTier._INTERNAL:
+            return "Nexus Internal"
         labels = {
             SubscriptionTier.TRIAL: "Trial",
             SubscriptionTier.STARTER: "Starter",
             SubscriptionTier.PRO: "Pro",
-            SubscriptionTier.ANNUAL: "Annual",
+            SubscriptionTier.BUSINESS: "Business",
             SubscriptionTier.UNLIMITED: "Unlimited",
         }
         return labels.get(tier, "Unknown")
@@ -308,6 +368,123 @@ class LicenseManager:
         except (json.JSONDecodeError, OSError):
             self._status = LicenseStatus.NOT_ACTIVATED
             self._license_data = None
+
+    # ------------------------------------------------------------------
+    # Internal validation (hidden from public API)
+    # ------------------------------------------------------------------
+
+    def _check_founder_key(self, key: str) -> tuple[Optional[SubscriptionTier], bool]:
+        """
+        Hidden validation for FOUNDER keys.
+        Uses a separately-derived secret. Not exposed ANYWHERE.
+        Returns (tier, is_valid).
+        """
+        if len(key) != 40:
+            return None, False
+        tier_code = key[:2]
+        if tier_code != "FD":
+            return None, False
+        expiry_hex = key[2:12]
+        random_part = key[12:20]
+        hmac_part = key[20:40]
+
+        payload = f"{tier_code}{expiry_hex}{random_part}"
+        expected_hmac = hmac.new(
+            self._FOUNDER_SALT,
+            payload.encode(),
+            hashlib.sha256
+        ).hexdigest()[:20].upper()
+
+        if not hmac.compare_digest(hmac_part, expected_hmac):
+            return None, False
+
+        # Founder keys use a far-future expiry (year 2099+)
+        try:
+            expiry_ts = int(expiry_hex, 16)
+            expiry_date = datetime.fromtimestamp(expiry_ts)
+        except (ValueError, OSError):
+            return None, False
+
+        if expiry_date.year < 2099:
+            return None, False
+
+        # Check if this founder key has been voided (contract breach)
+        voided_keys = self._load_voided_founder_keys()
+        if key in voided_keys:
+            return None, False
+
+        return SubscriptionTier._FOUNDER, True
+
+    def _check_internal_key(self, key: str) -> tuple[Optional[SubscriptionTier], bool]:
+        """
+        Hidden validation for Avery Logic Works™ employee/master keys.
+        Uses a separately-derived secret. Not exposed in public tier_map.
+        Returns (tier, is_valid).
+        """
+        if len(key) != 40:
+            return None, False
+        tier_code = key[:2]
+        # Internal tier prefix is intentionally short and obscure
+        if tier_code != "NI":
+            return None, False
+        expiry_hex = key[2:12]
+        random_part = key[12:20]
+        hmac_part = key[20:40]
+
+        # Verify with internal salt (different from public secret)
+        payload = f"{tier_code}{expiry_hex}{random_part}"
+        expected_hmac = hmac.new(
+            self._INTERNAL_SALT,
+            payload.encode(),
+            hashlib.sha256
+        ).hexdigest()[:20].upper()
+
+        if not hmac.compare_digest(hmac_part, expected_hmac):
+            return None, False
+
+        # Internal keys use a far-future expiry (year 2099+) as a sanity check
+        try:
+            expiry_ts = int(expiry_hex, 16)
+            expiry_date = datetime.fromtimestamp(expiry_ts)
+        except (ValueError, OSError):
+            return None, False
+
+        # Sanity: must be far-future (2099 or later)
+        if expiry_date.year < 2099:
+            return None, False
+
+        return SubscriptionTier._INTERNAL, True
+
+    def _get_voided_founder_path(self) -> Path:
+        base = Path.home() / ".command_nexus"
+        base.mkdir(parents=True, exist_ok=True)
+        return base / "voided_founder_keys.json"
+
+    def _load_voided_founder_keys(self) -> set[str]:
+        path = self._get_voided_founder_path()
+        if not path.exists():
+            return set()
+        try:
+            return set(json.loads(path.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, OSError):
+            return set()
+
+    def void_founder_key(self, key: str, reason: str = "") -> bool:
+        """
+        Void a founder key (e.g. contract breach, employee departure).
+        Returns True if the key was voided.
+        """
+        key = key.strip().upper().replace("-", "")
+        # Only founder can void other founder keys
+        if not self.is_founder_mode:
+            return False
+        path = self._get_voided_founder_path()
+        voided = self._load_voided_founder_keys()
+        if key in voided:
+            return False
+        voided.add(key)
+        path.write_text(json.dumps(sorted(voided), indent=2), encoding="utf-8")
+        return True
 
     def clear_license(self):
         """Remove saved license (for testing or deactivation)."""
@@ -338,6 +515,6 @@ if __name__ == "__main__":
         print(f"Tier: {lm.current_tier.value if lm.current_tier else 'None'}")
         print(f"Days remaining: {lm.get_days_remaining()}")
     else:
-        print("License Manager — no key provided")
+        print("License Manager â€” no key provided")
         print(f"Current status: {lm._status.value}")
         print(f"Demo mode: {lm.is_demo_mode}")

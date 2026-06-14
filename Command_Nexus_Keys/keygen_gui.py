@@ -15,7 +15,28 @@ import json
 import sys
 from pathlib import Path
 
-try:
+def _ensure_pyqt6() -> bool:
+    """Auto-install PyQt6 if missing. Returns True if available."""
+    try:
+        import PyQt6  # noqa: F401
+        return True
+    except ImportError:
+        pass
+    import subprocess
+    import sys
+    print("PyQt6 not found. Auto-installing...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "PyQt6"])
+        print("PyQt6 installed successfully.")
+        return True
+    except Exception as exc:
+        print(f"Failed to auto-install PyQt6: {exc}")
+        return False
+
+
+HAS_PYQT = _ensure_pyqt6()
+
+if HAS_PYQT:
     from PyQt6.QtCore import Qt, QSize
     from PyQt6.QtGui import QFont, QIcon
     from PyQt6.QtWidgets import (
@@ -23,9 +44,6 @@ try:
         QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QStackedWidget,
         QTextEdit, QVBoxLayout, QWidget, QTabWidget,
     )
-    HAS_PYQT = True
-except ImportError:
-    HAS_PYQT = False
 
 from nexus_crypto import (
     make_internal_key, make_founder_key, make_trial_key, make_paid_key, validate_key,

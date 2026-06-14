@@ -3,5 +3,9 @@ REM Command Nexus™ — Key Generator Suite (GUI)
 REM Run this to open the PyQt6 key generator dashboard.
 
 cd /d "%~dp0"
+py -3.12 -c "import PyQt6" 2>nul || (
+    echo PyQt6 not found. Installing now...
+    py -3.12 -m pip install --quiet PyQt6
+)
 py -3.12 keygen_gui.py
 if errorlevel 1 pause
