@@ -26,6 +26,7 @@ class WatcherEngine(QObject):
     alert_logged = pyqtSignal(object)       # SecurityAlert
     integrity_changed = pyqtSignal(object)  # IntegrityRecord
     trust_status_changed = pyqtSignal(bool) # True = trusted, False = breach
+    mode_changed = pyqtSignal(str)           # New mode name
 
     # Critical files that must never change
     _CRITICAL_FILES = {
@@ -254,6 +255,7 @@ class WatcherEngine(QObject):
         self._mode = mode
         passive_modes = {"STABILIZATION", "REPAIR", "CREATION", "DEMO"}
         self._state.active = mode not in passive_modes
+        self.mode_changed.emit(mode)
 
     def accept_current_baseline(self):
         """Accept current hashes as baseline (use after approved maintenance)."""
@@ -448,6 +450,8 @@ class WatcherWindow(QMainWindow):
         alert_layout.addWidget(QLabel("Security Alert Log"))
         self._alert_log = QTextEdit()
         self._alert_log.setReadOnly(True)
+        self._alert_log.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._alert_log.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._alert_log.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
         alert_layout.addWidget(self._alert_log, stretch=2)
 

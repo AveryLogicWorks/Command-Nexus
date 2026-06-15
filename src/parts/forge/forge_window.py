@@ -9,7 +9,7 @@ ABILITY_SURFACES = {
     "Notebook": "Notes, recall, tagging, and project-memory workspace",
     "Notes": "Notebook/notes placeholder",
     "Knowledge": "Notebook/notes placeholder",
-    "Book": "Human-editable AI Book with attachment markers and approval rules",
+    "Book": "Human-editable AI Knowledge with attachment markers and approval rules",
     "Writer": "Writing workflow with outline, draft, revise, tone, and approval-gated export",
     "Author": "Writing workflow with outline, draft, revise, tone, and approval-gated export",
     "Creative Writing": "Writing workflow with outline, draft, revise, tone, and approval-gated export",
@@ -718,7 +718,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     lines.append("")
     lines.append("# PART: ACTIVE MEMORY (User-Defined)")
     lines.append("This section holds the AI's live instructions, memories, and preferences.")
-    lines.append("It is populated by the Book AI dialog and can be updated through conversation.")
+    lines.append("It is populated by the Knowledge AI dialog and can be updated through conversation.")
     lines.append("Capability sections below are internal and only editable if the user explicitly asks.")
     lines.append("")
     lines.append("## Active Instructions")
@@ -1007,25 +1007,49 @@ from .capability_actions import (
 USE_CASE_OPTIONS: dict = {
     UseCaseClass.INDIVIDUAL: [
         "Chat Companion", "Coding Assistant", "Creative Writer",
-        "Learning Tutor", "Personal Organizer", "Research Assistant"
+        "Learning Tutor", "Personal Organizer", "Research Assistant",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Memory Bridge", "Visual Canvas", "Voice Interface",
+        "Calendar Manager", "Email Automation", "Document Generator",
     ],
     UseCaseClass.EDUCATIONAL: [
         "Classroom Tutor", "Assignment Grader", "Lesson Planner",
-        "Academic Researcher", "Language Coach", "Accessibility Aide"
+        "Academic Researcher", "Language Coach", "Accessibility Aide",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Learning Path Creator", "Knowledge Base Builder", "Presentation Builder",
+        "Translation Expert", "Fact Checker", "Smart Search",
     ],
     UseCaseClass.TASK_READY: [
         "Document Processor", "Meeting Scribe", "Data Entry Agent",
-        "Workflow Automator", "Content Moderator"
+        "Workflow Automator", "Content Moderator",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Meeting Facilitator", "Calendar Manager", "Email Automation",
+        "Spreadsheet Wizard", "Document Generator", "Smart Search",
     ],
     UseCaseClass.BUSINESS: [
         "Email Sifter & Responder", "Task / Project Manager",
         "Customer Support Agent", "Sales Assistant",
-        "Marketing Generator", "Financial Analyst", "HR Assistant"
+        "Marketing Generator", "Financial Analyst", "HR Assistant",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Team Orchestrator", "Data Analyst Pro", "Meeting Facilitator",
+        "Calendar Manager", "Document Generator", "Presentation Builder",
+        "Knowledge Base Builder", "API Integrator", "Workflow Automator",
+        "Competitive Analyst", "Smart Search", "Email Automation",
     ],
     UseCaseClass.ENTERPRISE: [
         "Business Intelligence Analyst", "Compliance Auditor",
         "Supply Chain Coordinator", "IT Operations Agent",
-        "Legal Document Reviewer", "Multi-Department Orchestrator"
+        "Legal Document Reviewer", "Multi-Department Orchestrator",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Security Auditor", "Code Reviewer", "Team Orchestrator",
+        "Data Analyst Pro", "Knowledge Base Builder", "API Integrator",
+        "Workflow Automator", "Medical Researcher", "Legal Assistant",
+        "Fact Checker", "Smart Search", "Memory Bridge",
     ],
     UseCaseClass.ALL_ROUNDER: [
         "Chat Companion", "Coding Assistant", "Creative Writer",
@@ -1038,8 +1062,38 @@ USE_CASE_OPTIONS: dict = {
         "Marketing Generator", "Financial Analyst", "HR Assistant",
         "Business Intelligence Analyst", "Compliance Auditor",
         "Supply Chain Coordinator", "IT Operations Agent",
-        "Legal Document Reviewer", "Multi-Department Orchestrator"
+        "Legal Document Reviewer", "Multi-Department Orchestrator",
+        "Customer Support AI",  # Available in all use cases
+        # All premium upgrades
+        "Team Orchestrator", "Memory Bridge", "Visual Canvas", "Data Analyst Pro",
+        "Code Reviewer", "API Integrator", "Knowledge Base Builder",
+        "Meeting Facilitator", "Email Automation", "Calendar Manager",
+        "Document Generator", "Translation Expert", "Presentation Builder",
+        "Spreadsheet Wizard", "Legal Assistant", "Medical Researcher",
+        "Accessibility Assistant", "Fact Checker", "Voice Interface",
+        "Workflow Automator", "Security Auditor", "Competitive Analyst",
+        "Learning Path Creator", "Smart Search",
     ],
+}
+
+# Use-case descriptions shown in capability selection dialog
+USE_CASE_DESCRIPTIONS: dict = {
+    UseCaseClass.INDIVIDUAL: "Personal AI assistant for daily tasks, creative projects, learning, and organization. Focuses on privacy and personal productivity.",
+    UseCaseClass.EDUCATIONAL: "Teaching and learning support with academic integrity, accessibility features, and structured knowledge sharing.",
+    UseCaseClass.TASK_READY: "Task-focused AI for document processing, meeting notes, data entry, and workflow automation. Gets work done efficiently.",
+    UseCaseClass.BUSINESS: "Professional AI for business operations including sales, support, marketing, HR, and finance. Drafts responses and manages workflows.",
+    UseCaseClass.ENTERPRISE: "Enterprise-grade AI with compliance, security auditing, multi-department coordination, and advanced analytics.",
+    UseCaseClass.ALL_ROUNDER: "Versatile AI with access to all capabilities. Great for users who need flexibility across many different types of tasks.",
+}
+
+# Recommended capabilities for each use case (for "Suggest Set" button)
+USE_CASE_RECOMMENDED: dict = {
+    UseCaseClass.INDIVIDUAL: ["Chat Companion", "Personal Organizer", "Research Assistant", "Creative Writer"],
+    UseCaseClass.EDUCATIONAL: ["Classroom Tutor", "Lesson Planner", "Academic Researcher", "Learning Path Creator"],
+    UseCaseClass.TASK_READY: ["Document Processor", "Meeting Scribe", "Calendar Manager", "Workflow Automator"],
+    UseCaseClass.BUSINESS: ["Email Sifter & Responder", "Task / Project Manager", "Meeting Facilitator", "Data Analyst Pro"],
+    UseCaseClass.ENTERPRISE: ["Compliance Auditor", "Security Auditor", "Team Orchestrator", "Knowledge Base Builder"],
+    UseCaseClass.ALL_ROUNDER: ["Chat Companion", "Research Assistant", "Document Processor", "Task / Project Manager"],
 }
 
 # Beginner-friendly capability descriptions for the live AI Details preview
@@ -1058,6 +1112,7 @@ CAPABILITY_DESCRIPTIONS: dict[str, str] = {
     "Accessibility Aide": "Adapts content for different needs â€” summaries, larger text, simpler language, or audio-style drafts.",
     "Document Processor": "Reads, summarizes, and extracts key points from documents. Helps turn long text into short takeaways.",
     "Meeting Scribe": "Takes notes during discussions, tracks decisions and action items, and produces clean summaries afterward.",
+    "Customer Support AI": "Adaptive AI for customer communication. Learns from interactions, handles inquiries professionally, and escalates when needed. Available in all use cases.",
     "Data Entry Agent": "Helps organize and enter structured information accurately, checking for errors along the way.",
     "Workflow Automator": "Suggests ways to streamline repetitive steps and keeps processes moving smoothly.",
     "Content Moderator": "Reviews text for inappropriate or off-topic material and flags concerns according to set rules.",
@@ -1280,6 +1335,328 @@ def _generate_combined_summary(name: str, use_case: str, capabilities: list[str]
 MILITARY_KEY = "CNX-MILGOV-2026"  # Hardcoded activation key
 
 
+class CapabilitySelectionDialog(QDialog):
+    """Modal dialog for selecting capabilities with detailed descriptions and hover tooltips."""
+
+    def __init__(self, use_case: UseCaseClass, parent=None, current_selections: list = None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Select Capabilities — {use_case.value}")
+        self.setModal(True)
+        self.resize(700, 600)
+        self._use_case = use_case
+        self._current_selections = current_selections or []
+        self._selected_capabilities: list = []
+        self._checkboxes: dict = {}
+        
+        self._setup_ui()
+        self._load_capabilities()
+        self._apply_dark_theme()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Header with use case info
+        header = QLabel(f"<h2>Choose Capabilities for {self._use_case.value}</h2>")
+        header.setWordWrap(True)
+        layout.addWidget(header)
+
+        # Description label
+        desc_text = USE_CASE_DESCRIPTIONS.get(self._use_case, "Select the capabilities you want this AI to have.")
+        desc = QLabel(desc_text)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("color: #8b949e; font-size: 12px;")
+        layout.addWidget(desc)
+
+        # Search/filter box
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("Search:"))
+        self._search_input = QLineEdit()
+        self._search_input.setPlaceholderText("Type to filter capabilities...")
+        self._search_input.textChanged.connect(self._filter_capabilities)
+        search_layout.addWidget(self._search_input)
+        layout.addLayout(search_layout)
+
+        # Select All / Clear All buttons
+        btn_layout = QHBoxLayout()
+        self._select_all_btn = QPushButton("Select All")
+        self._select_all_btn.clicked.connect(self._select_all)
+        self._clear_all_btn = QPushButton("Clear All")
+        self._clear_all_btn.clicked.connect(self._clear_all)
+        self._suggest_btn = QPushButton("💡 Suggest Set")
+        self._suggest_btn.setToolTip("Auto-select recommended capabilities for this use case")
+        self._suggest_btn.clicked.connect(self._suggest_capabilities)
+        btn_layout.addWidget(self._select_all_btn)
+        btn_layout.addWidget(self._clear_all_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self._suggest_btn)
+        layout.addLayout(btn_layout)
+
+        # Scroll area for capabilities
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        self._caps_container = QWidget()
+        self._caps_layout = QVBoxLayout(self._caps_container)
+        self._caps_layout.setSpacing(8)
+        self._caps_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        scroll.setWidget(self._caps_container)
+        layout.addWidget(scroll, stretch=1)
+
+        # Selection count label
+        self._count_label = QLabel("0 capabilities selected")
+        self._count_label.setStyleSheet("color: #58a6ff; font-weight: bold;")
+        layout.addWidget(self._count_label)
+
+        # Apply/Cancel buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Apply | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.button(QDialogButtonBox.StandardButton.Apply).setText("Apply Selection")
+        button_box.button(QDialogButtonBox.StandardButton.Apply).setStyleSheet(
+            "background-color: #2e7d32; color: white; font-weight: bold; padding: 8px 16px;"
+        )
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancel")
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setStyleSheet(
+            "background-color: #c62828; color: white; padding: 8px 16px;"
+        )
+        button_box.accepted.connect(self._on_apply)
+        button_box.rejected.connect(self._on_cancel)
+        layout.addWidget(button_box)
+
+    def _load_capabilities(self):
+        """Load all capabilities for this use case with descriptions and hover tooltips."""
+        options = USE_CASE_OPTIONS.get(self._use_case, [])
+        
+        for opt in options:
+            # Create container for each capability
+            cap_widget = QWidget()
+            cap_layout = QHBoxLayout(cap_widget)
+            cap_layout.setContentsMargins(4, 4, 4, 4)
+            cap_layout.setSpacing(8)
+            
+            # Checkbox
+            chk = QCheckBox(opt)
+            chk.setChecked(opt in self._current_selections)
+            chk.stateChanged.connect(self._update_count)
+            self._checkboxes[opt] = chk
+            cap_layout.addWidget(chk)
+            
+            # Info button with tooltip
+            info_btn = QPushButton("?")
+            info_btn.setFixedSize(20, 20)
+            info_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #1f6feb;
+                    color: white;
+                    border-radius: 10px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #58a6ff;
+                }
+            """)
+            
+            # Get description and tooltip
+            desc = CAPABILITY_DESCRIPTIONS.get(opt, "No description available.")
+            tooltip = self._build_tooltip(opt, desc)
+            info_btn.setToolTip(tooltip)
+            chk.setToolTip(tooltip)
+            
+            info_btn.clicked.connect(lambda checked, o=opt: self._show_capability_details(o))
+            cap_layout.addWidget(info_btn)
+            
+            # Description label (truncated)
+            desc_lbl = QLabel(desc[:80] + "..." if len(desc) > 80 else desc)
+            desc_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+            desc_lbl.setWordWrap(True)
+            cap_layout.addWidget(desc_lbl, stretch=1)
+            
+            # Compatible with indicator
+            compatible = self._get_compatible_caps(opt)
+            if compatible:
+                compat_lbl = QLabel(f"↔ {len(compatible)} compatible")
+                compat_lbl.setStyleSheet("color: #3fb950; font-size: 10px;")
+                compat_lbl.setToolTip(f"Works well with: {', '.join(compatible[:5])}")
+                cap_layout.addWidget(compat_lbl)
+            
+            self._caps_layout.addWidget(cap_widget)
+        
+        self._update_count()
+
+    def _build_tooltip(self, capability: str, description: str) -> str:
+        """Build detailed tooltip for a capability."""
+        lines = [
+            f"<b>{capability}</b>",
+            "",
+            description,
+            "",
+            "<b>Compatible with:</b>",
+        ]
+        
+        compatible = self._get_compatible_caps(capability)
+        if compatible:
+            for cap in compatible[:8]:
+                lines.append(f"  • {cap}")
+            if len(compatible) > 8:
+                lines.append(f"  ... and {len(compatible) - 8} more")
+        else:
+            lines.append("  (General purpose capability)")
+        
+        lines.extend([
+            "",
+            "<i>💡 Tip: Click the ? button for full details</i>",
+        ])
+        
+        return "<br>".join(lines)
+
+    def _get_compatible_caps(self, capability: str) -> list:
+        """Get list of capabilities that work well with this one."""
+        from .capability_actions import CAPABILITY_REGISTRY, CAPABILITY_ALIASES
+        
+        # Resolve alias if needed
+        canonical = CAPABILITY_ALIASES.get(capability, capability)
+        
+        # Get from registry
+        cap_data = CAPABILITY_REGISTRY.get(canonical)
+        if cap_data and hasattr(cap_data, 'compatible_capabilities'):
+            return cap_data.compatible_capabilities[:10]
+        
+        return []
+
+    def _show_capability_details(self, capability: str):
+        """Show detailed info dialog for a capability."""
+        from .capability_actions import CAPABILITY_REGISTRY, CAPABILITY_ALIASES
+        
+        canonical = CAPABILITY_ALIASES.get(capability, capability)
+        cap_data = CAPABILITY_REGISTRY.get(canonical)
+        
+        if not cap_data:
+            QMessageBox.information(self, capability, "No detailed information available.")
+            return
+        
+        # Build detailed description
+        lines = [
+            f"<h2>{capability}</h2>",
+            "",
+            f"<b>Description:</b> {cap_data.description}",
+            "",
+            f"<b>Approval Level:</b> {cap_data.required_approval_level}",
+            "",
+            f"<b>Best for Use Cases:</b> {', '.join(cap_data.allowed_use_cases[:5])}",
+            "",
+            "<b>Compatible Capabilities:</b>",
+        ]
+        
+        if cap_data.compatible_capabilities:
+            for cap in cap_data.compatible_capabilities[:10]:
+                lines.append(f"  • {cap}")
+        
+        lines.extend([
+            "",
+            "<b>Starter Prompts:</b>",
+        ])
+        
+        if cap_data.starter_prompt_guidance:
+            for prompt in cap_data.starter_prompt_guidance[:5]:
+                lines.append(f"  💡 \"{prompt}\"")
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle(f"About {capability}")
+        msg.setText("\n".join(lines))
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.exec()
+
+    def _filter_capabilities(self, text: str):
+        """Filter capabilities based on search text."""
+        text = text.lower()
+        for opt, chk in self._checkboxes.items():
+            desc = CAPABILITY_DESCRIPTIONS.get(opt, "").lower()
+            visible = text in opt.lower() or text in desc
+            chk.parent().setVisible(visible)
+
+    def _select_all(self):
+        for chk in self._checkboxes.values():
+            chk.setChecked(True)
+
+    def _clear_all(self):
+        for chk in self._checkboxes.values():
+            chk.setChecked(False)
+
+    def _suggest_capabilities(self):
+        """Auto-select recommended capabilities for this use case."""
+        # Clear first
+        self._clear_all()
+        
+        # Select recommended ones based on use case
+        recommendations = USE_CASE_RECOMMENDED.get(self._use_case, [])
+        for cap in recommendations:
+            if cap in self._checkboxes:
+                self._checkboxes[cap].setChecked(True)
+
+    def _update_count(self):
+        count = sum(1 for chk in self._checkboxes.values() if chk.isChecked())
+        self._count_label.setText(f"{count} capability{'ies' if count != 1 else 'y'} selected")
+
+    def _on_apply(self):
+        self._selected_capabilities = [
+            opt for opt, chk in self._checkboxes.items() if chk.isChecked()
+        ]
+        self.accept()
+
+    def _on_cancel(self):
+        self._selected_capabilities = []
+        self.reject()
+
+    def get_selected_capabilities(self) -> list:
+        return self._selected_capabilities
+
+    def _apply_dark_theme(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #0d1117;
+                color: #c9d1d9;
+            }
+            QLabel {
+                color: #c9d1d9;
+            }
+            QCheckBox {
+                color: #c9d1d9;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+            QLineEdit {
+                background-color: #161b22;
+                border: 1px solid #30363d;
+                color: #c9d1d9;
+                padding: 6px;
+                border-radius: 4px;
+            }
+            QScrollArea {
+                border: 1px solid #30363d;
+                background-color: #161b22;
+            }
+            QPushButton {
+                background-color: #21262d;
+                border: 1px solid #30363d;
+                color: #c9d1d9;
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #30363d;
+                border-color: #58a6ff;
+            }
+        """)
+
+
 class SecurityScanDialog(QDialog):
     """Modal dialog that simulates scanning a dropped-in AI."""
 
@@ -1422,6 +1799,8 @@ class CharacterSheetWidget(QWidget):
         self._notes = QTextEdit()
         self._notes.setPlaceholderText("Additional notes, directives, or context for this AI...")
         self._notes.setMaximumHeight(120)
+        self._notes.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._notes.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._notes.textChanged.connect(self._update_ai_details_preview)
         layout.addWidget(QLabel("Notes:"))
         layout.addWidget(self._notes)
@@ -1463,9 +1842,56 @@ class CharacterSheetWidget(QWidget):
 
         for uc in UseCaseClass:
             if uc.value in text:
-                self._refresh_capabilities(uc)
+                # Open capability selection dialog for better UX
+                self._open_capability_dialog(uc)
                 break
+
+    def _open_capability_dialog(self, use_case: UseCaseClass):
+        """Open the enhanced capability selection dialog."""
+        # Get current selections to pass to dialog
+        current_selections = [chk.text() for chk in self._cap_checks if chk.isChecked()]
+        
+        # Create and show dialog
+        dialog = CapabilitySelectionDialog(use_case, self, current_selections)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Apply was clicked - update capabilities
+            selected = dialog.get_selected_capabilities()
+            self._set_capabilities(selected)
+        # If Cancel was clicked, do nothing - keep previous selections
+        
         self._update_ai_details_preview()
+
+    def _set_capabilities(self, capabilities: list):
+        """Set the selected capabilities in the UI."""
+        # Clear current
+        self._clear_capabilities()
+        
+        # Get all available options for current use case
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
+        current_uc = None
+        for uc in UseCaseClass:
+            if uc.value == uc_text:
+                current_uc = uc
+                break
+        
+        if not current_uc:
+            return
+            
+        # Add all options with proper selection state
+        options = USE_CASE_OPTIONS.get(current_uc, [])
+        for i, opt in enumerate(options):
+            chk = QCheckBox(opt)
+            chk.setChecked(opt in capabilities)
+            chk.stateChanged.connect(self._update_ai_details_preview)
+            
+            # Add hover tooltip with description
+            desc = CAPABILITY_DESCRIPTIONS.get(opt, "")
+            if desc:
+                chk.setToolTip(f"<b>{opt}</b><br>{desc}")
+            
+            self._caps_layout.addWidget(chk, i // 2, i % 2)
+            self._cap_checks.append(chk)
 
     def _clear_capabilities(self):
         for check in self._cap_checks:
@@ -1876,7 +2302,37 @@ class AIForgeWindow(QMainWindow):
                 n = n[:-1].strip()
             return n
 
-        # Build normalized lookup maps
+        # ── STEP 1: Deduplicate existing units in _units and _list ──
+        # If multiple AIs have the same normalized name, keep only the first (prefer starters)
+        seen_norms: dict[str, AIUnit] = {}
+        units_to_keep: list[AIUnit] = []
+        for u in self._units:
+            norm = _normalize(u.name)
+            if norm in seen_norms:
+                # Duplicate found - remove from list widget if present
+                existing = seen_norms[norm]
+                # Prefer to keep the starter if one is a starter
+                if getattr(u, "is_starter", False) and not getattr(existing, "is_starter", False):
+                    # Replace with this starter
+                    units_to_keep.remove(existing)
+                    units_to_keep.append(u)
+                    seen_norms[norm] = u
+                # Otherwise keep the existing one (skip this duplicate)
+            else:
+                seen_norms[norm] = u
+                units_to_keep.append(u)
+        
+        # Rebuild _units with deduplicated list
+        self._units = units_to_keep
+        
+        # Rebuild _list widget to match _units
+        self._list.clear()
+        for u in self._units:
+            item = QListWidgetItem(f"{u.name} [{u.use_case.value}] ({u.source.value})")
+            item.setData(Qt.ItemDataRole.UserRole, u.uuid)
+            self._list.addItem(item)
+
+        # ── STEP 2: Build normalized lookup for starter processing ──
         norm_to_unit: dict[str, AIUnit] = {}
         for u in self._units:
             norm = _normalize(u.name)
@@ -2055,7 +2511,7 @@ class AIForgeWindow(QMainWindow):
         btn_activate.clicked.connect(self._activate_selected)
         left_layout.addWidget(btn_activate)
 
-        btn_book = QPushButton("Open Book for AI")
+        btn_book = QPushButton("Open Knowledge for AI")
         btn_book.setStyleSheet("background-color: #00897b; color: white; font-weight: bold;")
         btn_book.clicked.connect(self._open_book_for_selected)
         left_layout.addWidget(btn_book)
@@ -2101,6 +2557,8 @@ class AIForgeWindow(QMainWindow):
         right_layout.addWidget(QLabel("AI Details"))
         self._detail = QTextEdit()
         self._detail.setReadOnly(True)
+        self._detail.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._detail.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._detail.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
         right_layout.addWidget(self._detail, stretch=1)
 
@@ -2142,7 +2600,7 @@ class AIForgeWindow(QMainWindow):
             self._detail.setText(text)
 
     def _on_book_defaults_edited(self, ai_uuid: str, edited: bool):
-        """Update the AIUnit when Book default nodes are edited in the BookWindow."""
+        """Update the AIUnit when Book default nodes are edited in the KnowledgeWindow."""
         for u in self._units:
             if u.uuid == ai_uuid:
                 u.book_defaults_edited = edited
@@ -2230,6 +2688,7 @@ class AIForgeWindow(QMainWindow):
                 libs = "\n  â€¢ ".join([""] + u.libraries) if u.libraries else "  (none selected)"
                 opt_gr = "\n  â€¢ ".join([""] + u.guardrails) if u.guardrails else "  (none selected)"
                 book_status = "Customized" if u.book_defaults_edited else "Default generated (ready)"
+                # NOTE: book_defaults_edited is the internal field name for Intelligence customization tracking
                 if not u.ability_book_path:
                     book_status = "Not generated yet"
                 if self._obs.is_obfuscated:
@@ -2265,7 +2724,7 @@ class AIForgeWindow(QMainWindow):
                         f"Starter workflows:{workflows}\n\n"
                         f"Archive: {u.archive_path or '(not generated)'}\n"
                         f"Ability book: {u.ability_book_path or '(not generated)'}\n"
-                        f"Book defaults: {book_status}\n\n"
+                        f"Knowledge defaults: {book_status}\n\n"
                         f"Personality:\n{pers}\n\n"
                         f"Created: {u.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
                     )
@@ -2467,7 +2926,7 @@ class AIForgeWindow(QMainWindow):
             name=name,
             use_case=use_case,
             source=AISource.DROPPED_IN,
-            capabilities=["Imported â€” Reoriented to Book structure"],
+            capabilities=["Imported â€” Reoriented to Knowledge structure"],
             locked=True,
             context_notes=watcher_result.sanitized_text if watcher_result.sanitized_text else safe_content[:2000] or "Imported working copy â€” stasis-cleared",
         )
@@ -2544,7 +3003,7 @@ class AIForgeWindow(QMainWindow):
                     "AI Activated",
                     f"'{u.name}' is now active in the Visibility Window.\n\n"
                     f"Ability surfaces:\n{surfaces}\n\n"
-                    f"Archive: {u.archive_path or 'N/A'}\nBook: {u.ability_book_path or 'N/A'}\n\n"
+                    f"Archive: {u.archive_path or 'N/A'}\nIntelligence: {u.ability_book_path or 'N/A'}\n\n"
                     f"Note: Some abilities are in placeholder mode; backend not connected yet."
                 )
                 self._on_ai_selected(item)
@@ -2567,7 +3026,7 @@ class AIForgeWindow(QMainWindow):
     def _open_book_for_selected(self):
         item = self._list.currentItem()
         if not item:
-            QMessageBox.warning(self, "No Selection", "Select an AI to open its Book.")
+            QMessageBox.warning(self, "No Selection", "Select an AI to open its Intelligence.")
             return
         uid = item.data(Qt.ItemDataRole.UserRole)
         for u in self._units:

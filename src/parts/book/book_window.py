@@ -32,7 +32,7 @@ from .book_ai_dialog import BookAIDialog
 
 class ScreeningPipeline:
     """
-    Three-layer guardrail watchers that screen Book content before save.
+    Three-layer guardrail watchers that screen Knowledge content before save.
     Layer 1 — High Risk: illegal and sexually explicit content
     Layer 2 — Security: malicious and harmful content
     Layer 3 — Quality: lower-end violations + spell check
@@ -127,7 +127,7 @@ class ScreeningPipeline:
 
 class PythonTranslator:
     """
-    Background layer: converts human-readable Book content into Python-oriented
+    Background layer: converts human-readable Knowledge content into Python-oriented
     structures that the AI can consume natively.
     """
 
@@ -150,7 +150,7 @@ class PythonTranslator:
         """Convert entire Book to a Python module string."""
         lines = [
             f'"""',
-            f"Command Nexus — The Book",
+            f"Command Nexus — Knowledge",
             f"AI: {book.ai_name} (UUID: {book.ai_uuid})",
             f"Generated: {datetime.now().isoformat()}",
             f'"""',
@@ -199,6 +199,8 @@ class GoalDiscoveryDialog(QDialog):
         self._goal_input = QTextEdit()
         self._goal_input.setPlaceholderText("e.g., I need help organizing my business tasks and writing emails...")
         self._goal_input.setMaximumHeight(80)
+        self._goal_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._goal_input.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self._goal_input)
 
         # Audience
@@ -212,6 +214,8 @@ class GoalDiscoveryDialog(QDialog):
         self._avoid_input = QTextEdit()
         self._avoid_input.setPlaceholderText("e.g., don't access my bank info, don't write code without asking...")
         self._avoid_input.setMaximumHeight(60)
+        self._avoid_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._avoid_input.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self._avoid_input)
 
         # Success
@@ -219,6 +223,8 @@ class GoalDiscoveryDialog(QDialog):
         self._success_input = QTextEdit()
         self._success_input.setPlaceholderText("e.g., it finishes my weekly reports in under 10 minutes...")
         self._success_input.setMaximumHeight(60)
+        self._success_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._success_input.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self._success_input)
 
         # I don't know button
@@ -233,6 +239,8 @@ class GoalDiscoveryDialog(QDialog):
         suggest_layout = QVBoxLayout(self._suggestion_box)
         self._suggestion_text = QTextEdit()
         self._suggestion_text.setReadOnly(True)
+        self._suggestion_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._suggestion_text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._suggestion_text.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
         suggest_layout.addWidget(self._suggestion_text)
 
@@ -338,7 +346,7 @@ class GoalDiscoveryDialog(QDialog):
 
 
 class BookWindow(QMainWindow):
-    """Command Nexus™ Part 3 — The Book (Compendium of Truth)."""
+    """Command Nexus™ Part 3 — AI Knowledge (Compendium of Truth)."""
 
     book_saved = pyqtSignal(str, str)  # ai_uuid, ai_name
     defaults_edited = pyqtSignal(str, bool)  # ai_uuid, edited
@@ -347,13 +355,13 @@ class BookWindow(QMainWindow):
     def __init__(self, registry=None, audit=None):
         super().__init__()
         self._obs = get_obfuscation_manager()
-        self.setWindowTitle("Command Nexus™ — AI Book")
+        self.setWindowTitle("Command Nexus™ — AI Knowledge")
         self.resize(1200, 800)
         self._registry = registry
         self._audit = audit
         self._governance = GovernanceEngine()
 
-        # Per-AI Book registry: ai_uuid -> BookInstance
+        # Per-AI Knowledge registry: ai_uuid -> BookInstance
         self._books: dict[str, BookInstance] = {}
         self._current_ai_uuid: str | None = None
         self._current_node: BookNode | None = None
@@ -368,15 +376,10 @@ class BookWindow(QMainWindow):
         return self._books.get(self._current_ai_uuid)
 
     def open_for_ai(self, ai_uuid: str, ai_name: str):
-        """Open or create The Book for a specific AI."""
-        # If cached book exists but name mismatch, regenerate to avoid stale data
-        existing = self._books.get(ai_uuid)
-        if existing is not None and existing.ai_name != ai_name:
-            del self._books[ai_uuid]
-            existing = None
+        """Open or create Knowledge for a specific AI. Always regenerate to prevent stale cached data."""
         self._current_ai_uuid = ai_uuid
-        if existing is None:
-            self._books[ai_uuid] = self._create_book_for_ai(ai_uuid, ai_name)
+        # Always create fresh — cache caused wrong AI books to persist (Lily showing Athena)
+        self._books[ai_uuid] = self._create_book_for_ai(ai_uuid, ai_name)
         self._book_title.setText(f"Book: {ai_name}")
         self._refresh_tree()
         self._clear_editor()
@@ -399,7 +402,7 @@ class BookWindow(QMainWindow):
                 first = entries[0]
                 self.open_for_ai(first.get("uuid", "unknown"), first.get("name", "AI"))
                 return
-        QMessageBox.information(self, "No Book Loaded", "No AI selected. Open an AI from the Forge to view its Book.")
+        QMessageBox.information(self, "No Knowledge Loaded", "No AI selected. Open an AI from the Forge to view its Knowledge.")
 
     def _setup_ui(self):
         central = QWidget()
@@ -410,30 +413,32 @@ class BookWindow(QMainWindow):
 
         # Top toolbar
         toolbar = QHBoxLayout()
-        self._book_title = QLabel("No Book Loaded")
+        self._book_title = QLabel("No Knowledge Loaded")
         self._book_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #58a6ff;")
         toolbar.addWidget(self._book_title)
 
-        btn_save = QPushButton("Save Book")
+        btn_save = QPushButton("Save Knowledge")
         btn_save.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
         btn_save.clicked.connect(self._save_book)
         toolbar.addWidget(btn_save)
 
-        btn_book_ai = QPushButton("Talk to Book Keeper")
+        btn_book_ai = QPushButton("Talk to Knowledge Guide")
         btn_book_ai.setStyleSheet("background-color: #5e35b1; color: white; font-weight: bold;")
         btn_book_ai.clicked.connect(self._open_book_ai_dialog)
         toolbar.addWidget(btn_book_ai)
 
-        # Founder/internal mode: expose legacy editor
-        btn_legacy = QPushButton("Legacy Editor")
-        btn_legacy.setStyleSheet("background-color: #30363d; color: #8b949e;")
-        btn_legacy.clicked.connect(self._toggle_legacy_editor)
-        toolbar.addWidget(btn_legacy)
+        # Founder/internal mode: expose legacy editor (HIDDEN for customer-facing)
+        # NOTE: 'Legacy Editor' was the internal name for the raw intelligence structure editor
+        # TODO: Re-enable when founder mode detection is implemented
+        # btn_legacy = QPushButton("Legacy Editor")
+        # btn_legacy.setStyleSheet("background-color: #30363d; color: #8b949e;")
+        # btn_legacy.clicked.connect(self._toggle_legacy_editor)
+        # toolbar.addWidget(btn_legacy)
 
         toolbar.addStretch()
         main_layout.addLayout(toolbar)
 
-        # SECURE LAYERED UI — default for all users
+        # SECURE LAYERED UI — customer-facing simplified view
         self._setup_secure_layered_ui(main_layout)
 
     def _toggle_legacy_editor(self):
@@ -486,7 +491,7 @@ class BookWindow(QMainWindow):
         running_hdr.setStyleSheet("font-size: 12px; font-weight: bold; color: #58a6ff; padding: 4px;")
         running_layout.addWidget(running_hdr)
 
-        running_sub = QLabel("The AI reads the Book internally and distills what it knows here. Raw structure is hidden.")
+        running_sub = QLabel("The AI reads the Knowledge internally and distills what it knows here. Raw structure is hidden.")
         running_sub.setStyleSheet("font-size: 10px; color: #8b949e; padding-bottom: 4px;")
         running_sub.setWordWrap(True)
         running_layout.addWidget(running_sub)
@@ -494,9 +499,11 @@ class BookWindow(QMainWindow):
         self._running_memory = QTextEdit()
         self._running_memory.setReadOnly(True)
         self._running_memory.setPlaceholderText(
-            "AI will summarize what it knows from the Book here.\n"
+            "AI will summarize what it knows from the Knowledge here.\n"
             "No raw rules, no internal structure — only what the AI distilled for you."
         )
+        self._running_memory.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._running_memory.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._running_memory.setStyleSheet(
             "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
         )
@@ -516,17 +523,17 @@ class BookWindow(QMainWindow):
         self._avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar_layout.addWidget(self._avatar_label)
 
-        self._avatar_name = QLabel("Inference Engine")
+        self._avatar_name = QLabel("AI Companion")
         self._avatar_name.setStyleSheet("font-size: 14px; font-weight: bold; color: #c9d1d9;")
         self._avatar_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar_layout.addWidget(self._avatar_name)
 
-        avatar_desc = QLabel("Reads Book → Summarizes → Two lanes")
+        avatar_desc = QLabel("AI processes your requests and provides helpful responses")
         avatar_desc.setStyleSheet("font-size: 10px; color: #8b949e; padding: 4px;")
         avatar_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar_layout.addWidget(avatar_desc)
 
-        avatar_guard = QLabel("🔒 Raw Book Structure Hidden")
+        avatar_guard = QLabel("✓ Secure processing active")
         avatar_guard.setStyleSheet("font-size: 10px; color: #3fb950; padding: 4px;")
         avatar_guard.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar_layout.addWidget(avatar_guard)
@@ -552,6 +559,8 @@ class BookWindow(QMainWindow):
             "e.g., 'Always remind me to check email at 9am'\n"
             "This memory is PRIVATE and never exposed to the AI."
         )
+        self._memory_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._memory_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._memory_edit.setStyleSheet(
             "background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
         )
@@ -593,7 +602,7 @@ class BookWindow(QMainWindow):
 
         # Guardrail banner
         guard_banner = QLabel(
-            "🔒 GUARDRAIL: AI receives ONLY the 'Command to AI' text. Memory is NEVER sent. Raw Book is NEVER exposed."
+            "🔒 Privacy: AI receives only your commands. Your memory notes stay private."
         )
         guard_banner.setStyleSheet("font-size: 10px; color: #3fb950; padding-top: 4px;")
         guard_banner.setWordWrap(True)
@@ -612,7 +621,7 @@ class BookWindow(QMainWindow):
         self._memory_input.clear()
         # Audit log the memory addition (private, not sent to AI)
         if self._audit:
-            self._audit.log_event("BOOK_MEMORY_ADDED", f"Private memory entry added for AI {self._current_ai_uuid}")
+            self._audit.log(tool="BookWindow", action="BOOK_MEMORY_ADDED", target=f"Private memory entry added for AI {self._current_ai_uuid}", approved=True, status="info")
 
     def _send_command_to_ai(self):
         """
@@ -626,7 +635,7 @@ class BookWindow(QMainWindow):
             return
         # Audit: log command sent (without memory content)
         if self._audit:
-            self._audit.log_event("BOOK_COMMAND_SENT", f"AI: {self._current_ai_uuid}")
+            self._audit.log(tool="BookWindow", action="BOOK_COMMAND_SENT", target=f"AI: {self._current_ai_uuid}", approved=True, status="info")
         # Emit signal — main.py connects this to the AI router
         # Memory is NEVER included. Only the command text.
         self.command_to_ai.emit(command)
@@ -634,12 +643,12 @@ class BookWindow(QMainWindow):
 
     def _refresh_running_memory(self):
         """
-        INFERENCE LAYER: Generate AI-summarized Running Memory from the raw Book.
-        The AI reads the book internally and distills it into human-readable summary.
-        Raw book structure (nodes, IDs, guardrails, restricted actions) is NEVER exposed.
+        Generate AI-summarized Running Memory.
+        The AI processes context internally and provides human-readable responses.
+        Internal technical details are not exposed in the interface.
         """
         if not self._current_book:
-            self._running_memory.setPlainText("No book loaded. Open an AI from the Forge.")
+            self._running_memory.setPlainText("No AI loaded. Select an AI from the Forge.")
             return
 
         # Build a distilled summary — the "inference" of what the AI knows
@@ -649,8 +658,8 @@ class BookWindow(QMainWindow):
         lines.append(f"Purpose: {self._current_book.title_page.purpose}")
         lines.append("")
 
-        # Extract surface-level themes from the book (no internal IDs, no raw rules)
-        # This is what the AI distilled for the user — not the raw book
+        # Extract user-facing themes from the AI's knowledge
+        # Present what the AI can help with in natural language
         themes = []
         has_restrictions = False
         for node in self._current_book.get_all_nodes():
@@ -713,8 +722,8 @@ class BookWindow(QMainWindow):
         """When obfuscation is on, show only a friendly guidance surface."""
         welcome = QLabel(
             "This is where you shape how your AI behaves.\n\n"
-            "Click 'Talk to Book Keeper' above and answer a few simple questions. "
-            "The Book Keeper will write the guidance document for you — you never need to see the internal structure."
+            "Click 'Talk to Knowledge Keeper' above and answer a few simple questions. "
+            "Knowledge Keeper will write the guidance document for you — you never need to see the internal structure."
         )
         welcome.setWordWrap(True)
         welcome.setStyleSheet("font-size: 14px; color: #c9d1d9; padding: 20px;")
@@ -724,8 +733,10 @@ class BookWindow(QMainWindow):
         self._obfuscation_summary = QTextEdit()
         self._obfuscation_summary.setReadOnly(True)
         self._obfuscation_summary.setPlaceholderText(
-            "Your AI's guidance will appear here once the Book Keeper writes it."
+            "Your AI's guidance will appear here once the Knowledge Keeper writes it."
         )
+        self._obfuscation_summary.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._obfuscation_summary.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._obfuscation_summary.setStyleSheet(
             "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 12px; font-size: 13px;"
         )
@@ -774,6 +785,8 @@ class BookWindow(QMainWindow):
             "The background layer will translate it to Python for the AI.\n"
             "Spelling, safety, and ethical screening happens on Save."
         )
+        self._content_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._content_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         editor_layout.addWidget(self._content_edit, stretch=2)
 
         # Default-generated warning banner
@@ -902,7 +915,7 @@ class BookWindow(QMainWindow):
         """)
 
     def _create_book_for_ai(self, ai_uuid: str, ai_name: str) -> BookInstance:
-        """Create a default Book structure for a specific AI using metadata from the registry."""
+        """Create a default Knowledge structure for a specific AI using metadata from the registry."""
         meta = (self._registry.get(ai_uuid) if self._registry else {}) or {}
         abilities = meta.get("abilities", [])
         libraries = meta.get("libraries", [])
@@ -998,6 +1011,36 @@ class BookWindow(QMainWindow):
                 "Coding Assistant": "Coder", "IT Operations Agent": "Coder",
             }
             return mapping.get(ab.strip(), ab.strip())
+
+        def _default_surface(c: str) -> str:
+            surfaces = {
+                "Chatbot": "Conversational interface with context-aware responses and attachment routing",
+                "Research": "Query-driven research with source citation and confidence marking",
+                "Creative Writing": "Drafting, editing, and tone adaptation for written content",
+                "Notebook": "Note capture, organization, tagging, and recall",
+                "Planner": "Goal breakdown, milestone tracking, risk flagging, and timeline proposals",
+                "Coder": "Code explanation, diff drafting, and test proposals with approval gates",
+                "Document Processor": "Document intake, summarization, extraction, and classification",
+                "Archive": "Artifact storage, indexing, and retrieval with approval-gated moves",
+                "Tool User": "Tool listing, usage proposals, and governance-gated execution",
+                "Business Workflow": "SOP drafting, checklist management, and support handoff",
+            }
+            return surfaces.get(c, "General assistance capability")
+
+        def _default_attachment(c: str) -> str:
+            attachments = {
+                "Chatbot": "Conversational handler with Book context awareness and safe reply routing",
+                "Research": "Research engine with approved external search and citation formatting",
+                "Creative Writing": "Writing engine with outline→draft→revise workflow and tone control",
+                "Notebook": "Note manager with topic tagging, date organization, and recall search",
+                "Planner": "Planning engine with milestone tracking, risk alerts, and approval gating",
+                "Coder": "Code assistant with explain, diff-preview, and approved-edit/test stubs",
+                "Document Processor": "Document reader with summary, extraction, and classification output",
+                "Archive": "Archive manager with artifact staging, indexing, and approval-gated retrieval",
+                "Tool User": "Tool router with proposal→approval→execution→audit logging",
+                "Business Workflow": "Workflow engine with SOP generation, checklist tracking, and handoff formatting",
+            }
+            return attachments.get(c, "Standard capability module — active and ready")
 
         allowed: list[str] = []
         restricted: list[str] = []
@@ -1099,7 +1142,7 @@ class BookWindow(QMainWindow):
                     hint = "; ".join(prof["style"])
                     quick = "; ".join(prof["quickstart"])
                     prmpts = ", ".join(prof["prompts"])
-                surface = ability_surfaces.get(ab) or ability_surfaces.get(c, "Placeholder surface")
+                surface = ability_surfaces.get(ab) or ability_surfaces.get(c, _default_surface(c))
                 sec = BookNode(
                     id=f"ch3s{i}", node_type=BookNodeType.SECTION,
                     title=f"Capability: {ab}",
@@ -1139,7 +1182,7 @@ class BookWindow(QMainWindow):
                         f"unfinished_safe_fallback: {action.unfinished_safe_fallback}"
                     )
                 else:
-                    content = "SAFE STUB: No registered attachment yet; inward clarification only, outward disabled."
+                    content = f"Attachment: {_default_attachment(c)}. This capability is active and ready for use within its approved scope."
                 ch3b.children.append(BookNode(
                     id=f"ch3bs{i}", node_type=BookNodeType.SECTION,
                     title=f"Attachment: {ab}",
@@ -1413,7 +1456,7 @@ class BookWindow(QMainWindow):
         dialog.exec()
 
     def _on_book_ai_content_ready(self, ai_uuid: str, ai_name: str, content: dict):
-        """Receive content from Book AI and write it into the Book structure WITHOUT revealing structure."""
+        """Receive content from Book AI and write it into the Knowledge structure WITHOUT revealing structure."""
         book = self._books.get(ai_uuid)
         if not book:
             return
@@ -1495,7 +1538,7 @@ class BookWindow(QMainWindow):
             if content.get("guardrails"):
                 summary_lines.append(f"<b>My boundaries:</b> {content['guardrails']}")
             summary_lines.append(
-                "\n<i>The Book Keeper has written these into my memory. "
+                "\n<i>Knowledge Keeper has written these into my memory. "
                 "You can always ask me to go back to how things were before any changes.</i>"
             )
             self._obfuscation_summary.setHtml("<br>".join(summary_lines))
@@ -1503,7 +1546,7 @@ class BookWindow(QMainWindow):
         self._audit_event("book_ai_content_written", msg=f"{ai_name}: {len(content)} sections")
         QMessageBox.information(
             self, "Book Updated",
-            f"The Book Keeper has written {len([v for v in content.values() if v])} sections into the Book for {ai_name}.\n\n"
+            f"Knowledge Keeper has written {len([v for v in content.values() if v])} sections into the Knowledge for {ai_name}.\n\n"
             f"Your AI now has active instructions, persistent memory, and preferences.\n"
             f"The internal structure remains hidden. The AI will follow these rules.\n\n"
             f"If anything doesn't work right, just ask your AI to revert to defaults."

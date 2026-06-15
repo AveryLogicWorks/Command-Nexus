@@ -48,12 +48,9 @@ class CommandNexusApp:
                 sys.exit(0)
             # Audit log the startup mode
             if dlg.demo_mode:
-                self._audit.log_event("DEMO_MODE_STARTUP", "User started in demo mode (no license)")
+                self._audit.log(tool="CommandNexusApp", action="DEMO_MODE_STARTUP", target="User started in demo mode (no license)", approved=True, status="info")
             elif self._license.is_activated:
-                self._audit.log_event(
-                    "LICENSE_ACTIVATED_STARTUP",
-                    f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}"
-                )
+                self._audit.log(tool="CommandNexusApp", action="LICENSE_ACTIVATED_STARTUP", target=f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}", approved=True, status="info")
 
         # ── Anti-Tamper Tripwire ─────────────────────────────────────────
         self._tripwire = TripwireManager(license_manager=self._license)
@@ -66,7 +63,7 @@ class CommandNexusApp:
                 "Contact support@pantheonforge.io if you believe this is an error.\n\n"
                 "Any attempt to bypass this protection may result in permanent data loss.",
             )
-            self._audit.log_event("TRIPWIRE_TRIGGERED", self._tripwire.report())
+            self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_TRIGGERED", target=str(self._tripwire.report()), approved=False, status="critical")
             sys.exit(1)
         # ──────────────────────────────────────────────────────────────────
 

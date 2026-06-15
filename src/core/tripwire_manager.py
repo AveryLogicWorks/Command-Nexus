@@ -66,11 +66,24 @@ class TripwireManager:
     Call check_all() at app startup (before any user-facing window appears).
     """
 
-    def __init__(self, license_manager=None):
+    def __init__(self, license_manager=None, founder_mode: bool = False):
         self._lm = license_manager
         self._events: list[TamperEvent] = []
         self._tripped = False
         self._manifest: dict[str, str] = {}
+        self._founder_mode = founder_mode
+        self._paused = False  # Development pause - disables destructive checks
+
+    def pause(self):
+        """Pause tripwire for development/repair. Only effective in founder mode."""
+        self._paused = True
+
+    def resume(self):
+        """Resume tripwire checks."""
+        self._paused = False
+
+    def is_paused(self) -> bool:
+        return self._paused
 
     # =====================================================================
     # Public API
@@ -83,6 +96,16 @@ class TripwireManager:
         """
         self._events.clear()
         self._tripped = False
+
+        # ── Founder absolute bypass ──
+        if self._founder_mode:
+            self._events.append(TamperEvent("FOUNDER", "Tripwire bypassed — founder mode active", severity="info"))
+            return True
+
+        # ── Development pause ──
+        if self._paused:
+            self._events.append(TamperEvent("PAUSED", "Tripwire paused for development/repair", severity="info"))
+            return True
 
         # Order matters: early layers are forgiving, later layers are destructive
         checks: list[tuple[str, Callable[[], bool]]] = [

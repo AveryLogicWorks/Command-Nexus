@@ -238,6 +238,7 @@ class AuditPane(QGroupBox):
         self._text = QTextEdit()
         self._text.setReadOnly(True)
         self._text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         font = QFont("Consolas", 10)
         self._text.setFont(font)
         self._text.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
@@ -487,6 +488,7 @@ class NavigationBar(QWidget):
     open_book = pyqtSignal()
     open_constraints = pyqtSignal()
     open_governance = pyqtSignal()
+    open_customer_ai = pyqtSignal()
     voice_toggled = pyqtSignal(bool)
     mic_clicked = pyqtSignal()
 
@@ -494,19 +496,36 @@ class NavigationBar(QWidget):
         super().__init__(parent)
 
         btn_forge = QPushButton("AI Forge")
-        btn_book = QPushButton("The Book")
+        btn_forge.setObjectName("nav_forge")
+        
+        btn_book = QPushButton("Intelligence")
+        btn_book.setObjectName("nav_book")
+        
         btn_constraints = QPushButton("Upgrades")
+        btn_constraints.setObjectName("nav_constraints")
+        
         btn_governance = QPushButton("Governance")
+        btn_governance.setObjectName("nav_governance")
+        
+        btn_customer_ai = QPushButton("🤖 Support")
+        btn_customer_ai.setObjectName("nav_customer_ai")
+        
+        btn_tour = QPushButton("🎓 Tour")
+        btn_tour.setObjectName("nav_tour")
 
         btn_forge.setStyleSheet("background-color: #5e35b1; color: white; font-weight: bold; min-width: 90px;")
         btn_book.setStyleSheet("background-color: #00897b; color: white; font-weight: bold; min-width: 90px;")
         btn_constraints.setStyleSheet("background-color: #f57c00; color: white; font-weight: bold; min-width: 90px;")
         btn_governance.setStyleSheet("background-color: #455a64; color: white; font-weight: bold; min-width: 90px;")
+        btn_customer_ai.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold; min-width: 90px;")
+        btn_tour.setStyleSheet("background-color: #1f6feb; color: white; font-weight: bold; min-width: 80px;")
 
         btn_forge.clicked.connect(self.open_forge.emit)
         btn_book.clicked.connect(self.open_book.emit)
         btn_constraints.clicked.connect(self.open_constraints.emit)
         btn_governance.clicked.connect(self.open_governance.emit)
+        btn_customer_ai.clicked.connect(self.open_customer_ai.emit)
+        btn_tour.clicked.connect(self._on_tour_clicked)
 
         self._btn_voice = QPushButton("Voice: OFF")
         self._btn_voice.setCheckable(True)
@@ -523,9 +542,25 @@ class NavigationBar(QWidget):
         layout.addWidget(btn_book)
         layout.addWidget(btn_constraints)
         layout.addWidget(btn_governance)
+        layout.addWidget(btn_customer_ai)
+        layout.addWidget(btn_tour)
+        layout.addSpacing(20)
         layout.addWidget(self._btn_voice)
         layout.addWidget(self._btn_mic)
         layout.addStretch()
+
+    def _on_tour_clicked(self):
+        """Show the interactive demo tour (demo mode - nothing persists)."""
+        from ..tour.demo_tour import DemoTourController
+        
+        # Get main window (parent chain: NavigationBar -> VisibilityWindow -> CommandNexusApp)
+        parent = self.parent()
+        while parent and not hasattr(parent, '_audit'):
+            parent = parent.parent()
+        
+        # Start demo tour (positions tooltip in bottom-right, waits for clicks)
+        self._tour_controller = DemoTourController(parent or self.window(), getattr(parent, '_audit', None), demo_mode=True)
+        self._tour_controller.start_tour()
 
     def _on_voice_toggle(self):
         on = self._btn_voice.isChecked()
@@ -1010,7 +1045,7 @@ class VisibilityWindow(QMainWindow):
 
         greeting = (
             f"Hi, I'm {session.name}. "
-            f"I'm ready to assist using my pre-built skills from The Book. "
+            f"I'm ready to assist using my pre-built skills from Knowledge. "
             + " ".join(skill_lines)
             + " Let's get started on your mission."
         )
@@ -1249,6 +1284,16 @@ class VisibilityWindow(QMainWindow):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def closeEvent(self, event):
+        self._viewport.stop_capture()
+        self._sim.stop()
+        if hasattr(self, '_watcher_poll'):
+            self._watcher_poll.stop()
+        if hasattr(self, '_voice'):
+            self._voice.stop()
+        event.accept()
+
 
 # ---------------------------------------------------------------------------
 # Parental Controls Helpers
@@ -1506,6 +1551,8 @@ class ParentalControlsInfoDialog(QDialog):
 
         info = QTextEdit()
         info.setReadOnly(True)
+        info.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        info.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         info.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:12px;")
         info.setHtml("""
         <h3 style="color:#58a6ff;">What is Parental Controls?</h3>
@@ -1547,12 +1594,3 @@ class ParentalControlsInfoDialog(QDialog):
 # ---------------------------------------------------------------------------
 # End Parental Controls Dialog
 # ---------------------------------------------------------------------------
-
-    def closeEvent(self, event):
-        self._viewport.stop_capture()
-        self._sim.stop()
-        if hasattr(self, '_watcher_poll'):
-            self._watcher_poll.stop()
-        if hasattr(self, '_voice'):
-            self._voice.stop()
-        event.accept()
