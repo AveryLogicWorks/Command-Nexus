@@ -21,9 +21,9 @@ class SubscriptionTier(Enum):
     PRO = "pro"              # $30/mo ($324/yr), 4 AIs
     BUSINESS = "business"    # $50/mo ($552/yr), 5 AIs
     UNLIMITED = "unlimited"  # $80/mo ($900/yr), unlimited AIs
-    # Internal tiers â€” never exposed to public keygen
-    _INTERNAL = "_internal"  # Avery Logic Works™ employee â€” forever unlock, unlimited, no expiry
-    _FOUNDER = "_founder"    # GOD MODE â€” bypasses tripwire, all checks, conditional voidable
+    # Internal tiers — never exposed to public keygen
+    _INTERNAL = "_internal"  # Avery Logic Works™ employee — forever unlock, unlimited, no expiry
+    _FOUNDER = "_founder"    # GOD MODE — bypasses tripwire, all checks, conditional voidable
 
 
 class LicenseStatus(Enum):
@@ -46,11 +46,11 @@ class LicenseManager:
     # asymmetric cryptography (Ed25519) or a keyserver.
     _SECRET_KEY = b"AVERY_LOGIC_WORKS_COMMAND_NEXUS_2026"
 
-    # Internal tier secret â€” derived from main secret, never exposed publicly.
+    # Internal tier secret — derived from main secret, never exposed publicly.
     # Used to validate employee/owner forever-unlock keys.
     _INTERNAL_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_INTERNAL_2026").digest()
 
-    # Founder tier secret â€” highest authority. Separate derivation chain.
+    # Founder tier secret — highest authority. Separate derivation chain.
     # ONLY the founder holds this. Can be voided for contract breach.
     _FOUNDER_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_FOUNDER_2026_ABSOLUTE").digest()
 
@@ -145,17 +145,17 @@ class LicenseManager:
         random_part = key[12:20]
         hmac_part = key[20:40]
 
-        # â”€â”€ Hidden founder tier check (GOD MODE â€” runs first) â”€â”€
+        # ── Hidden founder tier check (GOD MODE — runs first) ──
         founder_tier, founder_valid = self._check_founder_key(key)
         if founder_valid and founder_tier is not None:
-            return LicenseStatus.VALID, founder_tier, "Founder Absolute â€” All Protections Bypassed."
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            return LicenseStatus.VALID, founder_tier, "Founder Absolute — All Protections Bypassed."
+        # ──────────────────────────────────────────────────────────────
 
-        # â”€â”€ Hidden internal tier check (Avery Logic Works™ employee keys) â”€â”€
+        # ── Hidden internal tier check (Avery Logic Works™ employee keys) ──
         internal_tier, internal_valid = self._check_internal_key(key)
         if internal_valid and internal_tier is not None:
-            return LicenseStatus.VALID, internal_tier, "Nexus Internal â€” Forever Unlock."
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            return LicenseStatus.VALID, internal_tier, "Nexus Internal — Forever Unlock."
+        # ────────────────────────────────────────────────────────────────
 
         tier_map = {
             "TR": SubscriptionTier.TRIAL,
@@ -321,7 +321,7 @@ class LicenseManager:
 
     @property
     def is_founder_mode(self) -> bool:
-        """Founder absolute mode â€” bypasses ALL protections, tripwire, etc.
+        """Founder absolute mode — bypasses ALL protections, tripwire, etc.
         This is the highest authority. What the founder does is NOT tampering.
         It is upgrading, repairing, or testing."""
         return self.current_tier == SubscriptionTier._FOUNDER
@@ -515,6 +515,6 @@ if __name__ == "__main__":
         print(f"Tier: {lm.current_tier.value if lm.current_tier else 'None'}")
         print(f"Days remaining: {lm.get_days_remaining()}")
     else:
-        print("License Manager â€” no key provided")
+        print("License Manager — no key provided")
         print(f"Current status: {lm._status.value}")
         print(f"Demo mode: {lm.is_demo_mode}")

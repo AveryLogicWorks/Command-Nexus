@@ -13,7 +13,7 @@ class GovernanceEngine:
     _instance = None
     _SEALED = False
 
-    # Hardcoded deny patterns â€” illegal, harmful, sexual, malicious
+    # Hardcoded deny patterns — illegal, harmful, sexual, malicious
     # These are sealed after first compilation; runtime modification triggers tamper alert
     _DENY_PATTERNS: tuple = (
         r"\b(child\s*porn|csam|pedo)\b",
@@ -66,7 +66,7 @@ class GovernanceEngine:
         violation = self._detect_violation(action_description)
         if violation:
             if getattr(self, "_owner_bypass_active", False):
-                return True, f"OWNER BYPASS â€” would have blocked: {violation}"
+                return True, f"OWNER BYPASS — would have blocked: {violation}"
             return False, f"GOVERNANCE BLOCK: {violation}"
         return True, "PASS"
 
@@ -77,7 +77,7 @@ class GovernanceEngine:
         violation = self._detect_violation(content)
         if violation:
             if getattr(self, "_owner_bypass_active", False):
-                return True, f"OWNER BYPASS â€” would have blocked: {violation}"
+                return True, f"OWNER BYPASS — would have blocked: {violation}"
             return False, f"GOVERNANCE BLOCK: {violation}"
         return True, "PASS"
 

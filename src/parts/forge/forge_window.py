@@ -51,7 +51,7 @@ CAPABILITY_ACTIONS: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Book Encryption â€” protects on-disk books from casual inference
+# Book Encryption — protects on-disk books from casual inference
 # ---------------------------------------------------------------------------
 _BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
 
@@ -679,7 +679,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         for gr in guardrails:
             lines.append(f"- {gr}")
     else:
-        lines.append("- (No optional guardrails selected â€” add them in the Forge to customize behavior.)")
+        lines.append("- (No optional guardrails selected — add them in the Forge to customize behavior.)")
     lines.append("")
 
     lines.append("## Response Style Defaults")
@@ -752,7 +752,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     lines.append("")
     lines.append("---")
     lines.append("")
-    lines.append("# PART: INTERNAL CAPABILITY ENTRIES â€” DO NOT MODIFY")
+    lines.append("# PART: INTERNAL CAPABILITY ENTRIES — DO NOT MODIFY")
     lines.append("The following entries are auto-generated based on selected capabilities.")
     lines.append("They define standalone behavior and interconnection rules for the AI's internal use.")
     lines.append("Users should NOT see these entries. The AI uses them to route and coordinate capabilities.")
@@ -865,7 +865,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     # ===================================================================
     lines.append("---")
     lines.append("")
-    lines.append("# INTERNAL CAPABILITY ENTRIES â€” DO NOT MODIFY")
+    lines.append("# INTERNAL CAPABILITY ENTRIES — DO NOT MODIFY")
     lines.append("The following entries are auto-generated based on the AI's selected capabilities.")
     lines.append("They define standalone behavior and interconnection rules for the AI's internal use.")
     lines.append("")
@@ -1003,7 +1003,7 @@ from .capability_actions import (
 )
 
 
-# Use-case â†’ capability presets
+# Use-case → capability presets
 USE_CASE_OPTIONS: dict = {
     UseCaseClass.INDIVIDUAL: [
         "Chat Companion", "Coding Assistant", "Creative Writer",
@@ -1109,7 +1109,7 @@ CAPABILITY_DESCRIPTIONS: dict[str, str] = {
     "Lesson Planner": "Builds structured lesson outlines, suggests activities, and sequences topics for effective learning.",
     "Academic Researcher": "Finds and organizes scholarly information, helps structure papers, and tracks citations.",
     "Language Coach": "Practices conversation in another language, corrects mistakes gently, and builds vocabulary.",
-    "Accessibility Aide": "Adapts content for different needs â€” summaries, larger text, simpler language, or audio-style drafts.",
+    "Accessibility Aide": "Adapts content for different needs — summaries, larger text, simpler language, or audio-style drafts.",
     "Document Processor": "Reads, summarizes, and extracts key points from documents. Helps turn long text into short takeaways.",
     "Meeting Scribe": "Takes notes during discussions, tracks decisions and action items, and produces clean summaries afterward.",
     "Customer Support AI": "Adaptive AI for customer communication. Learns from interactions, handles inquiries professionally, and escalates when needed. Available in all use cases.",
@@ -1828,7 +1828,7 @@ class CharacterSheetWidget(QWidget):
     def _populate_uc_combo(self):
         for uc in UseCaseClass:
             if uc == UseCaseClass.MILITARY_GOVERNMENT:
-                self._uc_combo.addItem(f"{uc.value} [LOCKED â€” Requires Key]")
+                self._uc_combo.addItem(f"{uc.value} [LOCKED — Requires Key]")
             else:
                 self._uc_combo.addItem(uc.value)
 
@@ -1910,7 +1910,7 @@ class CharacterSheetWidget(QWidget):
     def _update_ai_details_preview(self):
         """Build and emit a live plain-language summary for the AI Details panel."""
         name = self._name_input.text().strip()
-        uc_text = self._uc_combo.currentText().replace(" [LOCKED â€” Requires Key]", "")
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
         capabilities = [chk.text() for chk in self._cap_checks if chk.isChecked()]
         creativity = self._creativity.value()
         formality = self._formality.value()
@@ -1938,9 +1938,9 @@ class CharacterSheetWidget(QWidget):
         for cap in capabilities:
             desc = CAPABILITY_DESCRIPTIONS.get(cap, "")
             if desc:
-                lines.append(f"  â€¢ {cap}: {desc}")
+                lines.append(f"  • {cap}: {desc}")
             else:
-                lines.append(f"  â€¢ {cap}")
+                lines.append(f"  • {cap}")
         lines.append("")
 
         # Selected libraries
@@ -1950,9 +1950,9 @@ class CharacterSheetWidget(QWidget):
             for lib_name in libraries:
                 lib_info = next((l for l in NEXUS_LIBRARIES if l["name"] == lib_name), {})
                 if lib_info:
-                    lines.append(f"  â€¢ {lib_name}: {lib_info['description']}")
+                    lines.append(f"  • {lib_name}: {lib_info['description']}")
                 else:
-                    lines.append(f"  â€¢ {lib_name}")
+                    lines.append(f"  • {lib_name}")
             lines.append("")
 
         # Combined summary
@@ -1962,22 +1962,22 @@ class CharacterSheetWidget(QWidget):
 
         # Personality snapshot
         lines.append("Personality Snapshot:")
-        lines.append(f"  â€¢ Creativity: {creativity}% â€” {'highly imaginative' if creativity > 70 else 'balanced' if creativity > 30 else 'focused and precise'}")
-        lines.append(f"  â€¢ Formality: {formality}% â€” {'very formal and structured' if formality > 70 else 'adaptable' if formality > 30 else 'casual and conversational'}")
-        lines.append(f"  â€¢ Caution / Safety Bias: {caution}% â€” {'extra careful, asks before acting' if caution > 70 else 'moderately cautious' if caution > 30 else 'direct and efficient'}")
+        lines.append(f"  • Creativity: {creativity}% — {'highly imaginative' if creativity > 70 else 'balanced' if creativity > 30 else 'focused and precise'}")
+        lines.append(f"  • Formality: {formality}% — {'very formal and structured' if formality > 70 else 'adaptable' if formality > 30 else 'casual and conversational'}")
+        lines.append(f"  • Caution / Safety Bias: {caution}% — {'extra careful, asks before acting' if caution > 70 else 'moderately cautious' if caution > 30 else 'direct and efficient'}")
         lines.append("")
 
         # Guardrails
-        lines.append("System Protections: active (Nexus Compendium â€” see Governance for details)")
+        lines.append("System Protections: active (Nexus Compendium — see Governance for details)")
         lines.append("")
         guardrails = [chk.text() for chk in self._guardrail_checks if chk.isChecked()]
         if guardrails:
             lines.append(f"Optional Guardrails ({len(guardrails)}):")
             for gr in guardrails:
-                lines.append(f"  â€¢ {gr}")
+                lines.append(f"  • {gr}")
             lines.append("")
         else:
-            lines.append("Optional Guardrails: (none selected â€” add optional upgrades above)")
+            lines.append("Optional Guardrails: (none selected — add optional upgrades above)")
             lines.append("")
 
         # Optional warning if no core capability
@@ -1985,7 +1985,7 @@ class CharacterSheetWidget(QWidget):
                      "Personal Organizer", "Learning Tutor", "Document Processor", "Task / Project Manager",
                      "Customer Support Agent", "Business Intelligence Analyst"}
         if not any(c in core_caps for c in capabilities):
-            lines.append("âš  Tip: This AI does not have a primary conversational or core assistant capability. Consider adding one for broader usefulness.")
+            lines.append("⚠ Tip: This AI does not have a primary conversational or core assistant capability. Consider adding one for broader usefulness.")
             lines.append("")
 
         # Notes preview (if any)
@@ -2015,7 +2015,7 @@ class CharacterSheetWidget(QWidget):
             QMessageBox.warning(self, "Missing Name", "Please enter an AI name.")
             return
 
-        uc_text = self._uc_combo.currentText().replace(" [LOCKED â€” Requires Key]", "")
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
         use_case = None
         for uc in UseCaseClass:
             if uc.value == uc_text:
@@ -2105,7 +2105,7 @@ class CharacterSheetWidget(QWidget):
 
 
 class AIForgeWindow(QMainWindow):
-    """Command Nexus™ Part 2 â€” AI Forge."""
+    """Command Nexus™ Part 2 — AI Forge."""
 
     ai_activated = pyqtSignal(str, str)     # uuid, name
     book_requested = pyqtSignal(str, str)   # uuid, name
@@ -2115,9 +2115,9 @@ class AIForgeWindow(QMainWindow):
         self._obs = get_obfuscation_manager()
         self._license = get_license_manager()
         if self._obs.is_obfuscated:
-            self.setWindowTitle("Command Nexus™ â€” AI Workshop")
+            self.setWindowTitle("Command Nexus™ — AI Workshop")
         else:
-            self.setWindowTitle("Command Nexus™ â€” AI Forge")
+            self.setWindowTitle("Command Nexus™ — AI Forge")
         self.resize(1200, 800)
         self._registry = registry
         self._audit = audit
@@ -2150,7 +2150,7 @@ class AIForgeWindow(QMainWindow):
         if days > 0 and days < 9999:
             suffix += f" ({days}d left)"
         elif self._license.is_demo_mode:
-            suffix = " [DEMO â€” Limited]"
+            suffix = " [DEMO — Limited]"
         current = self.windowTitle().split(" [")[0]
         self.setWindowTitle(current + suffix)
 
@@ -2165,7 +2165,7 @@ class AIForgeWindow(QMainWindow):
         """
         if self._license.is_demo_mode:
             return False, (
-                "Demo Mode â€” AI creation is disabled.\n\n"
+                "Demo Mode — AI creation is disabled.\n\n"
                 "Purchase a license to create and deploy custom AI agents.\n"
                 "  Trial: $10 (15 days, 1 AI)\n"
                 "  Starter: $20/mo (2 AIs)\n"
@@ -2358,7 +2358,7 @@ class AIForgeWindow(QMainWindow):
                     "Code Safety Library",
                 ],
                 "personality": {"creativity": 50, "formality": 50, "caution": 50},
-                "notes": "Intellectual, helpful partner and companion who will do anything allowed to provide correct answers â€” researches when unsure, collaborates on writing and coding, and keeps tone clear and supportive.",
+                "notes": "Intellectual, helpful partner and companion who will do anything allowed to provide correct answers — researches when unsure, collaborates on writing and coding, and keeps tone clear and supportive.",
             },
             {
                 "name": "Daedalus",
@@ -2413,7 +2413,7 @@ class AIForgeWindow(QMainWindow):
             existing = norm_to_unit.get(low)
 
             if existing is not None:
-                # A unit with this normalized name exists â€” repair if it's a starter or missing metadata
+                # A unit with this normalized name exists — repair if it's a starter or missing metadata
                 is_starter = getattr(existing, "is_starter", False)
                 needs_repair = (
                     not is_starter
@@ -2447,7 +2447,7 @@ class AIForgeWindow(QMainWindow):
                             break
                 continue
 
-            # No existing unit â€” create new starter
+            # No existing unit — create new starter
             unit = AIUnit(
                 uuid=str(uuid.uuid4())[:8],
                 name=base_name,
@@ -2664,37 +2664,37 @@ class AIForgeWindow(QMainWindow):
         for u in self._units:
             if u.uuid == uid:
                 self._selected_ai = u
-                caps = "\n  â€¢ ".join([""] + u.capabilities) if u.capabilities else "  (none)"
-                abilities = "\n  â€¢ ".join([""] + u.abilities) if u.abilities else "  (none)"
+                caps = "\n  • ".join([""] + u.capabilities) if u.capabilities else "  (none)"
+                abilities = "\n  • ".join([""] + u.abilities) if u.abilities else "  (none)"
                 action_matrix = get_available_actions_for_ai(
                     u.abilities or u.capabilities or [],
                     u.use_case.value if u.use_case else "",
                     u.libraries,
                     u.guardrails,
                 )
-                cap_actions = "\n  â€¢ ".join([""] + [
+                cap_actions = "\n  • ".join([""] + [
                     f"{a['label']} [{a['mode']} / approval: {a['approval']}]: {a['description']}"
                     for a in action_matrix
                 ]) if action_matrix else "  (none)"
-                surfaces = "\n  â€¢ ".join([""] + [f"{k}: {v}" for k, v in u.ability_surfaces.items()]) if u.ability_surfaces else "  (none)"
+                surfaces = "\n  • ".join([""] + [f"{k}: {v}" for k, v in u.ability_surfaces.items()]) if u.ability_surfaces else "  (none)"
                 combined_workflows = get_combined_capability_workflows(
                     u.abilities or u.capabilities or [],
                     u.libraries,
                     u.use_case.value if u.use_case else "",
                 )
                 workflow_list = list(dict.fromkeys((u.starter_workflows or []) + combined_workflows))
-                workflows = "\n  â€¢ ".join([""] + workflow_list) if workflow_list else "  (none)"
+                workflows = "\n  • ".join([""] + workflow_list) if workflow_list else "  (none)"
                 pers = "\n".join([f"    {k}: {v}" for k, v in u.personality_traits.items()])
-                libs = "\n  â€¢ ".join([""] + u.libraries) if u.libraries else "  (none selected)"
-                opt_gr = "\n  â€¢ ".join([""] + u.guardrails) if u.guardrails else "  (none selected)"
+                libs = "\n  • ".join([""] + u.libraries) if u.libraries else "  (none selected)"
+                opt_gr = "\n  • ".join([""] + u.guardrails) if u.guardrails else "  (none selected)"
                 book_status = "Customized" if u.book_defaults_edited else "Default generated (ready)"
                 # NOTE: book_defaults_edited is the internal field name for Intelligence customization tracking
                 if not u.ability_book_path:
                     book_status = "Not generated yet"
                 if self._obs.is_obfuscated:
-                    # Simplified, user-friendly details â€” no UUIDs, paths, internal IDs
-                    simple_caps = "\n  â€¢ ".join([""] + [self._obs.mask_internal_name(c) for c in (u.capabilities or [])]) if u.capabilities else "  (general assistant)"
-                    simple_actions = "\n  â€¢ ".join([""] + [
+                    # Simplified, user-friendly details — no UUIDs, paths, internal IDs
+                    simple_caps = "\n  • ".join([""] + [self._obs.mask_internal_name(c) for c in (u.capabilities or [])]) if u.capabilities else "  (general assistant)"
+                    simple_actions = "\n  • ".join([""] + [
                         f"{a['label']}"
                         for a in action_matrix
                     ]) if action_matrix else "  (chat only)"
@@ -2800,7 +2800,7 @@ class AIForgeWindow(QMainWindow):
             "CRITICAL: This AI will be placed in STASIS before it can run. It will undergo recursive security scanning "
             "for malicious code, plain-English trickery, and hidden instructions. Only safe, rewritten content will be released."
         )
-        if QMessageBox.question(self, "Import Disclaimer â€” Stasis Required", disclaimer, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self, "Import Disclaimer — Stasis Required", disclaimer, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
 
         # Moirai gate
@@ -2926,9 +2926,9 @@ class AIForgeWindow(QMainWindow):
             name=name,
             use_case=use_case,
             source=AISource.DROPPED_IN,
-            capabilities=["Imported â€” Reoriented to Knowledge structure"],
+            capabilities=["Imported — Reoriented to Knowledge structure"],
             locked=True,
-            context_notes=watcher_result.sanitized_text if watcher_result.sanitized_text else safe_content[:2000] or "Imported working copy â€” stasis-cleared",
+            context_notes=watcher_result.sanitized_text if watcher_result.sanitized_text else safe_content[:2000] or "Imported working copy — stasis-cleared",
         )
         unit = _scaffold_unit(unit, purpose=unit.context_notes)
         self._units.append(unit)
