@@ -97,14 +97,14 @@ class AuditSimulator(QObject):
     ]
 
     TRAJECTORIES = [
-        "Next: verify search results â†’ extract relevant link â†’ open target page",
-        "Next: read document summary â†’ identify key metrics â†’ compile into table",
-        "Next: draft email body â†’ attach required files â†’ send to distribution list",
-        "Next: cross-check data against source â†’ flag anomalies â†’ generate alert",
-        "Next: summarize findings â†’ format per template â†’ queue for review",
-        "Next: open IDE â†’ create new module â†’ scaffold class structure",
-        "Next: run test suite â†’ capture output â†’ compare against baseline",
-        "Next: scan inbox â†’ categorize by priority â†’ auto-respond to low-priority"
+        "Next: verify search results → extract relevant link → open target page",
+        "Next: read document summary → identify key metrics → compile into table",
+        "Next: draft email body → attach required files → send to distribution list",
+        "Next: cross-check data against source → flag anomalies → generate alert",
+        "Next: summarize findings → format per template → queue for review",
+        "Next: open IDE → create new module → scaffold class structure",
+        "Next: run test suite → capture output → compare against baseline",
+        "Next: scan inbox → categorize by priority → auto-respond to low-priority"
     ]
 
     def __init__(self):
@@ -147,7 +147,7 @@ class ViewportWidget(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setMinimumSize(400, 300)
-        self._label = QLabel("AI Vision Stream â€” standby. No active AI mission.")
+        self._label = QLabel("AI Vision Stream — standby. No active AI mission.")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setStyleSheet("background-color: #1a1a1a; color: #888888; font-size: 14px;")
         layout = QVBoxLayout(self)
@@ -173,15 +173,15 @@ class ViewportWidget(QFrame):
         self._mode = mode
         self._running = True
         self._timer.start(int(1000 / self._fps))
-        label = "AI Vision Stream â€” Screen capture active"
+        label = "AI Vision Stream — Screen capture active"
         if mode == "DEMO":
-            label = "AI Vision Stream â€” DEMO MODE (screen capture)"
+            label = "AI Vision Stream — DEMO MODE (screen capture)"
         elif mode == "MISSION":
-            label = "AI Vision Stream â€” Live mission (screen capture)"
+            label = "AI Vision Stream — Live mission (screen capture)"
         self._label.setText(label)
         self._label.setStyleSheet("background-color: #0d1117; color: #c9d1d9; font-size: 14px;")
 
-    def stop_stream(self, standby_text: str = "AI Vision Stream â€” standby. No active AI mission."):
+    def stop_stream(self, standby_text: str = "AI Vision Stream — standby. No active AI mission."):
         self._running = False
         self._timer.stop()
         self._mode = "IDLE"
@@ -574,11 +574,11 @@ class NavigationBar(QWidget):
 
 
 class VisibilityWindow(QMainWindow):
-    """Command Nexus™ Part 1 â€” The Visibility Window."""
+    """Command Nexus™ Part 1 — The Visibility Window."""
 
     def __init__(self, router=None, registry=None, audit=None, approval=None):
         super().__init__()
-        self.setWindowTitle("Command Nexus™ â€” Visibility Window")
+        self.setWindowTitle("Command Nexus™ — Visibility Window")
         self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         self._governance = GovernanceEngine()
         self._router = router
@@ -637,7 +637,7 @@ class VisibilityWindow(QMainWindow):
         self._nav.mic_clicked.connect(self._on_mic_clicked)
         left_layout.addWidget(self._nav, stretch=0)
 
-        # Mission Control â€” AI session selector + task queue + status
+        # Mission Control — AI session selector + task queue + status
         mission_group = QGroupBox("Mission Control")
         mission_layout = QVBoxLayout(mission_group)
         mission_layout.setContentsMargins(8, 8, 8, 8)
@@ -905,7 +905,7 @@ class VisibilityWindow(QMainWindow):
         self._mode = "DEMO"
         self._viewport.start_stream("DEMO")
         self._sim.start()
-        self._thought_pane.append("[SYSTEM] DEMO MODE â€” simulated AI vision/activity.")
+        self._thought_pane.append("[SYSTEM] DEMO MODE — simulated AI vision/activity.")
         self._action_pane.append("[SYSTEM] Demo stream running. Recording user actions for demonstration only.")
         self._trajectory_pane.append("[SYSTEM] Demo trajectory simulated.")
         self._audit_event("demo_start", msg="Demo mode activated")
@@ -1072,13 +1072,13 @@ class VisibilityWindow(QMainWindow):
         task = session.current_task
 
         if not self._registry:
-            # No backend connected â€” fail fast with clear message
+            # No backend connected — fail fast with clear message
             self._mission_timer.stop()
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now()
             session.current_task = None
             session.status = AIStatus.IDLE
-            self._thought_pane.append("[SYSTEM] Backend not connected â€” no AI runtime available to execute this mission.")
+            self._thought_pane.append("[SYSTEM] Backend not connected — no AI runtime available to execute this mission.")
             self._action_pane.append("[SYSTEM] Task failed. Deploy an AI from the Forge first, or connect a backend.")
             self._speak("Backend not connected. Please deploy an AI from the Forge first, or connect a backend.")
             self._update_status_display(AIStatus.FAILED)
@@ -1178,7 +1178,7 @@ class VisibilityWindow(QMainWindow):
             )
             self._thought_pane.append("[WATCHER] All files verified. Trust restored.")
         else:
-            self._watcher_trust_label.setText("âš  BREACH DETECTED")
+            self._watcher_trust_label.setText("⚠ BREACH DETECTED")
             self._watcher_trust_label.setStyleSheet(
                 "color: #ffffff; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #c62828; border-radius: 4px;"
@@ -1329,7 +1329,7 @@ class ParentalControlsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Parental Controls â€” Kid Safety")
+        self.setWindowTitle("Parental Controls — Kid Safety")
         self.setMinimumSize(480, 520)
         self._settings = {}
         self._load_settings()
@@ -1527,7 +1527,7 @@ class ParentalControlsInfoDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Parental Controls â€” More Info")
+        self.setWindowTitle("Parental Controls — More Info")
         self.setMinimumSize(480, 420)
         self._setup_ui()
         self._apply_dark_theme()
@@ -1574,7 +1574,7 @@ class ParentalControlsInfoDialog(QDialog):
         <p>You can set a maximum session length (in minutes) and choose to log all AI conversations for parent review later.</p>
 
         <h3 style="color:#58a6ff;">Changing Your Password</h3>
-        <p>Inside the Parental Controls settings, scroll to <b>Change Password</b> to set your own custom password. Remember it â€” there is no recovery mechanism built into the app.</p>
+        <p>Inside the Parental Controls settings, scroll to <b>Change Password</b> to set your own custom password. Remember it — there is no recovery mechanism built into the app.</p>
         """)
         layout.addWidget(info)
 

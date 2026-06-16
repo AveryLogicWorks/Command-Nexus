@@ -46,7 +46,7 @@ DEFAULT_VIEWPORT_FPS_FAST = 30
 AUDIT_PANE_MAX_LINES = 1000
 
 PROPRIETARY_NOTICE = (
-    "Command Nexus™ â€” PROPRIETARY AND CONFIDENTIAL\n"
+    "Command Nexus™ — PROPRIETARY AND CONFIDENTIAL\n"
     "Unauthorized use, reproduction, or distribution is strictly prohibited.\n"
     "All rights reserved.\n"
 )
