@@ -78,8 +78,8 @@ class LicenseActivationDialog(QDialog):
 
         key_input_layout = QHBoxLayout()
         self._key_input = QLineEdit()
-        self._key_input.setPlaceholderText("XXXX-XXXX-XXXX-XXXX-XXXX")
-        self._key_input.setMaxLength(24)  # 20 chars + 4 dashes
+        self._key_input.setPlaceholderText("Paste your 40-character license key here")
+        self._key_input.setMaxLength(44)  # 40 chars + 4 dashes
         self._key_input.setStyleSheet("font-size: 13px; padding: 6px;")
         self._key_input.textChanged.connect(self._format_key_input)
         key_input_layout.addWidget(self._key_input)
@@ -126,15 +126,44 @@ class LicenseActivationDialog(QDialog):
         # Pricing info
         pricing = QLabel(
             "<b>Available Tiers:</b><br>"
-            "  Trial â€” $10 (15 days, 1 AI)  |  "
-            "  Starter â€” $20/mo (2 AI)  |  "
-            "  Pro â€” $30/mo ($324/yr, 4 AI)  |  "
-            "  Business â€” $50/mo ($552/yr, 5 AI)  |  "
-            "  Unlimited â€” $80/mo ($900/yr)"
+            "  Trial — $10 one-time (15 days)  |  "
+            "  Pro — $30/month  |  "
+            "  Business — $50/month  |  "
+            "  Unlimited — $80/month  |  "
+            "  Enterprise — Negotiated Pricing"
         )
         pricing.setWordWrap(True)
         pricing.setStyleSheet("font-size: 11px; color: #8b949e; padding: 8px;")
         layout.addWidget(pricing)
+
+        # Early purchase notice
+        early_purchase = QLabel(
+            "<i>Buy your license early. Your license activates when Command Nexus officially drops.</i>"
+        )
+        early_purchase.setWordWrap(True)
+        early_purchase.setStyleSheet("font-size: 10px; color: #58a6ff; padding: 4px;")
+        layout.addWidget(early_purchase)
+
+        # Enterprise info
+        enterprise_info = QLabel(
+            "<b>Enterprise:</b> Custom Enterprise License available by scope. "
+            "Negotiated pricing based on users, deployment scope, custom workflows, integrations, "
+            "support level, and setup requirements. Contact Avery Logic Works for details."
+        )
+        enterprise_info.setWordWrap(True)
+        enterprise_info.setStyleSheet("font-size: 10px; color: #d29922; padding: 4px;")
+        layout.addWidget(enterprise_info)
+
+        # Owner/Aegis boundary
+        boundary_info = QLabel(
+            "<b>Important:</b> Enterprise unlocks the full customer-facing product layer. "
+            "Enterprise does not unlock Aegis Console, owner tools, guardrail bypass, "
+            "hidden repair tools, protected internals, or private maintenance authority. "
+            "Owner/Aegis access is private maintenance authority and is not sold as a license tier."
+        )
+        boundary_info.setWordWrap(True)
+        boundary_info.setStyleSheet("font-size: 10px; color: #f44336; padding: 4px;")
+        layout.addWidget(boundary_info)
 
         # Close button (only if already activated)
         if self._lm.is_activated:
@@ -145,8 +174,8 @@ class LicenseActivationDialog(QDialog):
     def _format_key_input(self, text: str):
         """Auto-insert dashes as user types."""
         raw = text.upper().replace("-", "")
-        if len(raw) > 20:
-            raw = raw[:20]
+        if len(raw) > 40:
+            raw = raw[:40]
         formatted = "-".join(raw[i:i+4] for i in range(0, len(raw), 4))
         self._key_input.blockSignals(True)
         self._key_input.setText(formatted)
@@ -159,7 +188,9 @@ class LicenseActivationDialog(QDialog):
             self._result_label.setText("<span style='color: #f44336;'>Please enter a license key.</span>")
             return
 
-        status, msg = self._lm.activate_key(key)
+        # Strip dashes for validation - license manager expects 40-character raw key
+        raw_key = key.replace("-", "")
+        status, msg = self._lm.activate_key(raw_key)
 
         if status == LicenseStatus.VALID:
             tier = self._lm.get_tier_label()

@@ -1,6 +1,6 @@
 """
-Command Nexus — Capability Book Engine
-Generates Book entries for capabilities automatically.
+Command Nexus — Capability Knowledge Engine
+Generates Knowledge entries for capabilities automatically.
 Each entry describes standalone behavior + interconnections.
 Code-driven — no giant static files.
 """

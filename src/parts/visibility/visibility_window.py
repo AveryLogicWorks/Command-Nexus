@@ -596,11 +596,21 @@ class VisibilityWindow(QMainWindow):
         self._tasks: dict[str, Task] = {}
         self._task_counter = 0
 
-        self._voice = VoiceController(self)
-        self._mic = SpeechRecognizer(self)
-        self._mic.text_ready.connect(self._on_mic_text)
-        self._mic.listening_changed.connect(self._on_mic_listening)
-        self._mic.error_occurred.connect(self._on_mic_error)
+        # Voice and mic - may fail if dependencies missing
+        try:
+            self._voice = VoiceController(self)
+        except Exception as e:
+            print(f"Warning: Voice controller failed to initialize: {e}")
+            self._voice = None
+        
+        try:
+            self._mic = SpeechRecognizer(self)
+            self._mic.text_ready.connect(self._on_mic_text)
+            self._mic.listening_changed.connect(self._on_mic_listening)
+            self._mic.error_occurred.connect(self._on_mic_error)
+        except Exception as e:
+            print(f"Warning: Speech recognizer failed to initialize: {e}")
+            self._mic = None
         self._setup_ui()
         self._setup_simulator()
         self._setup_timers()
@@ -1286,12 +1296,44 @@ class VisibilityWindow(QMainWindow):
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        self._viewport.stop_capture()
-        self._sim.stop()
-        if hasattr(self, '_watcher_poll'):
-            self._watcher_poll.stop()
-        if hasattr(self, '_voice'):
-            self._voice.stop()
+        """Cleanup resources when window is closed."""
+        try:
+            if hasattr(self, '_viewport') and self._viewport:
+                self._viewport.stop_capture()
+        except Exception:
+            pass
+        
+        try:
+            if hasattr(self, '_sim') and self._sim:
+                self._sim.stop()
+        except Exception:
+            pass
+        
+        try:
+            if hasattr(self, '_watcher_poll') and self._watcher_poll:
+                self._watcher_poll.stop()
+        except Exception:
+            pass
+        
+        try:
+            if hasattr(self, '_voice') and self._voice:
+                self._voice.stop()
+        except Exception:
+            pass
+        
+        try:
+            if hasattr(self, '_mission_timer') and self._mission_timer:
+                self._mission_timer.stop()
+        except Exception:
+            pass
+        
+        # Clear sessions and tasks
+        try:
+            self._sessions.clear()
+            self._tasks.clear()
+        except Exception:
+            pass
+        
         event.accept()
 
 

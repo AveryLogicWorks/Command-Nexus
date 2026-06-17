@@ -1,6 +1,6 @@
 """
-The Book — Compendium of Truth data models.
-Structured like a real book: Parts, Chapters, Subchapters, Sections, Relations,
+Knowledge — Compendium of Truth data models.
+Structured with Parts, Chapters, Subchapters, Sections, Relations,
 Glossary, Idioms, Abbreviations.
 """
 
@@ -26,7 +26,7 @@ class BookNodeType(Enum):
 
 @dataclass
 class BookNode:
-    """A single node in The Book hierarchy."""
+    """A single node in the Knowledge hierarchy."""
     id: str
     node_type: BookNodeType
     title: str

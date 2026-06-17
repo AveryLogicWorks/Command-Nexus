@@ -17,13 +17,16 @@ from typing import Optional
 
 class SubscriptionTier(Enum):
     TRIAL = "trial"          # $10 one-time, 15 days, 1 AI
+    TRIAL_ENTERPRISE = "trial_enterprise"  # 15-day Enterprise Evaluation, full customer access
     STARTER = "starter"      # $20/mo, 2 AIs
     PRO = "pro"              # $30/mo ($324/yr), 4 AIs
     BUSINESS = "business"    # $50/mo ($552/yr), 5 AIs
     UNLIMITED = "unlimited"  # $80/mo ($900/yr), unlimited AIs
-    # Internal tiers â€” never exposed to public keygen
-    _INTERNAL = "_internal"  # Avery Logic Works™ employee â€” forever unlock, unlimited, no expiry
-    _FOUNDER = "_founder"    # GOD MODE â€” bypasses tripwire, all checks, conditional voidable
+    ENTERPRISE_PROPERTY = "enterprise_property"  # Negotiated pricing, property deployment
+    ENTERPRISE_CORPORATE = "enterprise_corporate"  # Negotiated pricing, corporate deployment
+    # Internal tiers — never exposed to public keygen
+    _INTERNAL = "_internal"  # Avery Logic Works™ employee — forever unlock, unlimited, no expiry
+    _FOUNDER = "_founder"    # GOD MODE — bypasses tripwire, all checks, conditional voidable
 
 
 class LicenseStatus(Enum):
@@ -65,6 +68,16 @@ class LicenseManager:
             "duration_days": 15,
             "is_recurring": False,
         },
+        SubscriptionTier.TRIAL_ENTERPRISE: {
+            "max_active_ais": 9999,
+            "max_concurrent_sessions": 9999,
+            "allow_outward_actions": True,
+            "allow_cross_workflows": True,
+            "audit_retention_days": 365,
+            "allowed_libraries": "all",
+            "duration_days": 15,
+            "is_recurring": False,
+        },
         SubscriptionTier.STARTER: {
             "max_active_ais": 2,
             "max_concurrent_sessions": 2,
@@ -96,6 +109,26 @@ class LicenseManager:
             "is_recurring": True,
         },
         SubscriptionTier.UNLIMITED: {
+            "max_active_ais": 9999,
+            "max_concurrent_sessions": 9999,
+            "allow_outward_actions": True,  # full
+            "allow_cross_workflows": True,
+            "audit_retention_days": 9999,
+            "allowed_libraries": "all",
+            "duration_days": 30,
+            "is_recurring": True,
+        },
+        SubscriptionTier.ENTERPRISE_PROPERTY: {
+            "max_active_ais": 9999,
+            "max_concurrent_sessions": 9999,
+            "allow_outward_actions": True,  # full
+            "allow_cross_workflows": True,
+            "audit_retention_days": 9999,
+            "allowed_libraries": "all",
+            "duration_days": 30,
+            "is_recurring": True,
+        },
+        SubscriptionTier.ENTERPRISE_CORPORATE: {
             "max_active_ais": 9999,
             "max_concurrent_sessions": 9999,
             "allow_outward_actions": True,  # full
@@ -159,10 +192,13 @@ class LicenseManager:
 
         tier_map = {
             "TR": SubscriptionTier.TRIAL,
+            "TE": SubscriptionTier.TRIAL_ENTERPRISE,
             "ST": SubscriptionTier.STARTER,
             "PR": SubscriptionTier.PRO,
             "BU": SubscriptionTier.BUSINESS,
             "UN": SubscriptionTier.UNLIMITED,
+            "EP": SubscriptionTier.ENTERPRISE_PROPERTY,
+            "EC": SubscriptionTier.ENTERPRISE_CORPORATE,
         }
         tier = tier_map.get(tier_code)
         if tier is None:
@@ -189,7 +225,7 @@ class LicenseManager:
         now = datetime.now()
 
         if now > expiry_date:
-            if tier == SubscriptionTier.TRIAL:
+            if tier in (SubscriptionTier.TRIAL, SubscriptionTier.TRIAL_ENTERPRISE):
                 return LicenseStatus.TRIAL_EXPIRED, tier, "Trial period has expired. Please purchase a subscription."
             return LicenseStatus.EXPIRED, tier, "License has expired. Please renew your subscription."
 
@@ -339,10 +375,13 @@ class LicenseManager:
             return "Nexus Internal"
         labels = {
             SubscriptionTier.TRIAL: "Trial",
+            SubscriptionTier.TRIAL_ENTERPRISE: "Enterprise Evaluation",
             SubscriptionTier.STARTER: "Starter",
             SubscriptionTier.PRO: "Pro",
             SubscriptionTier.BUSINESS: "Business",
             SubscriptionTier.UNLIMITED: "Unlimited",
+            SubscriptionTier.ENTERPRISE_PROPERTY: "Enterprise (Property)",
+            SubscriptionTier.ENTERPRISE_CORPORATE: "Enterprise (Corporate)",
         }
         return labels.get(tier, "Unknown")
 

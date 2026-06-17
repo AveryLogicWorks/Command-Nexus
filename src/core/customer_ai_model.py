@@ -10,6 +10,7 @@ Features:
 - Learning from successful resolutions
 - Adaptive tone matching (professional, friendly, technical)
 - Integration with Command Nexus AI Forge
+- BASELINE GUARDRAILS INTEGRATION - Safety checks on all content
 
 This is NOT a full neural network - it's a rule-based + learning system
 that provides intelligent responses while being lightweight and fast.
@@ -20,9 +21,11 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+
+from .baseline_guardrails import check_baseline_guardrails
 
 
 class CustomerIntent(Enum):
@@ -255,6 +258,23 @@ class CustomerAIModel:
         Process a customer message and generate a response.
         Returns a dict with response, intent, and learning data.
         """
+        # BASELINE GUARDRAILS: Check incoming message
+        blocked, rule, block_msg = check_baseline_guardrails(message, context="customer_support")
+        if blocked:
+            print(f"[GUARDRAIL BLOCKED] Rule: {rule.id if rule else 'unknown'} | Message: {message[:100]}")
+            return {
+                "response": block_msg,
+                "intent": "blocked",
+                "tone": "professional",
+                "customer_id": customer_id,
+                "escalation_needed": True,
+                "learning_applied": False,
+                "guardrail_triggered": True,
+                "guardrail_rule": rule.id if rule else None,
+            }
+        else:
+            print(f"[GUARDRAIL ALLOWED] Message: {message[:100]}")
+        
         # Get or create customer profile
         profile = self.get_or_create_profile(customer_id)
         if customer_name:
@@ -272,6 +292,11 @@ class CustomerAIModel:
         
         # Generate response
         response = self._generate_response(intent, tone, profile, message)
+        
+        # BASELINE GUARDRAILS: Check outgoing response
+        response_blocked, response_rule, response_block_msg = check_baseline_guardrails(response, context="customer_support")
+        if response_blocked:
+            response = response_block_msg  # Replace with safe fallback
         
         # Record interaction for learning
         interaction = InteractionMemory(
@@ -293,6 +318,8 @@ class CustomerAIModel:
             "customer_id": customer_id,
             "escalation_needed": intent in [CustomerIntent.COMPLAINT, CustomerIntent.REFUND],
             "learning_applied": True,
+            "guardrail_triggered": response_blocked,
+            "guardrail_rule": response_rule.id if response_rule else None,
         }
     
     def _generate_response(

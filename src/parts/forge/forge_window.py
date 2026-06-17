@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ...core.obfuscation_manager import get_obfuscation_manager
 from ...core.license_manager import get_license_manager
+from ...core.nexus_use_lockafire import check_use_lock, UseLockArea
 
 ABILITY_SURFACES = {
     "Chatbot": "Workspace chat command surface with Book context and attachment routing",
@@ -1374,6 +1375,7 @@ class CapabilitySelectionDialog(QDialog):
         search_layout.addWidget(QLabel("Search:"))
         self._search_input = QLineEdit()
         self._search_input.setPlaceholderText("Type to filter capabilities...")
+        self._search_input.setMaxLength(100)  # Limit length to prevent overflow
         self._search_input.textChanged.connect(self._filter_capabilities)
         search_layout.addWidget(self._search_input)
         layout.addLayout(search_layout)
@@ -1423,8 +1425,8 @@ class CapabilitySelectionDialog(QDialog):
         button_box.button(QDialogButtonBox.StandardButton.Cancel).setStyleSheet(
             "background-color: #c62828; color: white; padding: 8px 16px;"
         )
-        button_box.accepted.connect(self._on_apply)
-        button_box.rejected.connect(self._on_cancel)
+        button_box.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self._on_apply)
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).clicked.connect(self._on_cancel)
         layout.addWidget(button_box)
 
     def _load_capabilities(self):
@@ -1728,6 +1730,7 @@ class CharacterSheetWidget(QWidget):
         name_row.addWidget(QLabel("AI Name:"))
         self._name_input = QLineEdit()
         self._name_input.setPlaceholderText("Enter AI name...")
+        self._name_input.setMaxLength(50)  # Limit length to prevent overflow
         self._name_input.textChanged.connect(self._update_ai_details_preview)
         name_row.addWidget(self._name_input)
         layout.addLayout(name_row)
@@ -1761,6 +1764,25 @@ class CharacterSheetWidget(QWidget):
         self._caps_layout = QGridLayout(self._caps_group)
         self._cap_checks: list = []
         layout.addWidget(self._caps_group)
+        
+        # Placeholder message when no capabilities selected
+        self._caps_placeholder = QLabel("Select a Use-Case Class, then click 'Select Capabilities' or 'Suggest Set' to choose abilities.")
+        self._caps_placeholder.setStyleSheet("color: #8b949e; font-style: italic; padding: 10px;")
+        self._caps_placeholder.setWordWrap(True)
+        self._caps_layout.addWidget(self._caps_placeholder, 0, 0, 1, 2)
+        
+        # Button to open capability selection dialog
+        caps_btn_row = QHBoxLayout()
+        self._select_caps_btn = QPushButton("Select Capabilities")
+        self._select_caps_btn.setStyleSheet("background-color: #1f6feb; color: white; font-weight: bold; padding: 6px 12px;")
+        self._select_caps_btn.clicked.connect(self._on_select_capabilities_clicked)
+        self._suggest_caps_btn = QPushButton("💡 Suggest Set")
+        self._suggest_caps_btn.setToolTip("Auto-select recommended capabilities for this use case")
+        self._suggest_caps_btn.clicked.connect(self._on_suggest_capabilities)
+        caps_btn_row.addWidget(self._select_caps_btn)
+        caps_btn_row.addWidget(self._suggest_caps_btn)
+        caps_btn_row.addStretch()
+        layout.addLayout(caps_btn_row)
 
         # Nexus Libraries checkboxes
         self._libs_group = QGroupBox("Nexus Libraries (not abilities)")
@@ -1807,12 +1829,12 @@ class CharacterSheetWidget(QWidget):
 
         # Optional AI Guardrails
         self._guardrails_group = QGroupBox("Optional AI Guardrails")
-        self._guardrails_layout = QGridLayout(self._guardrails_group)
+        self._guardrails_layout = QVBoxLayout(self._guardrails_group)
         self._guardrail_checks: list = []
-        for i, gr in enumerate(OPTIONAL_GUARDRAILS):
+        for gr in OPTIONAL_GUARDRAILS:
             chk = QCheckBox(gr)
             chk.stateChanged.connect(self._update_ai_details_preview)
-            self._guardrails_layout.addWidget(chk, i // 2, i % 2)
+            self._guardrails_layout.addWidget(chk)
             self._guardrail_checks.append(chk)
         layout.addWidget(self._guardrails_group)
 
@@ -1832,6 +1854,74 @@ class CharacterSheetWidget(QWidget):
             else:
                 self._uc_combo.addItem(uc.value)
 
+    def _on_select_capabilities_clicked(self):
+        """Handle click on Select Capabilities button."""
+        # Check if capability selection is locked by Approved Use Locks
+        allowed, message = check_use_lock(UseLockArea.CAPABILITY_SELECTION)
+        if not allowed:
+            QMessageBox.warning(self, "Approved Use Locks", message)
+            return
+
+        # Get current use case
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
+        current_uc = None
+        for uc in UseCaseClass:
+            if uc.value == uc_text:
+                current_uc = uc
+                break
+
+        if not current_uc:
+            QMessageBox.warning(self, "No Use Case", "Please select a Use-Case Class first.")
+            return
+
+        # Open capability selection dialog
+        self._open_capability_dialog(current_uc)
+    
+    def _on_suggest_capabilities(self):
+        """Auto-select recommended capabilities for current use case."""
+        # Get current use case
+        uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
+        current_uc = None
+        for uc in UseCaseClass:
+            if uc.value == uc_text:
+                current_uc = uc
+                break
+        
+        if not current_uc:
+            QMessageBox.warning(self, "No Use Case", "Please select a Use-Case Class first.")
+            return
+        
+        # Clear current selections
+        self._clear_capabilities()
+        
+        # Hide placeholder when adding capabilities
+        self._caps_placeholder.setVisible(False)
+        
+        # Get recommended capabilities
+        recommendations = USE_CASE_RECOMMENDED.get(current_uc, [])
+        
+        # Get all available options for this use case
+        options = USE_CASE_OPTIONS.get(current_uc, [])
+        
+        # Add checkboxes with recommended ones checked
+        for i, opt in enumerate(options):
+            chk = QCheckBox(opt)
+            chk.setChecked(opt in recommendations)
+            chk.stateChanged.connect(self._update_ai_details_preview)
+            
+            # Add hover tooltip with description
+            desc = CAPABILITY_DESCRIPTIONS.get(opt, "")
+            if desc:
+                chk.setToolTip(f"<b>{opt}</b><br>{desc}")
+            
+            self._caps_layout.addWidget(chk, i // 2, i % 2)
+            self._cap_checks.append(chk)
+        
+        self._update_ai_details_preview()
+        
+        count = len(recommendations)
+        QMessageBox.information(self, "Suggested Set", f"Selected {count} recommended capabilities for {current_uc.value}.")
+
     def _on_uc_changed(self, text: str):
         if "LOCKED" in text:
             self._mil_widget.setVisible(True)
@@ -1839,12 +1929,10 @@ class CharacterSheetWidget(QWidget):
             self._update_ai_details_preview()
             return
         self._mil_widget.setVisible(False)
-
-        for uc in UseCaseClass:
-            if uc.value in text:
-                # Open capability selection dialog for better UX
-                self._open_capability_dialog(uc)
-                break
+        
+        # Just clear capabilities when use case changes - user must click Select button
+        self._clear_capabilities()
+        self._update_ai_details_preview()
 
     def _open_capability_dialog(self, use_case: UseCaseClass):
         """Open the enhanced capability selection dialog."""
@@ -1866,6 +1954,9 @@ class CharacterSheetWidget(QWidget):
         """Set the selected capabilities in the UI."""
         # Clear current
         self._clear_capabilities()
+        
+        # Hide placeholder when adding capabilities
+        self._caps_placeholder.setVisible(False)
         
         # Get all available options for current use case
         uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
@@ -1897,6 +1988,8 @@ class CharacterSheetWidget(QWidget):
         for check in self._cap_checks:
             check.deleteLater()
         self._cap_checks.clear()
+        # Show placeholder again
+        self._caps_placeholder.setVisible(True)
 
     def _refresh_capabilities(self, uc: UseCaseClass):
         self._clear_capabilities()
@@ -2010,6 +2103,13 @@ class CharacterSheetWidget(QWidget):
         if not allowed:
             QMessageBox.critical(self, "Protected Mode", gate_msg)
             return
+
+        # Check if AI Factory / Create AI is locked by Approved Use Locks
+        allowed, message = check_use_lock(UseLockArea.AI_FACTORY)
+        if not allowed:
+            QMessageBox.warning(self, "Approved Use Locks", message)
+            return
+
         name = self._name_input.text().strip()
         if not name:
             QMessageBox.warning(self, "Missing Name", "Please enter an AI name.")
@@ -2125,7 +2225,11 @@ class AIForgeWindow(QMainWindow):
         self._selected_ai = None
         self._settings = SettingsManager()
         self._store_dir = self._settings.get_path("ai_store_path")
-        self._store_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._store_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            QMessageBox.critical(self, "Directory Error", f"Failed to create AI store directory: {e}")
+            raise
         self._stasis = StasisGate(self._settings.get_path("ai_store_path"))
         self._setup_ui()
         self._apply_dark_theme()
@@ -2812,14 +2916,19 @@ class AIForgeWindow(QMainWindow):
         # Snapshot original
         name = Path(path).stem
         snapshots_dir = self._store_dir / "import_snapshots"
-        snapshots_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            snapshots_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            QMessageBox.critical(self, "Import Failed", f"Could not create snapshots directory: {e}")
+            return
+        
         snapshot_path = snapshots_dir / f"{name}_original_{uuid.uuid4().hex[:8]}{Path(path).suffix}"
         try:
             orig_bytes = Path(path).read_bytes()
             snapshot_path.write_bytes(orig_bytes)
             checksum_original = sha256(orig_bytes).hexdigest()
-        except Exception:
-            QMessageBox.critical(self, "Import Failed", "Could not create original intake snapshot.")
+        except Exception as e:
+            QMessageBox.critical(self, "Import Failed", f"Could not create original intake snapshot: {e}")
             return
 
         # === STASIS GATE: Intake ===
@@ -2910,10 +3019,14 @@ class AIForgeWindow(QMainWindow):
         # === Load the REWRITTEN (safe) content ===
         rewritten_path = Path(record.rewritten_path) if record.rewritten_path else None
         safe_content = ""
-        if rewritten_path and rewritten_path.exists():
-            safe_content = rewritten_path.read_text(encoding="utf-8", errors="replace")
-        else:
-            safe_content = snapshot_path.read_text(errors="replace")
+        try:
+            if rewritten_path and rewritten_path.exists():
+                safe_content = rewritten_path.read_text(encoding="utf-8", errors="replace")
+            else:
+                safe_content = snapshot_path.read_text(errors="replace")
+        except Exception as e:
+            QMessageBox.critical(self, "Import Failed", f"Could not read safe content: {e}")
+            return
 
         # Run watcher on the safe content too
         watcher_result = run_watchers(safe_content) if snapshot_path.suffix in {".txt", ".py", ".json", ".yaml"} else run_watchers("")
@@ -2959,8 +3072,12 @@ class AIForgeWindow(QMainWindow):
             checksum_working_copy=sha256((unit.context_notes or "").encode("utf-8")).hexdigest(),
         )
         records_dir = self._store_dir / "import_records"
-        records_dir.mkdir(parents=True, exist_ok=True)
-        (records_dir / f"{record_import.import_id}.json").write_text(json.dumps(record_import.__dict__, default=str, indent=2), encoding="utf-8")
+        try:
+            records_dir.mkdir(parents=True, exist_ok=True)
+            (records_dir / f"{record_import.import_id}.json").write_text(json.dumps(record_import.__dict__, default=str, indent=2), encoding="utf-8")
+        except Exception as e:
+            self._audit_event("import_record_save_failed", msg=f"{name}: {e}")
+            # Non-fatal - AI was already saved, just record keeping failed
 
     def _activate_selected(self):
         item = self._list.currentItem()

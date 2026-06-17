@@ -27,7 +27,7 @@ from ..forge.capability_actions import (
     get_available_actions_for_ai,
     get_combined_capability_workflows,
 )
-from .book_ai_dialog import BookAIDialog
+from .book_ai_dialog import KnowledgeAIDialog
 
 
 class ScreeningPipeline:
@@ -205,8 +205,11 @@ class GoalDiscoveryDialog(QDialog):
 
         # Audience
         layout.addWidget(QLabel("<b>Who is it for?</b>\nWho will use or benefit from this AI?"))
-        self._audience_input = QLineEdit()
+        self._audience_input = QTextEdit()
         self._audience_input.setPlaceholderText("e.g., me, my team, my customers...")
+        self._audience_input.setMaximumHeight(60)
+        self._audience_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._audience_input.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self._audience_input)
 
         # Avoid
@@ -261,7 +264,7 @@ class GoalDiscoveryDialog(QDialog):
     def _on_idk(self):
         """Infer purpose from whatever context is available."""
         goal = self._goal_input.toPlainText().strip()
-        audience = self._audience_input.text().strip()
+        audience = self._audience_input.toPlainText().strip()
         avoid = self._avoid_input.toPlainText().strip()
         success = self._success_input.toPlainText().strip()
 
@@ -334,7 +337,7 @@ class GoalDiscoveryDialog(QDialog):
     def _on_accept(self):
         self._result = {
             "goal": self._goal_input.toPlainText().strip(),
-            "audience": self._audience_input.text().strip(),
+            "audience": self._audience_input.toPlainText().strip(),
             "avoid": self._avoid_input.toPlainText().strip(),
             "success": self._success_input.toPlainText().strip(),
             "confidence": self._result.get("confidence", "user-provided"),
@@ -419,7 +422,7 @@ class BookWindow(QMainWindow):
 
         btn_save = QPushButton("Save Knowledge")
         btn_save.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
-        btn_save.clicked.connect(self._save_book)
+        btn_save.clicked.connect(self._save_knowledge)
         toolbar.addWidget(btn_save)
 
         btn_book_ai = QPushButton("Talk to Knowledge Guide")
@@ -457,22 +460,22 @@ class BookWindow(QMainWindow):
 
     def _setup_secure_layered_ui(self, main_layout):
         """
-        INFERENCE LAYER — SECURE BOOK UI
-        ==================================
-        The AI is the inference engine. It reads the raw Book internally
+        INFERENCE LAYER — SECURE KNOWLEDGE UI
+        ====================================
+        The AI is the inference engine. It reads the Knowledge internally
         but NEVER exposes the internal structure. What the user sees is
         a distilled summary — the AI's "Running Memory".
 
-        Left  = Running Memory (AI-summarized from Book, visible to user)
+        Left  = Running Memory (AI-summarized from Knowledge, visible to user)
         Center = AI Avatar / Inference Engine
         Right = Persistent Memory (user private, NEVER to AI)
         Bottom = Two restricted inputs only
 
         GUARDRAILS:
-        - Raw book structure is NEVER shown to user or AI surface
-        - AI summarizes book into Running Memory (human-readable)
+        - Raw structure is NEVER shown to user or AI surface
+        - AI summarizes Knowledge into Running Memory (human-readable)
         - Memory content is NEVER included in AI chat context
-        - AI cannot infer raw book structure from memory
+        - AI cannot infer raw structure from memory
         """
         self._central_layout = main_layout
         self._layered_widget = QWidget()
@@ -588,6 +591,7 @@ class BookWindow(QMainWindow):
         self._memory_input = QLineEdit()
         self._memory_input.setPlaceholderText("Quick memory note (press Enter to add to persistent memory)...")
         self._memory_input.returnPressed.connect(self._add_quick_memory)
+        self._memory_input.setMaxLength(200)  # Limit length to prevent overflow
         row1.addWidget(self._memory_input)
         input_layout.addLayout(row1)
 
@@ -597,6 +601,7 @@ class BookWindow(QMainWindow):
         self._command_input = QLineEdit()
         self._command_input.setPlaceholderText("Type command here — this is what the AI sees and responds to...")
         self._command_input.returnPressed.connect(self._send_command_to_ai)
+        self._command_input.setMaxLength(500)  # Limit length to prevent overflow
         row2.addWidget(self._command_input)
         input_layout.addLayout(row2)
 
@@ -621,7 +626,7 @@ class BookWindow(QMainWindow):
         self._memory_input.clear()
         # Audit log the memory addition (private, not sent to AI)
         if self._audit:
-            self._audit.log(tool="BookWindow", action="BOOK_MEMORY_ADDED", target=f"Private memory entry added for AI {self._current_ai_uuid}", approved=True, status="info")
+            self._audit.log(tool="KnowledgeWindow", action="KNOWLEDGE_MEMORY_ADDED", target=f"Private memory entry added for AI {self._current_ai_uuid}", approved=True, status="info")
 
     def _send_command_to_ai(self):
         """
@@ -635,7 +640,7 @@ class BookWindow(QMainWindow):
             return
         # Audit: log command sent (without memory content)
         if self._audit:
-            self._audit.log(tool="BookWindow", action="BOOK_COMMAND_SENT", target=f"AI: {self._current_ai_uuid}", approved=True, status="info")
+            self._audit.log(tool="KnowledgeWindow", action="KNOWLEDGE_COMMAND_SENT", target=f"AI: {self._current_ai_uuid}", approved=True, status="info")
         # Emit signal — main.py connects this to the AI router
         # Memory is NEVER included. Only the command text.
         self.command_to_ai.emit(command)
@@ -705,7 +710,7 @@ class BookWindow(QMainWindow):
         self._running_memory.setPlainText("\n".join(lines))
 
     def _node_depth(self, target_node: BookNode, current=None, depth=0) -> int:
-        """Find depth of a node in the book tree."""
+        """Find depth of a node in the knowledge tree."""
         if current is None:
             if not self._current_book:
                 return 0
@@ -722,18 +727,18 @@ class BookWindow(QMainWindow):
         """When obfuscation is on, show only a friendly guidance surface."""
         welcome = QLabel(
             "This is where you shape how your AI behaves.\n\n"
-            "Click 'Talk to Knowledge Keeper' above and answer a few simple questions. "
-            "Knowledge Keeper will write the guidance document for you — you never need to see the internal structure."
+            "Click 'Talk to Knowledge Guide' above and answer a few simple questions. "
+            "Knowledge Guide will write the guidance document for you — you never need to see the internal structure."
         )
         welcome.setWordWrap(True)
         welcome.setStyleSheet("font-size: 14px; color: #c9d1d9; padding: 20px;")
         main_layout.addWidget(welcome)
 
-        # Simple read-only summary area (populated when a book is loaded)
+        # Simple read-only summary area (populated when knowledge is loaded)
         self._obfuscation_summary = QTextEdit()
         self._obfuscation_summary.setReadOnly(True)
         self._obfuscation_summary.setPlaceholderText(
-            "Your AI's guidance will appear here once the Knowledge Keeper writes it."
+            "Your AI's guidance will appear here once the Knowledge Guide writes it."
         )
         self._obfuscation_summary.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._obfuscation_summary.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1029,7 +1034,7 @@ class BookWindow(QMainWindow):
 
         def _default_attachment(c: str) -> str:
             attachments = {
-                "Chatbot": "Conversational handler with Book context awareness and safe reply routing",
+                "Chatbot": "Conversational handler with Knowledge context awareness and safe reply routing",
                 "Research": "Research engine with approved external search and citation formatting",
                 "Creative Writing": "Writing engine with outline→draft→revise workflow and tone control",
                 "Notebook": "Note manager with topic tagging, date organization, and recall search",
@@ -1250,7 +1255,7 @@ class BookWindow(QMainWindow):
         else:
             qs_content = (
                 "1) Open Chat from the Forge to talk to this AI.\n"
-                "2) Ask it to draft, research, or plan; it will cite rules from this Book.\n"
+                "2) Ask it to draft, research, or plan; it will cite rules from this Knowledge.\n"
                 "3) Risky actions (files/commands/network) require approval.\n"
                 "4) See Capability sections for what it can do."
             )
@@ -1384,19 +1389,19 @@ class BookWindow(QMainWindow):
         self._screen_status.setText("Screening: Modified (unsaved)")
         self._screen_status.setStyleSheet("color: #fbc02d; font-style: italic;")
 
-    def _save_book(self):
-        allowed, gate_msg = check_action_allowed("save_book", MoiraiHealthReport())
+    def _save_knowledge(self):
+        allowed, gate_msg = check_action_allowed("save_knowledge", MoiraiHealthReport())
         if not allowed:
             QMessageBox.critical(self, "Protected Mode", gate_msg)
             return
         if not self._current_book:
-            QMessageBox.warning(self, "No Book", "Create or load a book first.")
+            QMessageBox.warning(self, "No Knowledge", "Create or load knowledge first.")
             return
 
         # Run screening on ALL nodes
         all_nodes = self._current_book.get_all_nodes()
         total = len(all_nodes)
-        progress = QProgressDialog("Screening Book...", "Cancel", 0, total, self)
+        progress = QProgressDialog("Screening Knowledge...", "Cancel", 0, total, self)
         progress.setWindowTitle("Save Gate")
         progress.setModal(True)
 
@@ -1433,12 +1438,10 @@ class BookWindow(QMainWindow):
         else:
             QMessageBox.information(
                 self, "Saved",
-                "Book saved successfully.\n\n" +
+                "Knowledge saved successfully.\n\n" +
                 ("Screening log:\n" + "\n".join(messages[:10]) if messages else "No issues found.")
             )
 
-        self._screen_status.setText("Screening: Saved & Clean")
-        self._screen_status.setStyleSheet("color: #4caf50; font-style: italic;")
         self._refresh_tree()
         self.book_saved.emit(self._current_book.ai_uuid, self._current_book.ai_name)
 
@@ -1552,29 +1555,29 @@ class BookWindow(QMainWindow):
             f"If anything doesn't work right, just ask your AI to revert to defaults."
         )
 
-    def _store_book_snapshot(self, ai_uuid: str, book):
-        """Store a snapshot of the book before user edits, for rollback capability."""
-        if not hasattr(self, '_book_snapshots'):
-            self._book_snapshots = {}
+    def _store_knowledge_snapshot(self, ai_uuid: str, knowledge):
+        """Store a snapshot of the knowledge before user edits, for rollback capability."""
+        if not hasattr(self, '_knowledge_snapshots'):
+            self._knowledge_snapshots = {}
         # Only store if we haven't stored one yet (first snapshot is the default)
-        if ai_uuid not in self._book_snapshots:
+        if ai_uuid not in self._knowledge_snapshots:
             import copy
-            self._book_snapshots[ai_uuid] = copy.deepcopy(book)
+            self._knowledge_snapshots[ai_uuid] = copy.deepcopy(knowledge)
 
-    def _revert_book_to_defaults(self, ai_uuid: str) -> bool:
-        """Revert a book to its original default snapshot. Returns True if successful."""
-        if not hasattr(self, '_book_snapshots') or ai_uuid not in self._book_snapshots:
+    def _revert_knowledge_to_defaults(self, ai_uuid: str) -> bool:
+        """Revert knowledge to its original default snapshot. Returns True if successful."""
+        if not hasattr(self, '_knowledge_snapshots') or ai_uuid not in self._knowledge_snapshots:
             return False
         import copy
-        self._books[ai_uuid] = copy.deepcopy(self._book_snapshots[ai_uuid])
+        self._books[ai_uuid] = copy.deepcopy(self._knowledge_snapshots[ai_uuid])
         self._refresh_tree()
-        self._audit_event("book_reverted_to_defaults", msg=f"ai_uuid={ai_uuid}")
+        self._audit_event("knowledge_reverted_to_defaults", msg=f"ai_uuid={ai_uuid}")
         return True
 
     def _audit_event(self, action: str, msg: str = ""):
         if self._audit:
             try:
-                self._audit.log(tool="BookWindow", action=action, target=msg, status="info", approved=True)
+                self._audit.log(tool="KnowledgeWindow", action=action, target=msg, status="info", approved=True)
             except Exception:
                 pass
 
@@ -1585,11 +1588,11 @@ class BookWindow(QMainWindow):
         if path:
             if not path.endswith(".py"):
                 path += ".py"
-            py_code = PythonTranslator.translate_book(self._current_book)
+            py_code = PythonTranslator.translate_knowledge(self._current_book)
             Path(path).write_text(py_code, encoding="utf-8")
             QMessageBox.information(self, "Exported", f"Python module exported to:\n{path}")
 
-    def _new_book(self):
+    def _new_knowledge(self):
         # Step 1: Goal discovery
         context = self._current_book.title_page.purpose if self._current_book else ""
         gd = GoalDiscoveryDialog(self, existing_context=context)
@@ -1599,7 +1602,7 @@ class BookWindow(QMainWindow):
 
         # Step 2: Basic identity
         dialog = QDialog(self)
-        dialog.setWindowTitle("New Book")
+        dialog.setWindowTitle("New Knowledge")
         layout = QFormLayout(dialog)
         name_input = QLineEdit()
         name_input.setPlaceholderText("AI Name...")
@@ -1643,7 +1646,7 @@ class BookWindow(QMainWindow):
 
         self._current_book = BookInstance(ai_uuid=ai_uuid, ai_name=ai_name, title_page=tp, root=root)
         self._refresh_tree()
-        self._book_title.setText(f"Book: {ai_name}")
+        self._book_title.setText(f"Knowledge: {ai_name}")
 
     def _add_node_dialog(self):
         if not self._current_book:

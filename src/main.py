@@ -34,90 +34,151 @@ class CommandNexusApp:
         self.app.setStyle(QStyleFactory.create("Fusion"))
         self.app.setApplicationName("Command Nexus")
         self.app.setApplicationVersion("0.1.0-prototype")
-        self._governance = GovernanceEngine()
+        
+        # Track resources for cleanup on failure
+        self._server = None
+        self._watcher = None
+        self._visibility = None
+        self._owner_console = None
+        
+        try:
+            self._governance = GovernanceEngine()
+        except Exception as e:
+            QMessageBox.critical(None, "Initialization Error", f"Failed to initialize Governance Engine: {e}")
+            sys.exit(1)
 
         # Initialize settings (creates workspace dirs on first run)
-        self._settings = SettingsManager()
-        self._settings.initialize()
-        self._approval = ApprovalGate(self._settings)
-        self._audit = AuditLogger(self._settings)
-        self._registry = ToolRegistry()
-        self._router = CommandRouter(self._approval, self._audit, self._registry)
+        try:
+            self._settings = SettingsManager()
+            self._settings.initialize()
+        except Exception as e:
+            QMessageBox.critical(None, "Initialization Error", f"Failed to initialize settings: {e}")
+            sys.exit(1)
+        
+        try:
+            self._approval = ApprovalGate(self._settings)
+            self._audit = AuditLogger(self._settings)
+            self._registry = ToolRegistry()
+            self._router = CommandRouter(self._approval, self._audit, self._registry)
+        except Exception as e:
+            QMessageBox.critical(None, "Initialization Error", f"Failed to initialize core systems: {e}")
+            sys.exit(1)
 
         # License check
-        self._license = get_license_manager()
+        try:
+            self._license = get_license_manager()
+        except Exception as e:
+            QMessageBox.critical(None, "Initialization Error", f"Failed to initialize license manager: {e}")
+            sys.exit(1)
+        
         if not self._license.is_activated:
-            dlg = LicenseActivationDialog()
-            dlg.exec()
+            try:
+                dlg = LicenseActivationDialog()
+                dlg.exec()
+            except Exception as e:
+                QMessageBox.critical(None, "License Error", f"License dialog failed: {e}")
+                sys.exit(1)
             if not self._license.is_activated and not dlg.demo_mode:
                 # User closed dialog without activating or selecting demo
                 sys.exit(0)
             # Audit log the startup mode
-            if dlg.demo_mode:
-                self._audit.log(tool="CommandNexusApp", action="DEMO_MODE_STARTUP", target="User started in demo mode (no license)", approved=True, status="info")
-            elif self._license.is_activated:
-                self._audit.log(tool="CommandNexusApp", action="LICENSE_ACTIVATED_STARTUP", target=f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}", approved=True, status="info")
+            try:
+                if dlg.demo_mode:
+                    self._audit.log(tool="CommandNexusApp", action="DEMO_MODE_STARTUP", target="User started in demo mode (no license)", approved=True, status="info")
+                elif self._license.is_activated:
+                    self._audit.log(tool="CommandNexusApp", action="LICENSE_ACTIVATED_STARTUP", target=f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}", approved=True, status="info")
+            except Exception as e:
+                # Non-fatal: just log to console
+                print(f"Warning: Failed to log startup mode: {e}")
 
         # ── Anti-Tamper Tripwire ─────────────────────────────────────────
         # Founder mode bypasses ALL tripwire checks — what the founder does
         # is NOT tampering. It is upgrading, repairing, or testing.
-        is_founder = self._license.is_founder_mode if self._license.is_activated else False
-        is_internal = self._license.is_internal_mode if self._license.is_activated else False
-        self._tripwire = TripwireManager(
-            license_manager=self._license,
-            founder_mode=is_founder,
-        )
-        # Tripwire stays paused while watcher is in passive (STABILIZATION/REPAIR) mode.
-        # Prevents false trips during development and legitimate source modifications.
-        self._tripwire.pause()
-        if not self._tripwire.check_all():
-            QMessageBox.critical(
-                None,
-                "Security Alert",
-                "Command Nexus has detected unauthorized modification or tampering.\n\n"
-                "Your license has been voided and the program cannot continue.\n"
-                "Contact support@averylogicworks.com if you believe this is an error.\n\n"
-                "Any attempt to bypass this protection may result in permanent data loss.",
+        try:
+            is_founder = self._license.is_founder_mode if self._license.is_activated else False
+            is_internal = self._license.is_internal_mode if self._license.is_activated else False
+            self._tripwire = TripwireManager(
+                license_manager=self._license,
+                founder_mode=is_founder,
             )
-            self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_TRIGGERED", target=str(self._tripwire.report()), approved=False, status="critical")
+            # Tripwire stays paused while watcher is in passive (STABILIZATION/REPAIR) mode.
+            # Prevents false trips during development and legitimate source modifications.
+            self._tripwire.pause()
+            if not self._tripwire.check_all():
+                QMessageBox.critical(
+                    None,
+                    "Security Alert",
+                    "Command Nexus has detected unauthorized modification or tampering.\n\n"
+                    "Your license has been voided and the program cannot continue.\n"
+                    "Contact support@averylogicworks.com if you believe this is an error.\n\n"
+                    "Any attempt to bypass this protection may result in permanent data loss.",
+                )
+                try:
+                    self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_TRIGGERED", target=str(self._tripwire.report()), approved=False, status="critical")
+                except Exception:
+                    pass
+                sys.exit(1)
+        except Exception as e:
+            QMessageBox.critical(None, "Security Error", f"Tripwire initialization failed: {e}")
             sys.exit(1)
         # ──────────────────────────────────────────────────────────────────
 
-        self._server = LocalCommandServer(self._settings)
-        self._server.start()
+        try:
+            self._server = LocalCommandServer(self._settings)
+            self._server.start()
+        except Exception as e:
+            QMessageBox.critical(None, "Server Error", f"Failed to start local command server: {e}")
+            sys.exit(1)
 
         # Main window
-        self._visibility = VisibilityWindow(self._router, self._registry, self._audit, self._approval)
-        self._visibility.show()
+        try:
+            self._visibility = VisibilityWindow(self._router, self._registry, self._audit, self._approval)
+            self._visibility.show()
+        except Exception as e:
+            QMessageBox.critical(None, "Window Error", f"Failed to create main window: {e}")
+            self._cleanup()
+            sys.exit(1)
 
         # Show guided tour on first run (or if forced via settings)
         self._maybe_show_tour()
 
         # Navigation signal wiring
-        nav = self._visibility._nav
-        nav.open_forge.connect(self._open_forge)
-        nav.open_book.connect(self._open_book)
-        nav.open_constraints.connect(self._open_constraints)
-        nav.open_governance.connect(self._open_governance)
-        nav.open_customer_ai.connect(self._open_customer_ai)
+        try:
+            nav = self._visibility._nav
+            nav.open_forge.connect(self._open_forge)
+            nav.open_book.connect(self._open_book)
+            nav.open_constraints.connect(self._open_constraints)
+            nav.open_governance.connect(self._open_governance)
+            nav.open_customer_ai.connect(self._open_customer_ai)
+        except Exception as e:
+            QMessageBox.critical(None, "Navigation Error", f"Failed to wire navigation signals: {e}")
+            self._cleanup()
+            sys.exit(1)
 
         # Background defensive engine — passive during stabilization/repair
-        self._watcher = WatcherEngine(mode="STABILIZATION")
-        self._watcher.mode_changed.connect(self._on_watcher_mode_changed)
-        self._visibility.connect_watcher(self._watcher)
-
-        # Sync tripwire to watcher initial state (passive mode = tripwire paused)
-        self._on_watcher_mode_changed("STABILIZATION")
+        try:
+            self._watcher = WatcherEngine(mode="STABILIZATION")
+            self._watcher.mode_changed.connect(self._on_watcher_mode_changed)
+            self._visibility.connect_watcher(self._watcher)
+            # Sync tripwire to watcher initial state (passive mode = tripwire paused)
+            self._on_watcher_mode_changed("STABILIZATION")
+        except Exception as e:
+            QMessageBox.critical(None, "Watcher Error", f"Failed to initialize watcher engine: {e}")
+            self._cleanup()
+            sys.exit(1)
 
         # Owner-only local control console (Aegis Console)
-        self._owner_console = OwnerConsole(
-            governance=self._governance,
-            approval_gate=self._approval,
-            watcher=self._watcher,
-            audit=self._audit,
-            parent=self._visibility,
-        )
-        self._visibility.set_owner_console(self._owner_console)
+        try:
+            self._owner_console = OwnerConsole(
+                governance=self._governance,
+                approval_gate=self._approval,
+                watcher=self._watcher,
+                audit=self._audit,
+                parent=self._visibility,
+            )
+            self._visibility.set_owner_console(self._owner_console)
+        except Exception as e:
+            QMessageBox.warning(None, "Owner Console Warning", f"Failed to initialize owner console: {e}\n\nContinuing without owner console.")
 
         # Sub-windows (lazily instantiated)
         self._forge = None
@@ -271,6 +332,24 @@ class CommandNexusApp:
     def run(self):
         sys.exit(self.app.exec())
 
+    def _cleanup(self):
+        """Cleanup resources on initialization failure."""
+        try:
+            if self._server and hasattr(self._server, 'stop'):
+                self._server.stop()
+        except Exception:
+            pass
+        try:
+            if self._watcher and hasattr(self._watcher, 'stop'):
+                self._watcher.stop()
+        except Exception:
+            pass
+        try:
+            if self._visibility and hasattr(self._visibility, 'close'):
+                self._visibility.close()
+        except Exception:
+            pass
+
     def show_console(self):
         """Show the Aegis Console (owner-only control)."""
         if hasattr(self, "_owner_console") and self._owner_console is not None:
@@ -366,8 +445,13 @@ class GovernanceRulesDialog(QDialog):
 
     def _open_parental_controls(self):
         """Prompt for password then open ParentalControlsDialog."""
-        from src.parts.visibility.visibility_window import _load_parental_settings
-        settings = _load_parental_settings()
+        try:
+            from src.parts.visibility.visibility_window import _load_parental_settings
+            settings = _load_parental_settings()
+        except Exception as e:
+            QMessageBox.warning(self, "Import Error", f"Failed to load parental settings: {e}")
+            return
+        
         pwd, ok = QInputDialog.getText(
             self, "Parental Controls Locked",
             "Enter password to access Parental Controls.\nHint: Default is 'Nexus'",
@@ -383,9 +467,12 @@ class GovernanceRulesDialog(QDialog):
 
     def _open_parental_info(self):
         """Show informational dialog about Parental Controls."""
-        from src.parts.visibility.visibility_window import ParentalControlsInfoDialog
-        dlg = ParentalControlsInfoDialog(self)
-        dlg.exec()
+        try:
+            from src.parts.visibility.visibility_window import ParentalControlsInfoDialog
+            dlg = ParentalControlsInfoDialog(self)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Import Error", f"Failed to open parental controls info: {e}")
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""

@@ -94,8 +94,12 @@ class TripwireManager:
         Run every layer. Returns True only if the system is clean.
         If ANY layer trips, the license is voided and the app should exit.
         """
-        self._events.clear()
-        self._tripped = False
+        try:
+            self._events.clear()
+            self._tripped = False
+        except Exception as e:
+            self._events.append(TamperEvent("check_all", f"Failed to clear state: {e}", "critical"))
+            return False
 
         # ── Founder absolute bypass ──
         if self._founder_mode:
