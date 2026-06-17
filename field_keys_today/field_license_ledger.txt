@@ -1,0 +1,864 @@
+Moirai Ledger - Field Code Registry
+============================================================
+
+Last Updated: 2026-06-17T21:36:16.919923
+Total Codes: 120
+
+Code: BUSINESS-COMMAND-001
+  Label: Business Tier 1
+  Tier: BUSINESS
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.514102
+
+Code: BUSINESS-COMMAND-002
+  Label: Business Tier 2
+  Tier: BUSINESS
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.522697
+
+Code: BUSINESS-COMMAND-003
+  Label: Business Tier 3
+  Tier: BUSINESS
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.529290
+
+Code: HERMES-7-001
+  Label: 7-Day Free Trial 1
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.009363
+  Activation Date: 2026-06-17T21:35:41.119442
+
+Code: HERMES-7-002
+  Label: 7-Day Free Trial 2
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.017965
+  Activation Date: 2026-06-17T21:36:01.023434
+
+Code: HERMES-7-003
+  Label: 7-Day Free Trial 3
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.019964
+  Activation Date: 2026-06-17T21:36:01.030006
+
+Code: HERMES-7-004
+  Label: 7-Day Free Trial 4
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.022480
+  Activation Date: 2026-06-17T21:36:01.036579
+
+Code: HERMES-7-005
+  Label: 7-Day Free Trial 5
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.024483
+  Activation Date: 2026-06-17T21:36:01.042627
+
+Code: HERMES-7-006
+  Label: 7-Day Free Trial 6
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.026493
+  Activation Date: 2026-06-17T21:36:01.048172
+
+Code: HERMES-7-007
+  Label: 7-Day Free Trial 7
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.028526
+  Activation Date: 2026-06-17T21:36:01.054252
+
+Code: HERMES-7-008
+  Label: 7-Day Free Trial 8
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.031064
+  Activation Date: 2026-06-17T21:36:01.060318
+
+Code: HERMES-7-009
+  Label: 7-Day Free Trial 9
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.033095
+  Activation Date: 2026-06-17T21:36:01.066545
+
+Code: HERMES-7-010
+  Label: 7-Day Free Trial 10
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.034615
+  Activation Date: 2026-06-17T21:36:01.077389
+
+Code: HERMES-7-011
+  Label: 7-Day Free Trial 11
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.037122
+  Activation Date: 2026-06-17T21:36:01.083750
+
+Code: HERMES-7-012
+  Label: 7-Day Free Trial 12
+  Tier: TRIAL_7_DAY
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.040666
+  Activation Date: 2026-06-17T21:36:01.089319
+
+Code: HERMES-7-013
+  Label: 7-Day Free Trial 13
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.043545
+
+Code: HERMES-7-014
+  Label: 7-Day Free Trial 14
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.046003
+
+Code: HERMES-7-015
+  Label: 7-Day Free Trial 15
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.048528
+
+Code: HERMES-7-016
+  Label: 7-Day Free Trial 16
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.050563
+
+Code: HERMES-7-017
+  Label: 7-Day Free Trial 17
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.053610
+
+Code: HERMES-7-018
+  Label: 7-Day Free Trial 18
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.057481
+
+Code: HERMES-7-019
+  Label: 7-Day Free Trial 19
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.059846
+
+Code: HERMES-7-020
+  Label: 7-Day Free Trial 20
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.061878
+
+Code: HERMES-7-021
+  Label: 7-Day Free Trial 21
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.064679
+
+Code: HERMES-7-022
+  Label: 7-Day Free Trial 22
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.067537
+
+Code: HERMES-7-023
+  Label: 7-Day Free Trial 23
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.069680
+
+Code: HERMES-7-024
+  Label: 7-Day Free Trial 24
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.072385
+
+Code: HERMES-7-025
+  Label: 7-Day Free Trial 25
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.077258
+
+Code: HERMES-7-026
+  Label: 7-Day Free Trial 26
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.081297
+
+Code: HERMES-7-027
+  Label: 7-Day Free Trial 27
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.084828
+
+Code: HERMES-7-028
+  Label: 7-Day Free Trial 28
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.087343
+
+Code: HERMES-7-029
+  Label: 7-Day Free Trial 29
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.090356
+
+Code: HERMES-7-030
+  Label: 7-Day Free Trial 30
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.095921
+
+Code: HERMES-7-031
+  Label: 7-Day Free Trial 31
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.099475
+
+Code: HERMES-7-032
+  Label: 7-Day Free Trial 32
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.102515
+
+Code: HERMES-7-033
+  Label: 7-Day Free Trial 33
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.106219
+
+Code: HERMES-7-034
+  Label: 7-Day Free Trial 34
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.110075
+
+Code: HERMES-7-035
+  Label: 7-Day Free Trial 35
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.113539
+
+Code: HERMES-7-036
+  Label: 7-Day Free Trial 36
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.117639
+
+Code: HERMES-7-037
+  Label: 7-Day Free Trial 37
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.122694
+
+Code: HERMES-7-038
+  Label: 7-Day Free Trial 38
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.126693
+
+Code: HERMES-7-039
+  Label: 7-Day Free Trial 39
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.131757
+
+Code: HERMES-7-040
+  Label: 7-Day Free Trial 40
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.136818
+
+Code: HERMES-7-041
+  Label: 7-Day Free Trial 41
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.141376
+
+Code: HERMES-7-042
+  Label: 7-Day Free Trial 42
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.144917
+
+Code: HERMES-7-043
+  Label: 7-Day Free Trial 43
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.148975
+
+Code: HERMES-7-044
+  Label: 7-Day Free Trial 44
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.152531
+
+Code: HERMES-7-045
+  Label: 7-Day Free Trial 45
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.158134
+
+Code: HERMES-7-046
+  Label: 7-Day Free Trial 46
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.163028
+
+Code: HERMES-7-047
+  Label: 7-Day Free Trial 47
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.167133
+
+Code: HERMES-7-048
+  Label: 7-Day Free Trial 48
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.171667
+
+Code: HERMES-7-049
+  Label: 7-Day Free Trial 49
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.176173
+
+Code: HERMES-7-050
+  Label: 7-Day Free Trial 50
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.181743
+
+Code: HERMES-7-051
+  Label: 7-Day Free Trial 51
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.185286
+
+Code: HERMES-7-052
+  Label: 7-Day Free Trial 52
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.190347
+
+Code: HERMES-7-053
+  Label: 7-Day Free Trial 53
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.195914
+
+Code: HERMES-7-054
+  Label: 7-Day Free Trial 54
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.199969
+
+Code: HERMES-7-055
+  Label: 7-Day Free Trial 55
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.205545
+
+Code: HERMES-7-056
+  Label: 7-Day Free Trial 56
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.212017
+
+Code: HERMES-7-057
+  Label: 7-Day Free Trial 57
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.216153
+
+Code: HERMES-7-058
+  Label: 7-Day Free Trial 58
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.221197
+
+Code: HERMES-7-059
+  Label: 7-Day Free Trial 59
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.226764
+
+Code: HERMES-7-060
+  Label: 7-Day Free Trial 60
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.232292
+
+Code: HERMES-7-061
+  Label: 7-Day Free Trial 61
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.238321
+
+Code: HERMES-7-062
+  Label: 7-Day Free Trial 62
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.244893
+
+Code: HERMES-7-063
+  Label: 7-Day Free Trial 63
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.251479
+
+Code: HERMES-7-064
+  Label: 7-Day Free Trial 64
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.257057
+
+Code: HERMES-7-065
+  Label: 7-Day Free Trial 65
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.263641
+
+Code: HERMES-7-066
+  Label: 7-Day Free Trial 66
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.269217
+
+Code: HERMES-7-067
+  Label: 7-Day Free Trial 67
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.274283
+
+Code: HERMES-7-068
+  Label: 7-Day Free Trial 68
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.279857
+
+Code: HERMES-7-069
+  Label: 7-Day Free Trial 69
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.286949
+
+Code: HERMES-7-070
+  Label: 7-Day Free Trial 70
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.293029
+
+Code: HERMES-7-071
+  Label: 7-Day Free Trial 71
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.297584
+
+Code: HERMES-7-072
+  Label: 7-Day Free Trial 72
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.301646
+
+Code: HERMES-7-073
+  Label: 7-Day Free Trial 73
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.307216
+
+Code: HERMES-7-074
+  Label: 7-Day Free Trial 74
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.311130
+
+Code: HERMES-7-075
+  Label: 7-Day Free Trial 75
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.315195
+
+Code: HERMES-7-076
+  Label: 7-Day Free Trial 76
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.319727
+
+Code: HERMES-7-077
+  Label: 7-Day Free Trial 77
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.326811
+
+Code: HERMES-7-078
+  Label: 7-Day Free Trial 78
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.331325
+
+Code: HERMES-7-079
+  Label: 7-Day Free Trial 79
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.337395
+
+Code: HERMES-7-080
+  Label: 7-Day Free Trial 80
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.342916
+
+Code: HERMES-7-081
+  Label: 7-Day Free Trial 81
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.349448
+
+Code: HERMES-7-082
+  Label: 7-Day Free Trial 82
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.357037
+
+Code: HERMES-7-083
+  Label: 7-Day Free Trial 83
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.361562
+
+Code: HERMES-7-084
+  Label: 7-Day Free Trial 84
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.367643
+
+Code: HERMES-7-085
+  Label: 7-Day Free Trial 85
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.375247
+
+Code: HERMES-7-086
+  Label: 7-Day Free Trial 86
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.380283
+
+Code: HERMES-7-087
+  Label: 7-Day Free Trial 87
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.388331
+
+Code: HERMES-7-088
+  Label: 7-Day Free Trial 88
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.393903
+
+Code: HERMES-7-089
+  Label: 7-Day Free Trial 89
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.398941
+
+Code: HERMES-7-090
+  Label: 7-Day Free Trial 90
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.408053
+
+Code: HERMES-7-091
+  Label: 7-Day Free Trial 91
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.421665
+
+Code: HERMES-7-092
+  Label: 7-Day Free Trial 92
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.426664
+
+Code: HERMES-7-093
+  Label: 7-Day Free Trial 93
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.433240
+
+Code: HERMES-7-094
+  Label: 7-Day Free Trial 94
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.439803
+
+Code: HERMES-7-095
+  Label: 7-Day Free Trial 95
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.447390
+
+Code: HERMES-7-096
+  Label: 7-Day Free Trial 96
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.453923
+
+Code: HERMES-7-097
+  Label: 7-Day Free Trial 97
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.461500
+
+Code: HERMES-7-098
+  Label: 7-Day Free Trial 98
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.469545
+
+Code: HERMES-7-099
+  Label: 7-Day Free Trial 99
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.477131
+
+Code: HERMES-7-100
+  Label: 7-Day Free Trial 100
+  Tier: TRIAL_7_DAY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.485240
+
+Code: NEXUS-UNLIMITED-001
+  Label: Unlimited Tier 1
+  Tier: UNLIMITED
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.535364
+
+Code: NEXUS-UNLIMITED-002
+  Label: Unlimited Tier 2
+  Tier: UNLIMITED
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.542439
+
+Code: NEXUS-UNLIMITED-003
+  Label: Unlimited Tier 3
+  Tier: UNLIMITED
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.550042
+
+Code: OLYMPUS-CORPORATE-001
+  Label: Enterprise Corporate 1
+  Tier: ENTERPRISE_CORPORATE
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.633323
+
+Code: OLYMPUS-CORPORATE-002
+  Label: Enterprise Corporate 2
+  Tier: ENTERPRISE_CORPORATE
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.644925
+
+Code: OLYMPUS-CORPORATE-003
+  Label: Enterprise Corporate 3
+  Tier: ENTERPRISE_CORPORATE
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.656075
+
+Code: OLYMPUS-EVAL-001
+  Label: Enterprise Evaluation 1
+  Tier: ENTERPRISE_EVAL
+  Status: ACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.559166
+  Activation Date: 2026-06-17T21:36:16.909942
+
+Code: OLYMPUS-EVAL-002
+  Label: Enterprise Evaluation 2
+  Tier: ENTERPRISE_EVAL
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.571249
+
+Code: OLYMPUS-EVAL-003
+  Label: Enterprise Evaluation 3
+  Tier: ENTERPRISE_EVAL
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.579287
+
+Code: OLYMPUS-EVAL-004
+  Label: Enterprise Evaluation 4
+  Tier: ENTERPRISE_EVAL
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.588408
+
+Code: OLYMPUS-EVAL-005
+  Label: Enterprise Evaluation 5
+  Tier: ENTERPRISE_EVAL
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.597005
+
+Code: OLYMPUS-PROPERTY-001
+  Label: Enterprise Property 1
+  Tier: ENTERPRISE_PROPERTY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.606125
+
+Code: OLYMPUS-PROPERTY-002
+  Label: Enterprise Property 2
+  Tier: ENTERPRISE_PROPERTY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.615090
+
+Code: OLYMPUS-PROPERTY-003
+  Label: Enterprise Property 3
+  Tier: ENTERPRISE_PROPERTY
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.624646
+
+Code: PRO-COMMAND-001
+  Label: Pro Tier 1
+  Tier: PRO
+  Status: INACTIVE
+  Issue Type: SOLD
+  Issue Date: 2026-06-17T21:30:44.493335
+  Recipient: Test Customer
+  Company: Test Company
+  Payment: cash $30.0
+  Notes: 
+SOLD: test sale
+
+Code: PRO-COMMAND-002
+  Label: Pro Tier 2
+  Tier: PRO
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.501953
+
+Code: PRO-COMMAND-003
+  Label: Pro Tier 3
+  Tier: PRO
+  Status: INACTIVE
+  Issue Type: GENERATED
+  Issue Date: 2026-06-17T21:30:44.508031
+
