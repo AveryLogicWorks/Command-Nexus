@@ -14,6 +14,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+# Import Moirai Ledger for field code validation (Prometheus Activation)
+try:
+    from .moirai_ledger import get_moirai_ledger, CodeTier, CodeStatus
+    _MOIRAI_AVAILABLE = True
+except ImportError:
+    _MOIRAI_AVAILABLE = False
+
 
 class SubscriptionTier(Enum):
     TRIAL = "trial"          # $10 one-time, 15 days, 1 AI
@@ -49,11 +56,11 @@ class LicenseManager:
     # asymmetric cryptography (Ed25519) or a keyserver.
     _SECRET_KEY = b"AVERY_LOGIC_WORKS_COMMAND_NEXUS_2026"
 
-    # Internal tier secret â€” derived from main secret, never exposed publicly.
+    # Internal tier secret — derived from main secret, never exposed publicly.
     # Used to validate employee/owner forever-unlock keys.
     _INTERNAL_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_INTERNAL_2026").digest()
 
-    # Founder tier secret â€” highest authority. Separate derivation chain.
+    # Founder tier secret — highest authority. Separate derivation chain.
     # ONLY the founder holds this. Can be voided for contract breach.
     _FOUNDER_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_FOUNDER_2026_ABSOLUTE").digest()
 
@@ -178,17 +185,17 @@ class LicenseManager:
         random_part = key[12:20]
         hmac_part = key[20:40]
 
-        # â”€â”€ Hidden founder tier check (GOD MODE â€” runs first) â”€â”€
+        # ── Hidden founder tier check (GOD MODE — runs first) ──
         founder_tier, founder_valid = self._check_founder_key(key)
         if founder_valid and founder_tier is not None:
-            return LicenseStatus.VALID, founder_tier, "Founder Absolute â€” All Protections Bypassed."
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            return LicenseStatus.VALID, founder_tier, "Founder Absolute — All Protections Bypassed."
+        # ──────────────────────────────────────────────────────────────
 
-        # â”€â”€ Hidden internal tier check (Avery Logic Works™ employee keys) â”€â”€
+        # ── Hidden internal tier check (Avery Logic Works™ employee keys) ──
         internal_tier, internal_valid = self._check_internal_key(key)
         if internal_valid and internal_tier is not None:
-            return LicenseStatus.VALID, internal_tier, "Nexus Internal â€” Forever Unlock."
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            return LicenseStatus.VALID, internal_tier, "Nexus Internal — Forever Unlock."
+        # ────────────────────────────────────────────────────────────────
 
         tier_map = {
             "TR": SubscriptionTier.TRIAL,
@@ -237,6 +244,70 @@ class LicenseManager:
         Activate a license key. Saves to disk if valid.
         Returns (status, message).
         """
+        # ── Prometheus Activation: Check for Hermes Codes (field codes) ──
+        if _MOIRAI_AVAILABLE and "-" in key:
+            # Field codes have dashes, e.g., HERMES-7-001
+            ledger = get_moirai_ledger()
+            field_code = ledger.get_code(key)
+
+            if field_code is not None:
+                # This is a field code - validate against Moirai Ledger
+                if field_code.status == CodeStatus.INACTIVE:
+                    return LicenseStatus.INVALID, "This code is not yet activated. Please contact Avery Logic Works."
+                elif field_code.status == CodeStatus.REDEEMED:
+                    return LicenseStatus.INVALID, "This code has already been redeemed. Each code can only be used once."
+                elif field_code.status == CodeStatus.VOIDED:
+                    return LicenseStatus.INVALID, "This code has been voided. Please contact Avery Logic Works."
+                elif field_code.status == CodeStatus.EXPIRED:
+                    return LicenseStatus.EXPIRED, "This code has expired. Please contact Avery Logic Works."
+                elif field_code.status == CodeStatus.ACTIVE:
+                    # Code is ACTIVE - redeem it and generate license
+                    # Map field code tier to subscription tier
+                    tier_map = {
+                        CodeTier.TRIAL_7_DAY: SubscriptionTier.TRIAL,
+                        CodeTier.PRO: SubscriptionTier.PRO,
+                        CodeTier.BUSINESS: SubscriptionTier.BUSINESS,
+                        CodeTier.UNLIMITED: SubscriptionTier.UNLIMITED,
+                        CodeTier.ENTERPRISE_EVAL: SubscriptionTier.TRIAL_ENTERPRISE,
+                        CodeTier.ENTERPRISE_PROPERTY: SubscriptionTier.ENTERPRISE_PROPERTY,
+                        CodeTier.ENTERPRISE_CORPORATE: SubscriptionTier.ENTERPRISE_CORPORATE,
+                    }
+
+                    subscription_tier = tier_map.get(field_code.tier)
+                    if subscription_tier is None:
+                        return LicenseStatus.INVALID, "Unknown tier for this field code."
+
+                    # Redeem the field code
+                    if not ledger.redeem_code(key):
+                        return LicenseStatus.INVALID, "Failed to redeem field code. Please try again."
+
+                    # Generate a proper license key internally
+                    # Calculate expiry based on tier
+                    if field_code.tier == CodeTier.TRIAL_7_DAY:
+                        # 7 days from now
+                        expiry_date = datetime.now() + timedelta(days=7)
+                    elif field_code.tier == CodeTier.ENTERPRISE_EVAL:
+                        # 15 days from now
+                        expiry_date = datetime.now() + timedelta(days=15)
+                    else:
+                        # 1 year from now for paid tiers
+                        expiry_date = datetime.now() + timedelta(days=365)
+
+                    # Generate a proper license key (this is internal, not exposed to user)
+                    # We store the field code as the key for reference
+                    self._license_data = {
+                        "key": key,  # Store field code for reference
+                        "field_code": key,
+                        "tier": subscription_tier.value,
+                        "activated_at": datetime.now().isoformat(),
+                        "expiry_date": expiry_date.isoformat(),
+                    }
+                    self._status = LicenseStatus.VALID
+                    self._save_license()
+                    return LicenseStatus.VALID, f"Field code redeemed successfully. {subscription_tier.value} license activated."
+        # ─────────────────────────────────────────────────────────────────────
+
+        # Standard license key validation
         status, tier, message = self.validate_key(key)
 
         if status in (LicenseStatus.VALID,):
@@ -357,7 +428,7 @@ class LicenseManager:
 
     @property
     def is_founder_mode(self) -> bool:
-        """Founder absolute mode â€” bypasses ALL protections, tripwire, etc.
+        """Founder absolute mode — bypasses ALL protections, tripwire, etc.
         This is the highest authority. What the founder does is NOT tampering.
         It is upgrading, repairing, or testing."""
         return self.current_tier == SubscriptionTier._FOUNDER
@@ -554,6 +625,6 @@ if __name__ == "__main__":
         print(f"Tier: {lm.current_tier.value if lm.current_tier else 'None'}")
         print(f"Days remaining: {lm.get_days_remaining()}")
     else:
-        print("License Manager â€” no key provided")
+        print("License Manager — no key provided")
         print(f"Current status: {lm._status.value}")
         print(f"Demo mode: {lm.is_demo_mode}")

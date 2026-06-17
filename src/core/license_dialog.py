@@ -27,7 +27,7 @@ class LicenseActivationDialog(QDialog):
         self._lm = get_license_manager()
         self._activated = False
         self._demo_mode = False
-        self.setWindowTitle("Command Nexus™ â€” License Activation")
+        self.setWindowTitle("Command Nexus™ — License Activation")
         self.setMinimumSize(520, 400)
         self._setup_ui()
         self._apply_dark_theme()
@@ -40,7 +40,7 @@ class LicenseActivationDialog(QDialog):
         # Header
         header = QLabel(
             "<b>Welcome to Command Nexus</b><br>"
-            "Build, govern, and operate fully custom AI agents â€” no coding required."
+            "Build, govern, and operate fully custom AI agents — no coding required."
         )
         header.setStyleSheet("font-size: 14px; color: #c9d1d9;")
         header.setWordWrap(True)
@@ -104,12 +104,12 @@ class LicenseActivationDialog(QDialog):
         demo_text.setReadOnly(True)
         demo_text.setPlainText(
             "Demo Mode lets you explore the interface without a license:\n\n"
-            "  â€¢ Browse the Forge, Book, and Constraints windows\n"
-            "  â€¢ See how capability modules and governance work\n"
-            "  â€¢ View the audit trail and approval gate systems\n\n"
-            "  âœ— Cannot create or deploy AI agents\n"
-            "  âœ— Cannot activate advanced capabilities\n"
-            "  âœ— Cannot save or export configurations\n\n"
+            "  • Browse the Forge, Book, and Constraints windows\n"
+            "  • See how capability modules and governance work\n"
+            "  • View the audit trail and approval gate systems\n\n"
+            "  ✗ Cannot create or deploy AI agents\n"
+            "  ✗ Cannot activate advanced capabilities\n"
+            "  ✗ Cannot save or export configurations\n\n"
             "Purchase a license at any time to unlock full functionality."
         )
         demo_text.setStyleSheet("background-color: #161b22; color: #8b949e; border: 1px solid #30363d;")
@@ -126,10 +126,11 @@ class LicenseActivationDialog(QDialog):
         # Pricing info
         pricing = QLabel(
             "<b>Available Tiers:</b><br>"
-            "  Trial — $10 one-time (15 days)  |  "
-            "  Pro — $30/month  |  "
-            "  Business — $50/month  |  "
-            "  Unlimited — $80/month  |  "
+            "  Trial — $10 (15 days, 1 AI)  |  "
+            "  Starter — $20/mo (2 AI)  |  "
+            "  Pro — $30/mo ($324/yr, 4 AI)  |  "
+            "  Business — $50/mo ($552/yr, 5 AI)  |  "
+            "  Unlimited — $80/mo ($900/yr)  |  "
             "  Enterprise — Negotiated Pricing"
         )
         pricing.setWordWrap(True)
@@ -196,7 +197,7 @@ class LicenseActivationDialog(QDialog):
             tier = self._lm.get_tier_label()
             days = self._lm.get_days_remaining()
             self._result_label.setText(
-                f"<span style='color: #4caf50;'>âœ“ Activated!</span> {msg}"
+                f"<span style='color: #4caf50;'>✓ Activated!</span> {msg}"
             )
             self._status_label.setText(
                 f"<b>Status:</b> <span style='color: #4caf50;'>Active</span><br>"
@@ -205,7 +206,7 @@ class LicenseActivationDialog(QDialog):
             )
             self._activated = True
             self._demo_btn.setEnabled(False)
-            self._demo_btn.setText("License Activated â€” Restart Required")
+            self._demo_btn.setText("License Activated — Restart Required")
             QMessageBox.information(
                 self,
                 "License Activated",
@@ -216,15 +217,15 @@ class LicenseActivationDialog(QDialog):
             )
         elif status == LicenseStatus.EXPIRED:
             self._result_label.setText(
-                f"<span style='color: #f44336;'>âœ— Expired:</span> {msg}"
+                f"<span style='color: #f44336;'>✗ Expired:</span> {msg}"
             )
         elif status == LicenseStatus.TRIAL_EXPIRED:
             self._result_label.setText(
-                f"<span style='color: #f44336;'>âœ— Trial Expired:</span> {msg}"
+                f"<span style='color: #f44336;'>✗ Trial Expired:</span> {msg}"
             )
         else:
             self._result_label.setText(
-                f"<span style='color: #f44336;'>âœ— Invalid Key:</span> {msg}"
+                f"<span style='color: #f44336;'>✗ Invalid Key:</span> {msg}"
             )
 
     def _on_demo_mode(self):
