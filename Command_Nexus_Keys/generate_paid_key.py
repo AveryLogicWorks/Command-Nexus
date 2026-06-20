@@ -2,7 +2,7 @@
 """
 Command Nexus™ — PAID SUBSCRIPTION KEY GENERATOR
 =================================================
-Generates paid-tier keys: Starter, Pro, Business, Unlimited.
+Generates paid-tier keys: Basic 30-Day, 4-AI, Business Legacy, Unlimited.
 These are customer-facing subscription keys.
 
 Usage:

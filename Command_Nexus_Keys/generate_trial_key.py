@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Command Nexus™ — 7-DAY FREE TRIAL KEY GENERATOR
+Command Nexus™ — 15-DAY EARLY ACCESS TRIAL KEY GENERATOR
 ==================================================
-Generates public trial keys for demos, events, and handouts.
-Expires in 7 days (customizable). Uses the public salt.
+Generates public 15-day early-access trial keys for demos, events, and handouts.
+Expires in 15 days by default (customizable). Uses the public salt.
 
 Usage:
-    py generate_trial_key.py --qty 10 --days 7 --notes "Tech Expo Booth 3"
+    py generate_trial_key.py --qty 10 --days 15 --notes "Tech Expo Booth 3"
     py generate_trial_key.py --qty 50 --days 14 --out event_keys.json
 
 Avery Logic Works™ — Public / Marketing Use
@@ -22,10 +22,10 @@ from nexus_crypto import make_trial_key
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate 7-Day (or custom) Free Trial keys."
+        description="Generate 15-Day Early Access Trial keys."
     )
     parser.add_argument("--qty", type=int, default=5, help="Number of keys (max 500)")
-    parser.add_argument("--days", type=int, default=7, help="Trial duration in days")
+    parser.add_argument("--days", type=int, default=15, help="Trial duration in days")
     parser.add_argument("--notes", type=str, default=None, help="Event or campaign notes")
     parser.add_argument("--out", type=str, default="trial_keys.json", help="Output JSON file")
     parser.add_argument("--copy", action="store_true", help="Copy keys to clipboard")

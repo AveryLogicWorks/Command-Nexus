@@ -165,6 +165,17 @@ class LicenseManager:
         base.mkdir(parents=True, exist_ok=True)
         return base / "license.json"
 
+    @staticmethod
+    def normalize_license_key(key: str) -> str:
+        """Return the 40-character core key, accepting pasted dashes/spaces."""
+        return "".join(ch for ch in (key or "").strip().upper() if ch.isalnum())
+
+    @staticmethod
+    def format_license_key(key: str) -> str:
+        """Format a normalized key as XXXX-XXXX groups for display/pasting."""
+        raw = LicenseManager.normalize_license_key(key)
+        return "-".join(raw[i:i + 4] for i in range(0, len(raw), 4))
+
     # ------------------------------------------------------------------
     # Key validation
     # ------------------------------------------------------------------
@@ -174,9 +185,9 @@ class LicenseManager:
         Validate a license key string.
         Returns (status, tier, message).
         """
-        key = key.strip().upper().replace("-", "")
+        key = self.normalize_license_key(key)
         if len(key) != 40:
-            return LicenseStatus.INVALID, None, "Invalid key format. Expected 40 characters."
+            return LicenseStatus.INVALID, None, "Invalid key format. Expected 40 characters (10 groups of 4)."
 
         # Key format: TIER + EXPIRY_TIMESTAMP + RANDOM + HMAC (all hex)
         # Structure: tier_code(2) + expiry(10) + random(8) + hmac(20)
@@ -244,11 +255,13 @@ class LicenseManager:
         Activate a license key. Saves to disk if valid.
         Returns (status, message).
         """
+        entered_key = (key or "").strip().upper()
+
         # ── Prometheus Activation: Check for Hermes Codes (field codes) ──
-        if _MOIRAI_AVAILABLE and "-" in key:
+        if _MOIRAI_AVAILABLE and "-" in entered_key:
             # Field codes have dashes, e.g., HERMES-7-001
             ledger = get_moirai_ledger()
-            field_code = ledger.get_code(key)
+            field_code = ledger.get_code(entered_key)
 
             if field_code is not None:
                 # This is a field code - validate against Moirai Ledger
@@ -278,7 +291,7 @@ class LicenseManager:
                         return LicenseStatus.INVALID, "Unknown tier for this field code."
 
                     # Redeem the field code
-                    if not ledger.redeem_code(key):
+                    if not ledger.redeem_code(entered_key):
                         return LicenseStatus.INVALID, "Failed to redeem field code. Please try again."
 
                     # Generate a proper license key internally
@@ -296,8 +309,8 @@ class LicenseManager:
                     # Generate a proper license key (this is internal, not exposed to user)
                     # We store the field code as the key for reference
                     self._license_data = {
-                        "key": key,  # Store field code for reference
-                        "field_code": key,
+                        "key": entered_key,  # Store field code for reference
+                        "field_code": entered_key,
                         "tier": subscription_tier.value,
                         "activated_at": datetime.now().isoformat(),
                         "expiry_date": expiry_date.isoformat(),
@@ -311,8 +324,10 @@ class LicenseManager:
         status, tier, message = self.validate_key(key)
 
         if status in (LicenseStatus.VALID,):
+            normalized_key = self.normalize_license_key(key)
             self._license_data = {
-                "key": key,
+                "key": normalized_key,
+                "formatted_key": self.format_license_key(normalized_key),
                 "tier": tier.value,
                 "activated_at": datetime.now().isoformat(),
             }
@@ -330,7 +345,10 @@ class LicenseManager:
     def current_tier(self) -> Optional[SubscriptionTier]:
         if self._license_data is None:
             return None
-        return SubscriptionTier(self._license_data.get("tier", "trial"))
+        try:
+            return SubscriptionTier(self._license_data.get("tier", "trial"))
+        except ValueError:
+            return None
 
     @property
     def is_activated(self) -> bool:
@@ -384,7 +402,18 @@ class LicenseManager:
             return 9999
         if self.is_demo_mode or self._license_data is None:
             return -1
-        key = self._license_data.get("key", "")
+
+        # Field-code activations store an explicit ISO expiry date.
+        expiry_iso = self._license_data.get("expiry_date")
+        if expiry_iso:
+            try:
+                expiry = datetime.fromisoformat(expiry_iso)
+                remaining = (expiry - datetime.now()).days
+                return max(0, remaining)
+            except (ValueError, TypeError):
+                return -1
+
+        key = self.normalize_license_key(self._license_data.get("key", ""))
         if len(key) < 12:
             return -1
         try:
@@ -392,7 +421,7 @@ class LicenseManager:
             expiry = datetime.fromtimestamp(expiry_ts)
             remaining = (expiry - datetime.now()).days
             return max(0, remaining)
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, OSError):
             return -1
 
     def allows_outward_actions(self) -> bool:
@@ -473,8 +502,29 @@ class LicenseManager:
         try:
             with open(self._license_file, "r", encoding="utf-8") as f:
                 self._license_data = json.load(f)
+
+            # Field-code redemptions persist as an already-issued local license.
+            # Do not re-redeem the code on every launch; check the stored expiry.
+            if self._license_data.get("field_code") and self._license_data.get("expiry_date"):
+                try:
+                    expiry = datetime.fromisoformat(self._license_data["expiry_date"])
+                    tier = self.current_tier
+                    if datetime.now() > expiry:
+                        if tier in (SubscriptionTier.TRIAL, SubscriptionTier.TRIAL_ENTERPRISE):
+                            self._status = LicenseStatus.TRIAL_EXPIRED
+                        else:
+                            self._status = LicenseStatus.EXPIRED
+                    else:
+                        self._status = LicenseStatus.VALID
+                    return
+                except (ValueError, TypeError):
+                    self._status = LicenseStatus.INVALID
+                    return
+
             key = self._license_data.get("key", "")
-            self._status, _, _ = self.validate_key(key)
+            self._status, tier, _ = self.validate_key(key)
+            if self._status == LicenseStatus.VALID and tier is not None:
+                self._license_data["tier"] = tier.value
         except (json.JSONDecodeError, OSError):
             self._status = LicenseStatus.NOT_ACTIVATED
             self._license_data = None
@@ -584,7 +634,7 @@ class LicenseManager:
         Void a founder key (e.g. contract breach, employee departure).
         Returns True if the key was voided.
         """
-        key = key.strip().upper().replace("-", "")
+        key = self.normalize_license_key(key)
         # Only founder can void other founder keys
         if not self.is_founder_mode:
             return False

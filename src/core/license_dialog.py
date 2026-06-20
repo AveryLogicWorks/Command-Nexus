@@ -79,7 +79,8 @@ class LicenseActivationDialog(QDialog):
         key_input_layout = QHBoxLayout()
         self._key_input = QLineEdit()
         self._key_input.setPlaceholderText("Paste your 40-character license key here")
-        self._key_input.setMaxLength(44)  # 40 chars + 4 dashes
+        # 40 raw characters displayed as 10 groups of 4 = 49 visible chars including 9 dashes.
+        self._key_input.setMaxLength(49)
         self._key_input.setStyleSheet("font-size: 13px; padding: 6px;")
         self._key_input.textChanged.connect(self._format_key_input)
         key_input_layout.addWidget(self._key_input)
@@ -126,11 +127,10 @@ class LicenseActivationDialog(QDialog):
         # Pricing info
         pricing = QLabel(
             "<b>Available Tiers:</b><br>"
-            "  Trial — $10 (15 days, 1 AI)  |  "
-            "  Starter — $20/mo (2 AI)  |  "
-            "  Pro — $30/mo ($324/yr, 4 AI)  |  "
-            "  Business — $50/mo ($552/yr, 5 AI)  |  "
-            "  Unlimited — $80/mo ($900/yr)  |  "
+            "  15-Day Trial / Early Access  |  "
+            "  Basic — 30 days, 2 AI  |  "
+            "  4-AI Plan  |  "
+            "  Unlimited — saved AIs unlocked, runtime depends on hardware  |  "
             "  Enterprise — Negotiated Pricing"
         )
         pricing.setWordWrap(True)
@@ -139,7 +139,7 @@ class LicenseActivationDialog(QDialog):
 
         # Early purchase notice
         early_purchase = QLabel(
-            "<i>Buy your license early. Your license activates when Command Nexus officially drops.</i>"
+            "<i>Early Access: activate a valid key now to unlock the usable current build.</i>"
         )
         early_purchase.setWordWrap(True)
         early_purchase.setStyleSheet("font-size: 10px; color: #58a6ff; padding: 4px;")
@@ -174,7 +174,7 @@ class LicenseActivationDialog(QDialog):
 
     def _format_key_input(self, text: str):
         """Auto-insert dashes as user types."""
-        raw = text.upper().replace("-", "")
+        raw = "".join(ch for ch in text.upper() if ch.isalnum())
         if len(raw) > 40:
             raw = raw[:40]
         formatted = "-".join(raw[i:i+4] for i in range(0, len(raw), 4))
@@ -189,9 +189,9 @@ class LicenseActivationDialog(QDialog):
             self._result_label.setText("<span style='color: #f44336;'>Please enter a license key.</span>")
             return
 
-        # Strip dashes for validation - license manager expects 40-character raw key
-        raw_key = key.replace("-", "")
-        status, msg = self._lm.activate_key(raw_key)
+        # Pass the displayed key through; the license manager accepts dashes/spaces.
+        # This also preserves field codes like HERMES-7-001 if they are used later.
+        status, msg = self._lm.activate_key(key)
 
         if status == LicenseStatus.VALID:
             tier = self._lm.get_tier_label()

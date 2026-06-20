@@ -194,7 +194,7 @@ class GeneratorPanel(QWidget):
         lay.addWidget(QLabel("Trial Days:"), 0, 0)
         self.tr_days = QSpinBox()
         self.tr_days.setRange(1, 365)
-        self.tr_days.setValue(7)
+        self.tr_days.setValue(15)
         lay.addWidget(self.tr_days, 0, 1)
         lay.addWidget(QLabel("Notes:"), 1, 0)
         self.tr_notes = QLineEdit()

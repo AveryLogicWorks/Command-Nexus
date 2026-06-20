@@ -33,7 +33,7 @@ class SubscriptionTier(Enum):
 
 
 # NOTE: This MUST match the secret in src/core/license_manager.py
-_SECRET_KEY = b"PANTHEON_FORGE_COMMAND_NEXUS_2026"
+_SECRET_KEY = b"AVERY_LOGIC_WORKS_COMMAND_NEXUS_2026"
 
 _TIER_CODES = {
     SubscriptionTier.TRIAL: "TR",

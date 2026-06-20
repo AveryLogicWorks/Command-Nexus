@@ -37,6 +37,12 @@ def _hmac_sig(payload: str, salt: bytes) -> str:
     return hmac.new(salt, payload.encode(), hashlib.sha256).hexdigest()[:20].upper()
 
 
+def format_license_key(key: str) -> str:
+    """Display the 40-character raw key as 10 groups of 4 characters."""
+    raw = "".join(ch for ch in (key or "").strip().upper() if ch.isalnum())
+    return "-".join(raw[i:i + 4] for i in range(0, len(raw), 4))
+
+
 def generate_key(tier: str, expiry_dt: datetime, salt: bytes) -> dict:
     """
     Generate a single 40-character hex key.
@@ -49,9 +55,11 @@ def generate_key(tier: str, expiry_dt: datetime, salt: bytes) -> dict:
     random_part = secrets.token_hex(4).upper()
     payload = f"{tier_code}{expiry_hex}{random_part}"
     sig = _hmac_sig(payload, salt)
-    key = f"{tier_code}{expiry_hex}{random_part}{sig}"
+    raw_key = f"{tier_code}{expiry_hex}{random_part}{sig}"
+    key = format_license_key(raw_key)
     return {
         "key": key,
+        "raw_key": raw_key,
         "tier": tier.lower(),
         "tier_label": _tier_label(tier.lower()),
         "expiry_iso": expiry_dt.isoformat(),
@@ -61,10 +69,10 @@ def generate_key(tier: str, expiry_dt: datetime, salt: bytes) -> dict:
 
 def _tier_label(tier: str) -> str:
     labels = {
-        "trial": "7-Day Free Trial",
-        "starter": "Starter",
-        "pro": "Pro",
-        "business": "Business",
+        "trial": "15-Day Early Access Trial",
+        "starter": "Basic 30-Day (2 AI)",
+        "pro": "4-AI Plan",
+        "business": "Business Legacy (5 AI)",
         "unlimited": "Unlimited",
         "internal": "Nexus Internal",
         "founder": "Founder Absolute",
@@ -92,8 +100,8 @@ def make_founder_key(contract_id: str | None = None, notes: str | None = None) -
     return rec
 
 
-def make_trial_key(days: int = 7, notes: str | None = None) -> dict:
-    """Public trial key (default 7 days)."""
+def make_trial_key(days: int = 15, notes: str | None = None) -> dict:
+    """Public early-access trial key (default 15 days)."""
     expiry = datetime.now() + timedelta(days=days)
     rec = generate_key("trial", expiry, _SECRET_KEY)
     rec["notes"] = notes

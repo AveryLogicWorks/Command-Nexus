@@ -34,7 +34,7 @@ from typing import Optional
 # ============================================================================
 # Configuration — MUST match src/core/license_manager.py exactly
 # ============================================================================
-SECRET_KEY = b"PANTHEON_FORGE_COMMAND_NEXUS_2026"
+SECRET_KEY = b"AVERY_LOGIC_WORKS_COMMAND_NEXUS_2026"
 
 
 class SubscriptionTier(Enum):
@@ -62,6 +62,12 @@ TIER_PRICING = {
     SubscriptionTier.BUSINESS:    {"price": "$50/mo",  "duration": "30 days", "ais": 5},
     SubscriptionTier.UNLIMITED: {"price": "$80/mo",  "duration": "30 days", "ais": "unlimited"},
 }
+
+
+def format_license_key(key: str) -> str:
+    """Display the 40-character raw key as 10 groups of 4 characters."""
+    raw = "".join(ch for ch in (key or "").strip().upper() if ch.isalnum())
+    return "-".join(raw[i:i + 4] for i in range(0, len(raw), 4))
 
 
 # ============================================================================
@@ -102,11 +108,13 @@ def generate_license_key(
     payload = f"{tier_code}{expiry_hex}{random_part}"
     hmac_sig = hmac.new(SECRET_KEY, payload.encode(), hashlib.sha256).hexdigest()[:20].upper()
 
-    # Assemble 40-char key
-    key = f"{tier_code}{expiry_hex}{random_part}{hmac_sig}"
+    # Assemble 40-char raw key, then format for easy copy/paste.
+    raw_key = f"{tier_code}{expiry_hex}{random_part}{hmac_sig}"
+    key = format_license_key(raw_key)
 
     return {
         "key": key,
+        "raw_key": raw_key,
         "tier": tier.value,
         "tier_code": tier_code,
         "expiry_iso": expiry_dt.isoformat(),
@@ -206,14 +214,14 @@ def save_keys(keys: list[dict], filepath: str = "generated_keys.json"):
 def print_keys(keys: list[dict]):
     """Pretty-print keys to console."""
     print("\n" + "=" * 70)
-    print(f"{'TIER':<12} {'KEY':<45} {'EXPIRES':<12} {'AIS':<10}")
+    print(f"{'TIER':<12} {'KEY':<55} {'EXPIRES':<12} {'AIS':<10}")
     print("-" * 70)
     for entry in keys:
         tier = entry["tier"].upper()
         key = entry["key"]
         expires = entry["expiry_iso"][:10]
         ais = str(entry["ai_limit"])
-        print(f"{tier:<12} {key:<45} {expires:<12} {ais:<10}")
+        print(f"{tier:<12} {key:<55} {expires:<12} {ais:<10}")
     print("=" * 70)
     print(f"Total: {len(keys)} key(s)\n")
 
@@ -299,8 +307,8 @@ Examples:
     # Also print one key in a copy-paste friendly block for David
     print("---")
     print("WEB INTEGRATION NOTE (for David):")
-    print("  Each key is a 40-character hex string.")
-    print("  Pass the 'key' field to the user's download/email after purchase.")
+    print("  Each key is a 40-character raw string displayed as 10 groups of 4 with dashes.")
+    print("  Pass the dashed 'key' field to the user. The app also accepts the raw_key without dashes.")
     print("  The desktop app validates it with the same HMAC secret.")
     print("---\n")
 
