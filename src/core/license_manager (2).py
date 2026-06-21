@@ -124,15 +124,15 @@ class LicenseManager:
         Returns (status, tier, message).
         """
         key = key.strip().upper().replace("-", "")
-        if len(key) != 40:
-            return LicenseStatus.INVALID, None, "Invalid key format. Expected 40 characters."
+        if len(key) != 36:
+            return LicenseStatus.INVALID, None, "Invalid key format. Expected 36 characters."
 
         # Key format: TIER + EXPIRY_TIMESTAMP + RANDOM + HMAC (all hex)
-        # Structure: tier_code(2) + expiry(10) + random(8) + hmac(20)
+        # Structure: tier_code(2) + expiry(10) + random(8) + hmac(16)
         tier_code = key[:2]
         expiry_hex = key[2:12]
         random_part = key[12:20]
-        hmac_part = key[20:40]
+        hmac_part = key[20:36]
 
         tier_map = {
             "TR": SubscriptionTier.TRIAL,
@@ -151,7 +151,7 @@ class LicenseManager:
             self._SECRET_KEY,
             payload.encode(),
             hashlib.sha256
-        ).hexdigest()[:20].upper()
+        ).hexdigest()[:16].upper()
 
         if not hmac.compare_digest(hmac_part, expected_hmac):
             return LicenseStatus.INVALID, None, "Key signature verification failed."

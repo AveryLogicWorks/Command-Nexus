@@ -65,7 +65,7 @@ TIER_PRICING = {
 
 
 def format_license_key(key: str) -> str:
-    """Display the 40-character raw key as 10 groups of 4 characters."""
+    """Display the 40-character raw key as 9 groups of 4 characters."""
     raw = "".join(ch for ch in (key or "").strip().upper() if ch.isalnum())
     return "-".join(raw[i:i + 4] for i in range(0, len(raw), 4))
 
@@ -83,7 +83,7 @@ def generate_license_key(
     Generate a single license key for the given tier.
 
     Returns a dict with:
-        - key: the 40-char hex license key
+        - key: the 36-char hex license key
         - tier: tier name
         - tier_code: 2-letter prefix
         - expiry_iso: ISO-8601 expiry date
@@ -106,9 +106,9 @@ def generate_license_key(
 
     # HMAC-SHA256 signature, truncated to 20 hex chars
     payload = f"{tier_code}{expiry_hex}{random_part}"
-    hmac_sig = hmac.new(SECRET_KEY, payload.encode(), hashlib.sha256).hexdigest()[:20].upper()
+    hmac_sig = hmac.new(SECRET_KEY, payload.encode(), hashlib.sha256).hexdigest()[:16].upper()
 
-    # Assemble 40-char raw key, then format for easy copy/paste.
+    # Assemble 36-char raw key, then format for easy copy/paste.
     raw_key = f"{tier_code}{expiry_hex}{random_part}{hmac_sig}"
     key = format_license_key(raw_key)
 
@@ -150,13 +150,13 @@ def verify_key(key: str) -> dict:
     """
     key = key.strip().upper().replace("-", "")
 
-    if len(key) != 40:
-        return {"valid": False, "reason": "Invalid key format. Expected 40 characters."}
+    if len(key) != 36:
+        return {"valid": False, "reason": "Invalid key format. Expected 36 characters."}
 
     tier_code = key[:2]
     expiry_hex = key[2:12]
     random_part = key[12:20]
-    hmac_part = key[20:40]
+    hmac_part = key[20:36]
 
     # Reverse tier code lookup
     tier_map_inv = {v: k for k, v in TIER_CODES.items()}
@@ -166,7 +166,7 @@ def verify_key(key: str) -> dict:
 
     # Verify HMAC
     payload = f"{tier_code}{expiry_hex}{random_part}"
-    expected_hmac = hmac.new(SECRET_KEY, payload.encode(), hashlib.sha256).hexdigest()[:20].upper()
+    expected_hmac = hmac.new(SECRET_KEY, payload.encode(), hashlib.sha256).hexdigest()[:16].upper()
     if not hmac.compare_digest(hmac_part, expected_hmac):
         return {"valid": False, "reason": "Key signature verification failed."}
 
@@ -307,7 +307,7 @@ Examples:
     # Also print one key in a copy-paste friendly block for David
     print("---")
     print("WEB INTEGRATION NOTE (for David):")
-    print("  Each key is a 40-character raw string displayed as 10 groups of 4 with dashes.")
+    print("  Each key is a 40-character raw string displayed as 9 groups of 4 with dashes.")
     print("  Pass the dashed 'key' field to the user. The app also accepts the raw_key without dashes.")
     print("  The desktop app validates it with the same HMAC secret.")
     print("---\n")

@@ -360,7 +360,7 @@ class TestLicenseGenerator:
             TEST_SECRET,
             payload.encode(),
             hashlib.sha256
-        ).hexdigest()[:20].upper()
+        ).hexdigest()[:16].upper()
         
         key = f"{tier_code}{expiry_hex}{random_part}{hmac_value}"
         

@@ -34,11 +34,11 @@ TIER_CODES = {
 
 def _hmac_sig(payload: str, salt: bytes) -> str:
     """20-char uppercase HMAC-SHA256 truncated signature."""
-    return hmac.new(salt, payload.encode(), hashlib.sha256).hexdigest()[:20].upper()
+    return hmac.new(salt, payload.encode(), hashlib.sha256).hexdigest()[:16].upper()
 
 
 def format_license_key(key: str) -> str:
-    """Display the 40-character raw key as 10 groups of 4 characters."""
+    """Display the 40-character raw key as 9 groups of 4 characters."""
     raw = "".join(ch for ch in (key or "").strip().upper() if ch.isalnum())
     return "-".join(raw[i:i + 4] for i in range(0, len(raw), 4))
 
@@ -128,12 +128,12 @@ def make_paid_key(tier: str, months: int = 1) -> dict:
 def validate_key(key: str) -> dict | None:
     """Validate any key type and return metadata, or None if invalid."""
     key = key.strip().upper().replace("-", "")
-    if len(key) != 40:
+    if len(key) != 36:
         return None
     tier_code = key[:2]
     expiry_hex = key[2:12]
     random_part = key[12:20]
-    hmac_part = key[20:40]
+    hmac_part = key[20:36]
     payload = f"{tier_code}{expiry_hex}{random_part}"
 
     # Try each salt in order

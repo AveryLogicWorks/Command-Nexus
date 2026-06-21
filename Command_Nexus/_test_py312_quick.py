@@ -32,7 +32,7 @@ expiry_hex = f"{expiry:010x}".upper()
 random_part = "A1B2C3D4"
 secret = b"PANTHEON_FORGE_COMMAND_NEXUS_2026"
 payload = f"TR{expiry_hex}{random_part}"
-hmac_sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:20].upper()
+hmac_sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:16].upper()
 key = f"TR{expiry_hex}{random_part}{hmac_sig}"
 with open(os.path.join(license_dir, 'license.json'), 'w') as f:
     json.dump({"key": key, "tier": "trial", "activated_at": "2026-06-10T00:00:00"}, f)

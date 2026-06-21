@@ -78,8 +78,8 @@ class LicenseActivationDialog(QDialog):
 
         key_input_layout = QHBoxLayout()
         self._key_input = QLineEdit()
-        self._key_input.setPlaceholderText("Paste your 40-character license key here")
-        # 40 raw characters displayed as 10 groups of 4 = 49 visible chars including 9 dashes.
+        self._key_input.setPlaceholderText("Paste your 36-character license key here")
+        # 40 raw characters displayed as 9 groups of 4 = 49 visible chars including 9 dashes.
         self._key_input.setMaxLength(49)
         self._key_input.setStyleSheet("font-size: 13px; padding: 6px;")
         self._key_input.textChanged.connect(self._format_key_input)
@@ -175,8 +175,8 @@ class LicenseActivationDialog(QDialog):
     def _format_key_input(self, text: str):
         """Auto-insert dashes as user types."""
         raw = "".join(ch for ch in text.upper() if ch.isalnum())
-        if len(raw) > 40:
-            raw = raw[:40]
+        if len(raw) > 36:
+            raw = raw[:36]
         formatted = "-".join(raw[i:i+4] for i in range(0, len(raw), 4))
         self._key_input.blockSignals(True)
         self._key_input.setText(formatted)

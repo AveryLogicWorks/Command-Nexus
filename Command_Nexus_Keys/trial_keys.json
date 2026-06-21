@@ -1,12 +1,12 @@
 [
   {
-    "key": "TR00-6A4A-BD40-FB8A-8037-5F99-6EB9-FCC9-27E6-9D76",
-    "raw_key": "TR006A4ABD40FB8A80375F996EB9FCC927E69D76",
+    "key": "TR00-6A4C-1486-36B1-EE0D-EA55-083F-D252-70E0",
+    "raw_key": "TR006A4C148636B1EE0DEA55083FD25270E0",
     "tier": "trial",
     "tier_label": "15-Day Early Access Trial",
-    "expiry_iso": "2026-07-05T13:23:28.810040",
-    "created_at": "2026-06-20T13:23:28.810040",
-    "notes": "early access",
+    "expiry_iso": "2026-07-06T13:48:06.648228",
+    "created_at": "2026-06-21T13:48:06.648732",
+    "notes": "test key",
     "trial_days": 15
   }
 ]

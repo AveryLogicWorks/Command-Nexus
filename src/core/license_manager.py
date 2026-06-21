@@ -167,7 +167,7 @@ class LicenseManager:
 
     @staticmethod
     def normalize_license_key(key: str) -> str:
-        """Return the 40-character core key, accepting pasted dashes/spaces."""
+        """Return the 36-character core key, accepting pasted dashes/spaces."""
         return "".join(ch for ch in (key or "").strip().upper() if ch.isalnum())
 
     @staticmethod
@@ -186,15 +186,15 @@ class LicenseManager:
         Returns (status, tier, message).
         """
         key = self.normalize_license_key(key)
-        if len(key) != 40:
-            return LicenseStatus.INVALID, None, "Invalid key format. Expected 40 characters (10 groups of 4)."
+        if len(key) != 36:
+            return LicenseStatus.INVALID, None, "Invalid key format. Expected 36 characters."
 
         # Key format: TIER + EXPIRY_TIMESTAMP + RANDOM + HMAC (all hex)
-        # Structure: tier_code(2) + expiry(10) + random(8) + hmac(20)
+        # Structure: tier_code(2) + expiry(10) + random(8) + hmac(16)
         tier_code = key[:2]
         expiry_hex = key[2:12]
         random_part = key[12:20]
-        hmac_part = key[20:40]
+        hmac_part = key[20:36]
 
         # ── Hidden founder tier check (GOD MODE — runs first) ──
         founder_tier, founder_valid = self._check_founder_key(key)
@@ -228,7 +228,7 @@ class LicenseManager:
             self._SECRET_KEY,
             payload.encode(),
             hashlib.sha256
-        ).hexdigest()[:20].upper()
+        ).hexdigest()[:16].upper()
 
         if not hmac.compare_digest(hmac_part, expected_hmac):
             return LicenseStatus.INVALID, None, "Key signature verification failed."
@@ -539,21 +539,21 @@ class LicenseManager:
         Uses a separately-derived secret. Not exposed ANYWHERE.
         Returns (tier, is_valid).
         """
-        if len(key) != 40:
+        if len(key) != 36:
             return None, False
         tier_code = key[:2]
         if tier_code != "FD":
             return None, False
         expiry_hex = key[2:12]
         random_part = key[12:20]
-        hmac_part = key[20:40]
+        hmac_part = key[20:36]
 
         payload = f"{tier_code}{expiry_hex}{random_part}"
         expected_hmac = hmac.new(
             self._FOUNDER_SALT,
             payload.encode(),
             hashlib.sha256
-        ).hexdigest()[:20].upper()
+        ).hexdigest()[:16].upper()
 
         if not hmac.compare_digest(hmac_part, expected_hmac):
             return None, False
@@ -581,7 +581,7 @@ class LicenseManager:
         Uses a separately-derived secret. Not exposed in public tier_map.
         Returns (tier, is_valid).
         """
-        if len(key) != 40:
+        if len(key) != 36:
             return None, False
         tier_code = key[:2]
         # Internal tier prefix is intentionally short and obscure
@@ -589,7 +589,7 @@ class LicenseManager:
             return None, False
         expiry_hex = key[2:12]
         random_part = key[12:20]
-        hmac_part = key[20:40]
+        hmac_part = key[20:36]
 
         # Verify with internal salt (different from public secret)
         payload = f"{tier_code}{expiry_hex}{random_part}"
@@ -597,7 +597,7 @@ class LicenseManager:
             self._INTERNAL_SALT,
             payload.encode(),
             hashlib.sha256
-        ).hexdigest()[:20].upper()
+        ).hexdigest()[:16].upper()
 
         if not hmac.compare_digest(hmac_part, expected_hmac):
             return None, False

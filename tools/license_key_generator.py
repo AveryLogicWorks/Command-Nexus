@@ -64,7 +64,7 @@ def generate_key(tier: SubscriptionTier, days_valid: int) -> str:
         _SECRET_KEY,
         payload.encode(),
         hashlib.sha256
-    ).hexdigest()[:20].upper()
+    ).hexdigest()[:16].upper()
 
     # Final key: add dashes for readability (XXXX-XXXX-XXXX-XXXX-XXXX)
     raw = f"{tier_code}{expiry_hex}{random_part}{hmac_digest}"
@@ -78,13 +78,13 @@ def validate_generated_key(key: str) -> tuple[bool, str, datetime]:
     Returns (is_valid, tier_name, expiry_date).
     """
     key = key.strip().upper().replace("-", "")
-    if len(key) != 40:
+    if len(key) != 36:
         return False, "invalid", datetime.now()
 
     tier_code = key[:2]
     expiry_hex = key[2:12]
     random_part = key[12:20]
-    hmac_part = key[20:40]
+    hmac_part = key[20:36]
 
     tier_map = {v: k for k, v in _TIER_CODES.items()}
     tier = tier_map.get(tier_code)
@@ -96,7 +96,7 @@ def validate_generated_key(key: str) -> tuple[bool, str, datetime]:
         _SECRET_KEY,
         payload.encode(),
         hashlib.sha256
-    ).hexdigest()[:20].upper()
+    ).hexdigest()[:16].upper()
 
     if not hmac.compare_digest(hmac_part, expected_hmac):
         return False, "invalid_hmac", datetime.now()
