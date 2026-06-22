@@ -1479,8 +1479,8 @@ class BookWindow(QMainWindow):
         ai_name = self._current_book.ai_name
         existing_context = self._current_book.title_page.purpose if self._current_book.title_page else ""
 
-        dialog = BookAIDialog(ai_name, self._current_ai_uuid, existing_context, parent=self)
-        dialog.book_content_ready.connect(self._on_book_ai_content_ready)
+        dialog = KnowledgeAIDialog(ai_name, self._current_ai_uuid, existing_context, parent=self)
+        dialog.knowledge_content_ready.connect(self._on_book_ai_content_ready)
         dialog.exec()
 
     def _on_book_ai_content_ready(self, ai_uuid: str, ai_name: str, content: dict):
@@ -1490,7 +1490,7 @@ class BookWindow(QMainWindow):
             return
 
         # Store a snapshot of current state for rollback capability
-        self._store_book_snapshot(ai_uuid, book)
+        self._store_knowledge_snapshot(ai_uuid, book)
 
         # Find or create the "Active Memory" part to hold user-defined content
         active_memory_part = None
