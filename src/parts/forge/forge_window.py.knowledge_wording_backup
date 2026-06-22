@@ -5,8 +5,8 @@ from ...core.license_manager import get_license_manager
 from ...core.nexus_use_lockafire import check_use_lock, UseLockArea
 
 ABILITY_SURFACES = {
-    "Chatbot": "Workspace chat command surface with Knowledge / Intelligence context and attachment routing",
-    "Chat": "Workspace chat command surface with Knowledge / Intelligence context and attachment routing",
+    "Chatbot": "Workspace chat command surface with Book context and attachment routing",
+    "Chat": "Workspace chat command surface with Book context and attachment routing",
     "Notebook": "Notes, recall, tagging, and project-memory workspace",
     "Notes": "Notebook/notes placeholder",
     "Knowledge": "Notebook/notes placeholder",
@@ -128,7 +128,7 @@ def _generate_surfaces(abilities: list[str]) -> dict[str, str]:
         key = _canonical_ability(ab)
         desc = ABILITY_SURFACES.get(key, "Placeholder ability surface (backend not connected yet)")
         surfaces[key] = desc
-        surfaces[ab] = desc  # keep original name mapping for Knowledge / Intelligence rendering
+        surfaces[ab] = desc  # keep original name mapping for book rendering
     return surfaces
 
 def _starter_workflows(abilities: list[str]) -> list[str]:
@@ -137,7 +137,7 @@ def _starter_workflows(abilities: list[str]) -> list[str]:
     if {"Chatbot", "Notebook"} & combos:
         workflows.append("Chat can reference notebook/knowledge entries later.")
     if {"Chatbot", "Book"} & combos:
-        workflows.append("Chat can summarize/draft from Knowledge / Intelligence profile.")
+        workflows.append("Chat can summarize/draft from ability book.")
     if {"Planner", "Tool User"} & combos or {"Mission Planner", "Agent"} & combos:
         workflows.append("Plans require approval before tool execution.")
     if {"Vision", "Planner"} & combos or {"Visibility", "Planner"} & combos:
@@ -614,13 +614,13 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
 
     if use_case == UseCaseClass.MILITARY_GOVERNMENT:
         return "\n".join([
-            f"# Knowledge / Intelligence Profile for {name} (Public Build Placeholder)",
+            f"# Ability Book for {name} (Public Build Placeholder)",
             "", "This edition is a future controlled edition and is disabled in the public build.",
             "No operational doctrine generated.",
         ])
 
     lines: list[str] = []
-    lines.append(f"# Knowledge / Intelligence Profile for {name}")
+    lines.append(f"# Ability Book for {name}")
     lines.append("")
     lines.append("## Identity and Purpose")
     lines.append(f"- AI Name: {name}")
@@ -871,7 +871,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     lines.append("They define standalone behavior and interconnection rules for the AI's internal use.")
     lines.append("")
 
-    # Generate capability entries using the capKnowledge / Intelligence profile engine
+    # Generate capability entries using the capability book engine
     capability_book_content = generate_full_book_for_ai(abilities)
     lines.append(capability_book_content)
 
@@ -892,7 +892,7 @@ def _smoke_test_scaffold():
     )
     unit = _scaffold_unit(unit, purpose="Demo smoke", base_dir=tmp)
     assert unit.archive_path and Path(unit.archive_path).exists(), "Archive not created"
-    assert unit.ability_book_path and Path(unit.ability_book_path).exists(), "Knowledge / Intelligence profile not created"
+    assert unit.ability_book_path and Path(unit.ability_book_path).exists(), "Ability book not created"
     assert unit.ability_surfaces, "Surfaces missing"
     assert unit.starter_workflows, "Workflows missing"
     return True
@@ -2827,7 +2827,7 @@ class AIForgeWindow(QMainWindow):
                         f"Ability surfaces:{surfaces}\n\n"
                         f"Starter workflows:{workflows}\n\n"
                         f"Archive: {u.archive_path or '(not generated)'}\n"
-                        f"Knowledge / Intelligence profile: {u.ability_book_path or '(not generated)'}\n"
+                        f"Ability book: {u.ability_book_path or '(not generated)'}\n"
                         f"Knowledge defaults: {book_status}\n\n"
                         f"Personality:\n{pers}\n\n"
                         f"Created: {u.created_at.strftime('%Y-%m-%d %H:%M:%S')}"

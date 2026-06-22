@@ -38,7 +38,6 @@ from ...core.settings_manager import SettingsManager
 from ...core.task_models import Task, TaskStatus, AIStatus, AISession
 from ...core.approval_gate import ApprovalGate, ActionRequest, RiskLevel
 from ...core.nexus_moirai import check_action_allowed, MoiraiHealthReport
-from ...core.nexus_ai_runtime import NexusAIRuntime, RuntimeStatus as NexusRuntimeStatus
 from ...core.runtime_executor import LocalRuntimeExecutor, RuntimeStatus
 from ...core.constants import (
     SpeedLevel, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
@@ -589,7 +588,6 @@ class VisibilityWindow(QMainWindow):
         self._approval = approval or ApprovalGate()
         self._settings = SettingsManager()
         self._settings.initialize()
-        self._nexus_ai_runtime = NexusAIRuntime()
         self._runtime_executor = LocalRuntimeExecutor()
         self._mode = "IDLE"  # IDLE | DEMO | MISSION | PAUSED | ERROR
         self._resume_mode = None
@@ -1099,10 +1097,13 @@ class VisibilityWindow(QMainWindow):
         session.status = AIStatus.RUNNING
         self._mode = "MISSION"
         self._viewport.start_stream("MISSION")
-        self._sim.stop()
-        self._thought_pane.append("[SYSTEM] Runtime executor queued. Audit simulator stopped for real mission.")
-        self._action_pane.append("[SYSTEM] No fake activity will run while waiting for real execution.")
-        self._trajectory_pane.append("[SYSTEM] Next: runtime executor decides complete, pause, or fail.")
+        if self._has_real_runtime_executor(uuid):
+            self._sim.stop()
+        else:
+            self._sim.start()
+            self._thought_pane.append(f"[SYSTEM] {session.name} has no real backend executor connected yet.")
+            self._action_pane.append("[SYSTEM] Running visible TEST-RUNTIME so the mission does not silently fake completion.")
+            self._trajectory_pane.append("[SYSTEM] Next: wire Lily to a real local/API executor. For now, visible test lifecycle is active.")
         self._update_status_display(AIStatus.RUNNING)
         self._refresh_task_queue()
 
@@ -1137,21 +1138,18 @@ class VisibilityWindow(QMainWindow):
         self._trajectory_pane.append("[SYSTEM] Trajectory initialized from Book skills.")
         self._set_presence(PresenceState.RUNNING_MISSION, "Mission active")
 
-        # Begin execution lifecycle through Nexus AI Runtime.
-        self._sim.stop()
+        # Begin execution lifecycle
         self._mission_progress = 0
-        self._mission_timer.start(100)
+        self._mission_timer.start(1000)
 
     def _on_mission_tick(self):
         self._mission_progress += 1
         uuid = self._get_selected_uuid()
-
         if not uuid or uuid not in self._sessions:
             self._mission_timer.stop()
             return
 
         session = self._sessions[uuid]
-
         if not session.current_task:
             self._mission_timer.stop()
             return
@@ -1159,14 +1157,12 @@ class VisibilityWindow(QMainWindow):
         task = session.current_task
 
         if self._mission_progress == 1:
-            self._sim.stop()
-            self._thought_pane.append(f"[SYSTEM] Dispatching '{task.name}' to Nexus AI Runtime for {session.name}.")
-            self._action_pane.append("[SYSTEM] Fake timer completion is disabled. Runtime must return completed/paused/failed.")
-            self._trajectory_pane.append("[SYSTEM] Route: AI metadata -> Knowledge/Intelligence profile -> capability engine -> honest result.")
+            self._thought_pane.append(f"[SYSTEM] Dispatching '{task.name}' to runtime executor for {session.name}.")
+            self._action_pane.append("[SYSTEM] This mission will not be marked complete unless the executor returns completed.")
+            self._trajectory_pane.append("[SYSTEM] Runtime path: classify task -> run model/search/tool bridge -> report honest status.")
             return
 
         self._mission_timer.stop()
-        self._sim.stop()
 
         try:
             meta = self._registry.get(uuid) if self._registry else {}
@@ -1174,20 +1170,22 @@ class VisibilityWindow(QMainWindow):
             meta = {}
 
         try:
-            result = self._nexus_ai_runtime.run(task.name, ai_name=session.name, ai_uuid=uuid, ai_metadata=meta or {})
+            result = self._runtime_executor.run(task.name, ai_name=session.name, ai_metadata=meta or {})
         except Exception as e:
+            result = None
+            self._thought_pane.append(f"[SYSTEM] Runtime executor crashed: {e}")
+
+        if result is None:
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now()
             session.current_task = None
             session.status = AIStatus.FAILED
-            self._thought_pane.append(f"[SYSTEM] Nexus AI Runtime crashed: {e}")
-            self._action_pane.append("[SYSTEM] Task failed because runtime crashed.")
-            self._trajectory_pane.append("[SYSTEM] Next: inspect src/core/nexus_ai_runtime.py.")
+            self._action_pane.append("[SYSTEM] Task failed because runtime executor crashed.")
+            self._trajectory_pane.append("[SYSTEM] Next: inspect runtime_executor.py and logs.")
             self._update_status_display(AIStatus.FAILED)
             self._set_presence(PresenceState.ERROR, "Runtime crashed")
             self._refresh_task_queue()
             self._btn_cancel.setEnabled(False)
-            self._viewport.stop_stream("AI Vision Stream - runtime crashed.")
             self._audit_event("mission_runtime_crashed", msg=task.name)
             return
 
@@ -1197,26 +1195,24 @@ class VisibilityWindow(QMainWindow):
             self._action_pane.append(line)
         for line in result.trajectory_lines:
             self._trajectory_pane.append(line)
-
         if result.result_text:
             self._action_pane.append("[RESULT]")
             self._action_pane.append(result.result_text)
-
         if getattr(result, "opened_url", ""):
             self._trajectory_pane.append(f"[SYSTEM] Opened: {result.opened_url}")
 
-        if result.status == NexusRuntimeStatus.PAUSED:
+        if result.status == RuntimeStatus.PAUSED:
             task.status = TaskStatus.PAUSED
             session.status = AIStatus.PAUSED
             self._update_status_display(AIStatus.PAUSED)
             self._set_presence(PresenceState.PAUSED, result.title)
             self._refresh_task_queue()
             self._btn_cancel.setEnabled(True)
-            self._viewport.stop_stream("AI Vision Stream - paused. Waiting for backend, review, or approval.")
+            self._viewport.stop_stream("AI Vision Stream - task paused / waiting for real executor or review.")
             self._audit_event("mission_paused_runtime", msg=result.title)
             return
 
-        if result.status == NexusRuntimeStatus.FAILED:
+        if result.status == RuntimeStatus.FAILED:
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now()
             session.current_task = None
@@ -1225,7 +1221,7 @@ class VisibilityWindow(QMainWindow):
             self._set_presence(PresenceState.ERROR, result.title)
             self._refresh_task_queue()
             self._btn_cancel.setEnabled(False)
-            self._viewport.stop_stream("AI Vision Stream - mission failed.")
+            self._viewport.stop_stream()
             self._audit_event("mission_failed_runtime", msg=result.title)
             return
 
@@ -1234,7 +1230,7 @@ class VisibilityWindow(QMainWindow):
         session.task_history.append(task)
         session.current_task = None
         session.status = AIStatus.IDLE
-        self._action_pane.append(f"[SYSTEM] Task '{task.name}' completed by Nexus AI Runtime.")
+        self._action_pane.append(f"[SYSTEM] Task '{task.name}' completed by runtime executor.")
         self._speak(f"Task {task.name} completed.")
         self._update_status_display(AIStatus.IDLE)
         self._set_presence(PresenceState.IDLE, "Idle / ready")
