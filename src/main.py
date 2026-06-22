@@ -23,6 +23,7 @@ from src.core.settings_manager import SettingsManager
 from src.core.approval_gate import ApprovalGate
 from src.core.audit_logger import AuditLogger
 from src.core.command_router import CommandRouter, ToolRegistry, LocalCommandServer
+from src.core.nexus_ai_runtime import NexusAIRuntime
 from src.core.license_manager import get_license_manager
 from src.core.license_dialog import LicenseActivationDialog
 from src.core.tripwire_manager import TripwireManager
@@ -60,6 +61,7 @@ class CommandNexusApp:
             self._audit = AuditLogger(self._settings)
             self._registry = ToolRegistry()
             self._router = CommandRouter(self._approval, self._audit, self._registry)
+            self._ai_runtime = NexusAIRuntime()
         except Exception as e:
             QMessageBox.critical(None, "Initialization Error", f"Failed to initialize core systems: {e}")
             sys.exit(1)
@@ -270,8 +272,36 @@ class CommandNexusApp:
         self._book.open_for_ai(uuid, name)
 
     def _route_book_command(self, command: str):
-        """Route a command from the Knowledge window to the AI. Memory is NEVER included."""
-        self._router.route(command, source="book_command")
+        """Route a command from the Knowledge window to the AI runtime and show the response.
+        Memory is NEVER included — only the command text is sent."""
+        command = (command or "").strip()
+        if not command:
+            return
+
+        uuid = ""
+        name = "AI"
+        if self._book is not None:
+            uuid = self._book._current_ai_uuid or ""
+            name = getattr(self._book, "_current_ai_name", "") or "AI"
+        meta = self._registry.get(uuid) or {}
+
+        try:
+            result = self._ai_runtime.run(command, ai_name=name, ai_uuid=uuid, ai_metadata=meta)
+            response_text = result.result_text or result.title or "No response."
+            status = result.status.value.upper() if hasattr(result.status, "value") else str(result.status)
+        except Exception as exc:
+            response_text = f"AI runtime error: {exc}"
+            status = "ERROR"
+
+        if self._book is not None and hasattr(self._book, "show_ai_response"):
+            self._book.show_ai_response(command, response_text, status)
+
+        # Mirror the activity into the Visibility dashboard so the user can see it.
+        if self._visibility is not None and hasattr(self._visibility, "_thought_pane"):
+            self._visibility._thought_pane.append(f"[KNOWLEDGE] {name}: {command}")
+
+        self._audit.log(tool="KnowledgeWindow", action="KNOWLEDGE_COMMAND_ROUTED",
+                        target=f"AI: {uuid}", approved=True, status="info")
 
     def _on_ai_activated(self, uuid: str, name: str):
         self._visibility.add_ai_session(uuid, name)

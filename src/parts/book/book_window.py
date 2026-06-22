@@ -367,6 +367,7 @@ class BookWindow(QMainWindow):
         # Per-AI Knowledge registry: ai_uuid -> BookInstance
         self._books: dict[str, BookInstance] = {}
         self._current_ai_uuid: str | None = None
+        self._current_ai_name: str = ""
         self._current_node: BookNode | None = None
 
         self._setup_ui()
@@ -381,6 +382,7 @@ class BookWindow(QMainWindow):
     def open_for_ai(self, ai_uuid: str, ai_name: str):
         """Open or create Knowledge for a specific AI. Always regenerate to prevent stale cached data."""
         self._current_ai_uuid = ai_uuid
+        self._current_ai_name = ai_name
         # Always create fresh — cache caused wrong AI books to persist (Lily showing Athena)
         self._books[ai_uuid] = self._create_book_for_ai(ai_uuid, ai_name)
         self._book_title.setText(f"Book: {ai_name}")
@@ -540,7 +542,17 @@ class BookWindow(QMainWindow):
         avatar_guard.setStyleSheet("font-size: 10px; color: #3fb950; padding: 4px;")
         avatar_guard.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar_layout.addWidget(avatar_guard)
-        avatar_layout.addStretch()
+
+        self._response_view = QTextEdit()
+        self._response_view.setReadOnly(True)
+        self._response_view.setPlaceholderText("AI responses appear here. Use 'Command to AI' below to ask something.")
+        self._response_view.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._response_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._response_view.setStyleSheet(
+            "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
+        )
+        self._response_view.setMinimumHeight(140)
+        avatar_layout.addWidget(self._response_view, stretch=1)
         top_splitter.addWidget(avatar_widget)
 
         # ── RIGHT: Persistent Memory (Private) ──
@@ -645,6 +657,19 @@ class BookWindow(QMainWindow):
         # Memory is NEVER included. Only the command text.
         self.command_to_ai.emit(command)
         self._command_input.clear()
+
+    def show_ai_response(self, command: str, response: str, status: str = ""):
+        """Display the AI's response to a command in the Companion panel."""
+        if not hasattr(self, "_response_view"):
+            return
+        timestamp = datetime.now().strftime("%H:%M")
+        name = self._current_ai_name or "AI"
+        status_tag = f" [{status}]" if status and status != "COMPLETED" else ""
+        self._response_view.append(f"You ({timestamp}): {command}")
+        self._response_view.append(f"{name}{status_tag}: {response}")
+        self._response_view.append("")
+        sb = self._response_view.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
     def _refresh_running_memory(self):
         """
