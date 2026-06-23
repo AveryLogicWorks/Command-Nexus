@@ -156,7 +156,7 @@ class ModelSettingsDialog(QDialog):
             rt.ollama_url = (self._ollama_url.text().strip() or rt.ollama_url).rstrip("/")
             rt.ollama_model = self._ollama_model.text().strip() or rt.ollama_model
             reply = rt._call_model("Reply with exactly: NEXUS_OK")
-            if reply and "error" not in reply.lower():
+            if reply and "backend error:" not in reply.lower():
                 self._status.setText(f"Connection OK — model replied: {reply[:120]}")
             elif reply:
                 self._status.setText(f"Backend responded with an error: {reply[:160]}")

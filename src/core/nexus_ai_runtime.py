@@ -121,7 +121,7 @@ class NexusAIRuntime:
         self.model_backend = (s.get("model_backend") or "auto").strip().lower()
         self.openai_api_key = (s.get("openai_api_key") or os.environ.get("OPENAI_API_KEY", "")).strip()
         self.openai_model = (s.get("openai_model") or os.environ.get("COMMAND_NEXUS_OPENAI_MODEL", "gpt-4o-mini")).strip()
-        self.ollama_url = (s.get("ollama_url") or os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
+        self.ollama_url = (s.get("ollama_url") or os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434")).strip().rstrip("/")
         self.ollama_model = (s.get("ollama_model") or os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL", "llama3.2:1b")).strip()
 
     def _refresh_model_settings(self) -> None:
