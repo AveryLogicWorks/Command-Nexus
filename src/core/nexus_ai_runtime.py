@@ -12,7 +12,11 @@ import re
 import time
 import urllib.parse
 import urllib.request
-import webbrowser
+
+from .settings_manager import SettingsManager
+from .adaptive_memory import AdaptiveMemoryStore
+from .tool_executor import ToolExecutor, ToolResult
+from .model_registry import ModelRegistry
 
 
 _BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
@@ -100,20 +104,194 @@ class NexusAIRuntime:
     It must never fake-complete external, research, browser, file, or tool actions.
     """
 
-    def __init__(self):
+    def __init__(self, settings: SettingsManager | None = None):
         self.home = Path.home() / ".command_nexus"
         self.notes_dir = self.home / "notes"
         self.archive_dir = self.home / "runtime_archive"
         self.notes_dir.mkdir(parents=True, exist_ok=True)
         self.archive_dir.mkdir(parents=True, exist_ok=True)
 
-        self.openai_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-        self.openai_model = os.environ.get("COMMAND_NEXUS_OPENAI_MODEL", "gpt-4o-mini").strip()
+        self._settings = settings or SettingsManager()
+        self._settings.initialize()
+        s = self._settings.get()
 
-        self.ollama_url = os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-        self.ollama_model = os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL", "llama3.1").strip()
+        self.ai_backend = (os.environ.get("COMMAND_NEXUS_AI_BACKEND") or s.ai_backend or "ollama").strip().lower()
+        self.openai_api_key = (os.environ.get("OPENAI_API_KEY") or s.openai_api_key or "").strip()
+        self.openai_model = (os.environ.get("COMMAND_NEXUS_OPENAI_MODEL") or s.openai_model or "gpt-4o-mini").strip()
 
-        self.brave_api_key = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()
+        self.ollama_url = (os.environ.get("COMMAND_NEXUS_OLLAMA_URL") or s.ollama_url or "http://127.0.0.1:11434").rstrip("/")
+        self.ollama_model = (os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL") or s.ollama_model or "llama3.1").strip()
+
+        self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
+
+        self._memory = AdaptiveMemoryStore(self._settings)
+        self._tools = ToolExecutor(self._settings)
+        self._models = ModelRegistry(self._settings)
+        self._response_cache: dict[str, str] = {}
+
+    def save_memory(
+        self,
+        ai_uuid: str,
+        content: str,
+        tags: list[str] | None = None,
+        source: str = "mission",
+        importance: float = 0.5,
+    ) -> Any:
+        """Save a learned fact/preference to the local adaptive memory store."""
+        if not ai_uuid or not content:
+            return None
+        return self._memory.add(ai_uuid, content, tags=tags, source=source, importance=importance)
+
+    def _learn_from_mission(self, ai_uuid: str, task: str, intent: str, result: Any) -> None:
+        """Automatically extract and store memories from a mission attempt."""
+        if not ai_uuid or not self._memory:
+            return
+
+        status = getattr(result, "status", None)
+        title = getattr(result, "title", "Mission")
+
+        # Save a concise mission summary for completed missions, or an attempt record otherwise.
+        if status == "completed":
+            summary = f"Mission: {task} | Intent: {intent} | Outcome: {title}"
+            self._memory.add(
+                ai_uuid,
+                summary,
+                tags=[intent.lower(), "mission"],
+                source="mission",
+                importance=0.5,
+            )
+        else:
+            attempt = f"Attempted: {task} | Intent: {intent} | Status: {status}"
+            self._memory.add(
+                ai_uuid,
+                attempt,
+                tags=[intent.lower(), "attempt"],
+                source="mission",
+                importance=0.3,
+            )
+
+        # Extract preference / fact statements from the user task regardless of outcome.
+        prefs = self._extract_preferences(task)
+        for p in prefs:
+            self._memory.add(
+                ai_uuid,
+                p,
+                tags=["preference", "user_input"],
+                source="user_input",
+                importance=0.85,
+            )
+
+    def _extract_preferences(self, text: str) -> list[str]:
+        """Simple heuristic extraction of preference/fact statements from user text."""
+        text = (text or "").strip()
+        if not text:
+            return []
+
+        cues = ["prefer", "like", "always", "never", "want", "need", "use", "remember", "dislike", "hate"]
+        bare_phrases = {"remember that", "remember this", "remember to"}
+        sentences = [s.strip() for s in re.split(r"[.!?\n]", text) if s.strip()]
+        found: list[str] = []
+        for s in sentences:
+            lower = s.lower()
+            if len(s) < 10 or len(s) > 300:
+                continue
+            if not any(c in lower for c in cues):
+                continue
+            if any(p in lower for p in bare_phrases):
+                continue
+            # Require at least 4 words so bare cues like 'I want that' are skipped.
+            if len(s.split()) < 4:
+                continue
+            found.append(s)
+        return found
+
+    def suggest_next_steps(self, ai_uuid: str, ai_name: str = "AI") -> list[str]:
+        """
+        Propose next actions based on the AI's accumulated local memory.
+        Uses the configured model if available; otherwise falls back to heuristics.
+        """
+        if not ai_uuid or not self._memory:
+            return []
+
+        memories = self._memory.get_recent(ai_uuid, 15)
+        if not memories:
+            return ["Start a mission to build up local memory and preferences."]
+
+        memory_text = "\n".join(f"- [{m.source}] {m.content}" for m in memories)
+
+        prompt = (
+            f"You are {ai_name}, a Command Nexus governed AI.\n"
+            "Based on the user's recent local memory below, suggest 2-3 concrete next actions the user might want.\n"
+            "Keep each suggestion under 100 characters. Be helpful and privacy-aware.\n\n"
+            f"Recent memory:\n{memory_text}\n\n"
+            "Suggestions (one per line, no numbering):"
+        )
+
+        model_response = self._call_model(prompt)
+        if model_response:
+            suggestions = [line.strip("-• ").strip() for line in model_response.splitlines() if line.strip()]
+            return [s for s in suggestions if s][:5]
+
+        # Offline heuristic fallback.
+        suggestions: list[str] = []
+        project_memories = [m for m in memories if "project" in m.tags or "project" in m.content.lower()]
+        if project_memories:
+            suggestions.append(f"Continue working on {project_memories[0].content[:80]}...")
+        preference_memories = [m for m in memories if "preference" in m.tags]
+        if preference_memories:
+            suggestions.append(f"Apply your preference: {preference_memories[0].content[:80]}...")
+        if any("mission" in m.tags for m in memories):
+            suggestions.append("Review recent mission outcomes and refine the next task.")
+        if not suggestions:
+            suggestions.append("Keep using the AI to build more context and preferences.")
+        return suggestions[:5]
+
+    def health_check(self) -> dict[str, Any]:
+        """Return the current backend reachability and selected model status."""
+        result: dict[str, Any] = {
+            "backend": self.ai_backend,
+            "reachable": False,
+            "message": "",
+            "models": [],
+            "selected_model": "",
+        }
+        try:
+            if self.ai_backend == "openai":
+                if not self.openai_api_key:
+                    result["message"] = "OpenAI backend selected but no API key configured."
+                    return result
+                req = urllib.request.Request(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": "Bearer " + self.openai_api_key},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                models = [m.get("id", "") for m in data.get("data", [])]
+                result["reachable"] = True
+                result["models"] = models
+                result["selected_model"] = self.openai_model
+                result["message"] = (
+                    f"OpenAI connected. Model '{self.openai_model}' is available."
+                    if self.openai_model in models
+                    else f"OpenAI connected. Model '{self.openai_model}' not found in available models."
+                )
+            else:
+                url = self.ollama_url + "/api/tags"
+                req = urllib.request.Request(url, method="GET")
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                models = [m.get("name", "") for m in data.get("models", [])]
+                result["reachable"] = True
+                result["models"] = models
+                result["selected_model"] = self.ollama_model
+                result["message"] = (
+                    f"Ollama connected. Model '{self.ollama_model}' is available."
+                    if self.ollama_model in models
+                    else f"Ollama connected. Model '{self.ollama_model}' not found. Available: {', '.join(models[:5]) or 'none'}."
+                )
+        except Exception as e:
+            result["message"] = f"{self.ai_backend} backend unreachable: {e}"
+        return result
 
     def run(self, task: str, ai_name: str = "AI", ai_uuid: str = "", ai_metadata: dict[str, Any] | None = None) -> RuntimeResult:
         task = (task or "").strip()
@@ -140,7 +318,7 @@ class NexusAIRuntime:
         ]
 
         if not self._capability_allowed(intent, abilities):
-            return RuntimeResult(
+            result = RuntimeResult(
                 RuntimeStatus.PAUSED,
                 "Capability not attached",
                 thought + [f"[{ai_name}] Required capability is not attached for this task."],
@@ -148,45 +326,34 @@ class NexusAIRuntime:
                 ["Next: add the needed capability in AI Forge or choose an AI that has it."],
                 f"Required capability missing for this task: {intent}",
             )
+            self._learn_from_mission(ai_uuid, task, intent, result)
+            return result
 
         if intent == "Research":
-            return self._run_research(task, ai_name, meta, knowledge, thought)
+            result = self._run_research(task, ai_name, meta, knowledge, thought)
+        elif intent == "Coder":
+            result = self._run_coder(task, ai_name, meta, knowledge, thought)
+        elif intent == "Creative Writing":
+            result = self._run_writer(task, ai_name, meta, knowledge, thought)
+        elif intent == "Planner":
+            result = self._run_planner(task, ai_name, meta, knowledge, thought)
+        elif intent == "Document Processor":
+            result = self._run_document_processor(task, ai_name, meta, knowledge, thought)
+        elif intent == "Notebook":
+            result = self._run_notebook(task, ai_name, meta, knowledge, thought)
+        elif intent == "Archive":
+            result = self._run_archive(task, ai_name, meta, knowledge, thought)
+        elif intent == "Tutor":
+            result = self._run_tutor(task, ai_name, meta, knowledge, thought)
+        elif intent == "Business Workflow":
+            result = self._run_business(task, ai_name, meta, knowledge, thought)
+        elif intent == "Tool User":
+            result = self._run_tool_user(task, ai_name, meta, knowledge, thought)
+        else:
+            result = self._run_chat(task, ai_name, meta, knowledge, thought)
 
-        if intent == "Coder":
-            return self._run_coder(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Creative Writing":
-            return self._run_writer(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Planner":
-            return self._run_planner(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Document Processor":
-            return self._run_document_processor(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Notebook":
-            return self._run_notebook(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Archive":
-            return self._run_archive(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Tutor":
-            return self._run_tutor(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Business Workflow":
-            return self._run_business(task, ai_name, meta, knowledge, thought)
-
-        if intent == "Tool User":
-            return RuntimeResult(
-                RuntimeStatus.PAUSED,
-                "Approved tool executor required",
-                thought + [f"[{ai_name}] This requires real browser/file/app/tool control."],
-                [f"[{ai_name}] Paused before performing real external action."],
-                ["Next: attach approved tool executors, then resume."],
-                "Command Nexus can propose and approve this action, but no real tool executor is attached yet.",
-            )
-
-        return self._run_chat(task, ai_name, meta, knowledge, thought)
+        self._learn_from_mission(ai_uuid, task, intent, result)
+        return result
 
     def _canonical_abilities(self, meta: dict[str, Any]) -> set[str]:
         raw = meta.get("abilities") or meta.get("capabilities") or []
@@ -213,11 +380,27 @@ class NexusAIRuntime:
     def _classify(self, task: str) -> str:
         t = task.lower()
 
-        if any(x in t for x in ["research", "look up", "lookup", "search", "find sources", "sources", "citation", "cite", "verify", "current", "latest", "web", "internet", "news", "game mechanics"]):
+        if any(x in t for x in [
+            "research", "look up", "lookup", "search", "find sources", "sources", "citation",
+            "cite", "verify", "current", "latest", "web search", "search the web", "websearch",
+            "internet", "news", "game mechanics",
+        ]):
             return "Research"
 
         if any(x in t for x in ["code", "bug", "python", "javascript", "html", "css", "function", "class", "error", "traceback", "fix script", "patch"]):
             return "Coder"
+
+        if any(x in t for x in [
+            "read file", "show file", "display file", "open file", "cat file", "view file",
+            "write file", "create file", "save file", "write to file", "create a file",
+            "list directory", "list files", "list folder", "list dir", "show files",
+            "delete file", "delete folder", "delete directory", "remove file", "remove folder",
+            "move file", "move folder", "rename file", "rename folder",
+            "run command", "run shell", "execute ", "shell command", "terminal ",
+            "install", "uninstall", "download", "open app", "click", "type into",
+            "send email", "upload", "publish", "submit",
+        ]):
+            return "Tool User"
 
         if any(x in t for x in ["write", "draft", "rewrite", "story", "script", "copy", "article", "post", "paragraph", "creative"]):
             return "Creative Writing"
@@ -239,9 +422,6 @@ class NexusAIRuntime:
 
         if any(x in t for x in ["customer", "sales", "marketing", "hr", "sop", "business", "support reply"]):
             return "Business Workflow"
-
-        if any(x in t for x in ["delete", "move file", "rename file", "run command", "install", "uninstall", "download", "open app", "click", "type into", "send email", "upload", "publish", "submit"]):
-            return "Tool User"
 
         return "Chatbot"
 
@@ -275,6 +455,26 @@ class NexusAIRuntime:
         if len(clean) <= limit:
             return clean
         return clean[:limit] + "\n\n[Knowledge excerpt truncated for runtime prompt.]"
+
+    def _memory_excerpt(self, ai_uuid: str, task: str, limit: int = 2000) -> str:
+        """Retrieve the most relevant learned memories for this AI and task."""
+        if not ai_uuid or not self._memory:
+            return ""
+        memories = self._memory.search(ai_uuid, task)[:12]
+        if not memories:
+            memories = self._memory.get_recent(ai_uuid, 6)
+        if not memories:
+            return ""
+        lines = ["Learned context from previous interactions:"]
+        total = 0
+        for m in memories:
+            entry = f"- [{m.source}] {m.content}"
+            if total + len(entry) > limit:
+                lines.append("[Additional memories omitted for prompt size]")
+                break
+            lines.append(entry)
+            total += len(entry)
+        return "\n".join(lines)
 
     def _run_chat(self, task, ai_name, meta, knowledge, thought):
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "chat"))
@@ -323,21 +523,15 @@ class NexusAIRuntime:
             )
 
         url = "https://www.google.com/search?q=" + urllib.parse.quote_plus(task)
-        opened = False
-        try:
-            webbrowser.open(url)
-            opened = True
-        except Exception:
-            opened = False
 
         return RuntimeResult(
             RuntimeStatus.PAUSED,
             "Research waiting for real source review",
             thought + [f"[{ai_name}] No search API/source reader is connected."],
-            [f"[{ai_name}] Browser search opened." if opened else f"[{ai_name}] Browser search could not open."],
+            [f"[{ai_name}] Research paused; URL ready for manual review: {url}"],
             ["Next: collect sources -> read sources -> summarize -> cite -> then complete."],
             "Research paused. It cannot truthfully complete until sources are collected and reviewed.",
-            opened_url=url if opened else "",
+            opened_url=url,
         )
 
     def _run_coder(self, task, ai_name, meta, knowledge, thought):
@@ -443,7 +637,121 @@ class NexusAIRuntime:
         )
         return RuntimeResult(RuntimeStatus.COMPLETED, "Business workflow completed", thought + [f"[{ai_name}] Business workflow executed locally."], [f"[{ai_name}] Produced draft-safe workflow."], ["Next: review and approve outward actions."], result)
 
+    def _run_tool_user(self, task, ai_name, meta, knowledge, thought):
+        """
+        Fast, rule-based local tool execution.
+
+        No model call is made here. We extract the action and target from the
+        user's text using simple heuristics, execute through ToolExecutor, and
+        report exactly what happened. This keeps the system usable on small local
+        models (7B/8B and below) and avoids loading larger models just to route
+        file commands.
+        """
+        t = task.lower()
+
+        # Shell commands (high risk — kept inside workspace by default)
+        if any(x in t for x in ["run command", "run shell", "execute ", "shell command", "terminal "]):
+            cmd = re.sub(r"^(?:run|execute|shell|command|terminal)[:\s]*", "", task, flags=re.I).strip()
+            if cmd:
+                res = self._tools.run_shell(cmd)
+                return RuntimeResult(
+                    RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                    res.action,
+                    thought + [f"[{ai_name}] Executed shell command via ToolExecutor."],
+                    [res.message],
+                    ["Next: review stdout/stderr if needed."],
+                    f"Command: {res.data.get('command', cmd)}\nExit: {res.data.get('returncode', '?')}\n\nSTDOUT:\n{res.data.get('stdout', '')}\n\nSTDERR:\n{res.data.get('stderr', '')}",
+                )
+
+        # Write / create file
+        if any(x in t for x in ["write file", "create file", "save file", "write to file", "create a file"]):
+            path = self._extract_path(task)
+            content = self._extract_inline_text(task)
+            if not path:
+                return RuntimeResult(RuntimeStatus.PAUSED, "No file path found", thought + [f"[{ai_name}] Could not determine which file to write."], ["Provide a file path or filename, e.g. 'write file notes.txt content: hello'"], [], "")
+            if not content:
+                return RuntimeResult(RuntimeStatus.PAUSED, "No content found", thought + [f"[{ai_name}] Could not determine what content to write."], ["Provide content after 'content:' or in quotes."], [], "")
+            res = self._tools.write_file(path, content)
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: read the file back to verify."],
+                res.message,
+            )
+
+        # Delete file/dir
+        if any(x in t for x in ["delete file", "delete folder", "delete directory", "remove file", "remove folder"]):
+            path = self._extract_path(task)
+            if not path:
+                return RuntimeResult(RuntimeStatus.PAUSED, "No path found", thought + [f"[{ai_name}] Could not determine which file or folder to delete."], ["Provide a path, e.g. 'delete file old.txt'"], [], "")
+            res = self._tools.delete_file(path)
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: confirm deletion or list parent directory."],
+                res.message,
+            )
+
+        # Move / rename
+        if any(x in t for x in ["move file", "move folder", "rename file", "rename folder"]):
+            paths = re.findall(r'["\']([^"\']+)["\']', task)
+            if len(paths) < 2:
+                return RuntimeResult(RuntimeStatus.PAUSED, "Move needs two paths", thought + [f"[{ai_name}] Need source and destination paths."], ["Use quotes, e.g. 'move file \"a.txt\" to \"b.txt\"'"], [], "")
+            res = self._tools.move_file(paths[0], paths[1])
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: verify the destination."],
+                res.message,
+            )
+
+        # Read file (default or explicit)
+        if any(x in t for x in ["read file", "show file", "display file", "open file", "cat file", "view file"]):
+            path = self._extract_path(task)
+            if not path:
+                return RuntimeResult(RuntimeStatus.PAUSED, "No file path found", thought + [f"[{ai_name}] Could not determine which file to read."], ["Provide a file path, e.g. 'read file notes.txt'"], [], "")
+            res = self._tools.read_file(path)
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: summarize or edit the content."],
+                res.data.get("content", res.message),
+            )
+
+        # List directory
+        if any(x in t for x in ["list directory", "list files", "list folder", "list dir", "show files", "dir "]):
+            path = self._extract_path(task) or "."
+            res = self._tools.list_dir(path)
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: read or modify a specific file."],
+                "\n".join(f"- {e['name']} ({e['type']})" for e in res.data.get("entries", [])),
+            )
+
+        # Fallback: if we got here, we don't know what tool to run
+        return RuntimeResult(
+            RuntimeStatus.PAUSED,
+            "Tool intent unclear",
+            thought + [f"[{ai_name}] Detected Tool User intent but could not map it to a supported action."],
+            ["Supported: read file, write file, list files, move file, delete file, run shell command."],
+            ["Next: rephrase with a clear action and path."],
+            "",
+        )
+
     def _prompt(self, task, ai_name, meta, knowledge, mode):
+        ai_uuid = str(meta.get("uuid", ""))
+        memory_text = self._memory_excerpt(ai_uuid, task)
         return (
             f"You are {ai_name}, a Command Nexus governed AI.\n"
             f"Mode: {mode}\n"
@@ -452,19 +760,39 @@ class NexusAIRuntime:
             f"Libraries: {meta.get('libraries', [])}\n"
             f"Guardrails: {meta.get('guardrails', [])}\n\n"
             f"Knowledge / Intelligence Profile:\n{self._knowledge_excerpt(knowledge)}\n\n"
+            f"{memory_text}\n\n"
             f"Task:\n{task}\n\n"
             "Do not claim external actions were performed unless a tool actually performed them."
         )
 
-    def _call_model(self, prompt: str) -> str:
-        out = self._call_ollama(prompt)
-        if out:
-            return out
-        return self._call_openai(prompt)
+    def _call_model(self, prompt: str, model: str | None = None) -> str:
+        cache_key = f"{model or self.ollama_model}:{hash(prompt) & 0xFFFFFFFF}"
+        if cache_key in self._response_cache:
+            return self._response_cache[cache_key]
 
-    def _call_ollama(self, prompt: str) -> str:
+        if self.ai_backend == "openai":
+            out = self._call_openai(prompt)
+            if out and not out.startswith("OpenAI backend error"):
+                self._response_cache[cache_key] = out
+                return out
+            out = self._call_ollama(prompt, model=model)
+            if out:
+                self._response_cache[cache_key] = out
+            return out
+
+        # Default / ollama: local-first, fall back to OpenAI if configured
+        out = self._call_ollama(prompt, model=model)
+        if out:
+            self._response_cache[cache_key] = out
+            return out
+        out = self._call_openai(prompt)
+        if out:
+            self._response_cache[cache_key] = out
+        return out
+
+    def _call_ollama(self, prompt: str, model: str | None = None) -> str:
         try:
-            payload = {"model": self.ollama_model, "prompt": prompt, "stream": False}
+            payload = {"model": model or self.ollama_model, "prompt": prompt, "stream": False}
             req = urllib.request.Request(
                 self.ollama_url + "/api/generate",
                 data=json.dumps(payload).encode("utf-8"),

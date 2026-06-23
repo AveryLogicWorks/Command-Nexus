@@ -1,0 +1,74 @@
+[
+  {
+    "id": "50779840-1a88-4a3f-aa58-ad2ea11a14c8",
+    "ai_uuid": "ab9643f0-0965-45cf-9958-248a5022826a",
+    "content": "Mission: hello | Intent: Chatbot | Outcome: Local chat fallback completed",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T06:00:32.837207"
+  },
+  {
+    "id": "0f2c833e-2b89-4f90-86b1-fae7794409b3",
+    "ai_uuid": "ab9643f0-0965-45cf-9958-248a5022826a",
+    "content": "Mission: Write a Python function to add two numbers | Intent: Coder | Outcome: Coder local fallback completed",
+    "tags": [
+      "coder",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T06:00:36.860906"
+  },
+  {
+    "id": "d3673247-80f3-4b94-b519-e54e7567f615",
+    "ai_uuid": "ab9643f0-0965-45cf-9958-248a5022826a",
+    "content": "Attempted: Research the latest Python features | Intent: Research | Status: RuntimeStatus.PAUSED",
+    "tags": [
+      "research",
+      "attempt"
+    ],
+    "source": "mission",
+    "importance": 0.3,
+    "created_at": "2026-06-23T06:00:36.862434"
+  },
+  {
+    "id": "d54104d5-212c-466f-a556-dbd413ea6cc4",
+    "ai_uuid": "ab9643f0-0965-45cf-9958-248a5022826a",
+    "content": "Mission: Plan a project to build a website | Intent: Planner | Outcome: Planner completed",
+    "tags": [
+      "planner",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T06:00:36.872843"
+  },
+  {
+    "id": "1152a318-e61e-4e37-938e-27e23c56c135",
+    "ai_uuid": "ab9643f0-0965-45cf-9958-248a5022826a",
+    "content": "Mission: I prefer short answers. What is Rust? | Intent: Chatbot | Outcome: Local chat fallback completed",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T06:00:40.896676"
+  },
+  {
+    "id": "ef72a168-fa38-4d3b-8287-c4b92c5517d0",
+    "ai_uuid": "ab9643f0-0965-45cf-9958-248a5022826a",
+    "content": "I prefer short answers",
+    "tags": [
+      "preference",
+      "user_input"
+    ],
+    "source": "user_input",
+    "importance": 0.85,
+    "created_at": "2026-06-23T06:00:40.898530"
+  }
+]

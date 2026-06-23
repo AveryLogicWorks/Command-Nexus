@@ -18,6 +18,7 @@ class NexusSettings:
     books_path: str = ""      # Per-AI books storage
     ai_store_path: str = ""   # Persistent AI unit storage
     upgrades_path: str = ""   # Upgrade configs
+    memory_path: str = ""     # Adaptive memory / long-term context storage
     safety_mode: str = "standard"   # standard | strict | permissive
     audit_depth: str = "full"       # full | summary | minimal
     default_speed: str = "Regular"
@@ -36,6 +37,14 @@ class NexusSettings:
     selected_avatar_path: str = ""
     launch_on_startup: bool = False
     obfuscation_mode: bool = False  # Anti-inference layer — hides internal structures
+
+    # AI backend configuration (local-first defaults)
+    ai_backend: str = "ollama"  # ollama | openai
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "llama3.1"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    brave_api_key: str = ""  # Optional web search API
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -88,6 +97,7 @@ class SettingsManager:
             books_path=str(root / "books"),
             ai_store_path=str(root / "ai_store"),
             upgrades_path=str(root / "upgrades"),
+            memory_path=str(root / "memory"),
             safety_mode="standard",
             audit_depth="full",
             default_speed="Regular",
@@ -115,7 +125,7 @@ class SettingsManager:
                 encoding="utf-8"
             )
             # Ensure directories exist
-            for path_attr in ["workspace_path", "logs_path", "audit_path", "books_path", "ai_store_path", "upgrades_path"]:
+            for path_attr in ["workspace_path", "logs_path", "audit_path", "books_path", "ai_store_path", "upgrades_path", "memory_path"]:
                 p = Path(getattr(self._settings, path_attr))
                 p.mkdir(parents=True, exist_ok=True)
 

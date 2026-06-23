@@ -1454,7 +1454,7 @@ class BookWindow(QMainWindow):
         ai_name = self._current_book.ai_name
         existing_context = self._current_book.title_page.purpose if self._current_book.title_page else ""
 
-        dialog = BookAIDialog(ai_name, self._current_ai_uuid, existing_context, parent=self)
+        dialog = KnowledgeAIDialog(ai_name, self._current_ai_uuid, existing_context, parent=self)
         dialog.book_content_ready.connect(self._on_book_ai_content_ready)
         dialog.exec()
 

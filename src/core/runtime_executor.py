@@ -10,6 +10,8 @@ import urllib.request
 import webbrowser
 from typing import Any
 
+from .settings_manager import SettingsManager
+
 
 class RuntimeStatus(str, Enum):
     COMPLETED = "completed"
@@ -42,14 +44,19 @@ class LocalRuntimeExecutor:
     Otherwise the task pauses visibly.
     """
 
-    def __init__(self):
-        self.openai_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-        self.openai_model = os.environ.get("COMMAND_NEXUS_OPENAI_MODEL", "gpt-4o-mini").strip()
+    def __init__(self, settings: SettingsManager | None = None):
+        self._settings = settings or SettingsManager()
+        self._settings.initialize()
+        s = self._settings.get()
 
-        self.ollama_url = os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-        self.ollama_model = os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL", "llama3.1").strip()
+        self.ai_backend = (os.environ.get("COMMAND_NEXUS_AI_BACKEND") or s.ai_backend or "ollama").strip().lower()
+        self.openai_api_key = (os.environ.get("OPENAI_API_KEY") or s.openai_api_key or "").strip()
+        self.openai_model = (os.environ.get("COMMAND_NEXUS_OPENAI_MODEL") or s.openai_model or "gpt-4o-mini").strip()
 
-        self.brave_api_key = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()
+        self.ollama_url = (os.environ.get("COMMAND_NEXUS_OLLAMA_URL") or s.ollama_url or "http://127.0.0.1:11434").rstrip("/")
+        self.ollama_model = (os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL") or s.ollama_model or "llama3.1").strip()
+
+        self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
 
     def run(self, task: str, ai_name: str = "AI", ai_metadata: dict[str, Any] | None = None) -> RuntimeResult:
         task = (task or "").strip()
@@ -241,6 +248,11 @@ class LocalRuntimeExecutor:
         )
 
     def _call_model(self, prompt: str) -> str:
+        if self.ai_backend == "openai":
+            text = self._call_openai(prompt)
+            if text and not text.startswith("OpenAI backend error"):
+                return text
+            return self._call_ollama(prompt)
         text = self._call_ollama(prompt)
         if text:
             return text

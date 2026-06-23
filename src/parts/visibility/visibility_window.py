@@ -589,8 +589,8 @@ class VisibilityWindow(QMainWindow):
         self._approval = approval or ApprovalGate()
         self._settings = SettingsManager()
         self._settings.initialize()
-        self._nexus_ai_runtime = NexusAIRuntime()
-        self._runtime_executor = LocalRuntimeExecutor()
+        self._nexus_ai_runtime = NexusAIRuntime(self._settings)
+        self._runtime_executor = LocalRuntimeExecutor(self._settings)
         self._mode = "IDLE"  # IDLE | DEMO | MISSION | PAUSED | ERROR
         self._resume_mode = None
 
@@ -621,70 +621,6 @@ class VisibilityWindow(QMainWindow):
         self._apply_dark_theme()
         self._set_idle_display()
         self._presence_state = PresenceState.BACKEND_NOT_CONNECTED if not self._registry else PresenceState.IDLE
-
-    def _has_real_runtime_executor(self, uuid: str) -> bool:
-        """
-        Registry enabled means selectable. It does NOT mean Lily has a real executor.
-        Until an LLM/local backend bridge is wired, missions use visible TEST-RUNTIME.
-        """
-        if not self._registry:
-            return False
-        try:
-            meta = self._registry.get(uuid) or {}
-        except Exception:
-            return False
-
-        runtime_keys = (
-            "executor",
-            "runtime",
-            "backend",
-            "llm_backend",
-            "callable",
-            "command_handler",
-            "agent_runtime",
-        )
-        return any(bool(meta.get(k)) for k in runtime_keys)
-
-    def _append_visible_test_runtime_step(self, task: Task, session: AISession):
-        """
-        Visible fallback execution for Forge AIs like Lily when no real backend exists yet.
-        This does not pretend to be a real LLM. It proves the command path, task queue,
-        viewport, and audit panes are alive.
-        """
-        step = self._mission_progress
-        idx = min(max(step - 1, 0), 5)
-
-        thoughts = [
-            f"[{session.name}] Received mission: {task.name}",
-            f"[{session.name}] Reading configured abilities and safe operating limits.",
-            f"[{session.name}] Building a local test plan for this request.",
-            f"[{session.name}] Checking what would require approval before real action.",
-            f"[{session.name}] Producing visible test output in the command window.",
-            f"[{session.name}] Preparing to finish the test mission cleanly.",
-        ]
-
-        actions = [
-            f"[{session.name}] TEST-RUNTIME: mission accepted.",
-            f"[{session.name}] TEST-RUNTIME: registry/session path confirmed.",
-            f"[{session.name}] TEST-RUNTIME: task queue and status loop confirmed.",
-            f"[{session.name}] TEST-RUNTIME: viewport/audit panes confirmed.",
-            f"[{session.name}] TEST-RUNTIME: no real backend executor attached yet.",
-            f"[{session.name}] TEST-RUNTIME: returning result to Visibility Window.",
-        ]
-
-        trajectories = [
-            "Next: parse request -> create safe local plan.",
-            "Next: update Thought, Action, and Trajectory panes.",
-            "Next: keep user approval-gated before real file/system action.",
-            "Next: show visible output instead of silent placeholder behavior.",
-            "Next: report that real Lily backend still needs an executor bridge.",
-            "Next: complete test mission and return AI to idle.",
-        ]
-
-        self._thought_pane.append(thoughts[idx])
-        self._action_pane.append(actions[idx])
-        self._trajectory_pane.append(trajectories[idx])
-
 
     def _setup_ui(self):
         central = QWidget()
@@ -804,7 +740,7 @@ class VisibilityWindow(QMainWindow):
         presence_layout.addWidget(self._presence_detail)
         left_layout.addWidget(presence_group, stretch=0)
 
-        # Right side: Audit panes
+        # Right side: Audit panes + Adaptive Suggestions
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -813,9 +749,26 @@ class VisibilityWindow(QMainWindow):
         self._action_pane = AuditPane("Current Action")
         self._trajectory_pane = AuditPane("Planned Trajectory")
 
-        right_layout.addWidget(self._thought_pane, stretch=1)
-        right_layout.addWidget(self._action_pane, stretch=1)
-        right_layout.addWidget(self._trajectory_pane, stretch=1)
+        right_layout.addWidget(self._thought_pane, stretch=2)
+        right_layout.addWidget(self._action_pane, stretch=2)
+        right_layout.addWidget(self._trajectory_pane, stretch=2)
+
+        suggestions_group = QGroupBox("Adaptive Suggestions")
+        suggestions_group.setStyleSheet("QGroupBox { color: #c9d1d9; }")
+        suggestions_layout = QVBoxLayout(suggestions_group)
+        suggestions_layout.setContentsMargins(6, 6, 6, 6)
+
+        self._suggestions_list = QListWidget()
+        self._suggestions_list.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._suggestions_list.setMaximumHeight(120)
+        suggestions_layout.addWidget(self._suggestions_list)
+
+        self._btn_refresh_suggestions = QPushButton("Refresh")
+        self._btn_refresh_suggestions.setStyleSheet("background-color: #21262d; color: #c9d1d9;")
+        self._btn_refresh_suggestions.clicked.connect(self._update_suggestions)
+        suggestions_layout.addWidget(self._btn_refresh_suggestions)
+
+        right_layout.addWidget(suggestions_group, stretch=1)
 
         # Splitter
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -837,6 +790,12 @@ class VisibilityWindow(QMainWindow):
         act_parental.triggered.connect(self._show_parental_controls)
         act_info = gov_menu.addAction("More Info")
         act_info.triggered.connect(self._show_parental_info)
+
+        backend_menu = menu.addMenu("Backend")
+        act_check = backend_menu.addAction("Check Backend")
+        act_check.triggered.connect(self._check_backend)
+        act_backend = backend_menu.addAction("Configure AI Backend")
+        act_backend.triggered.connect(self._show_backend_config)
 
     def _setup_simulator(self):
         self._sim = AuditSimulator()
@@ -1011,6 +970,28 @@ class VisibilityWindow(QMainWindow):
             self._update_status_display(self._sessions[uuid].status)
         else:
             self._update_status_display(AIStatus.IDLE)
+        self._update_suggestions()
+
+    def _update_suggestions(self):
+        """Refresh the Adaptive Suggestions list from the local memory store."""
+        self._suggestions_list.clear()
+        uuid = self._get_selected_uuid()
+        if not uuid:
+            self._suggestions_list.addItem("Select an AI to see suggestions.")
+            return
+        if not self._nexus_ai_runtime:
+            self._suggestions_list.addItem("Runtime not available.")
+            return
+        try:
+            suggestions = self._nexus_ai_runtime.suggest_next_steps(uuid)
+        except Exception as e:
+            self._suggestions_list.addItem(f"Suggestions error: {e}")
+            return
+        if not suggestions:
+            self._suggestions_list.addItem("Use this AI to build memory and suggestions.")
+            return
+        for s in suggestions:
+            self._suggestions_list.addItem(s)
 
     def _update_status_display(self, status: AIStatus):
         colors = {
@@ -1242,6 +1223,7 @@ class VisibilityWindow(QMainWindow):
         self._btn_cancel.setEnabled(False)
         self._viewport.stop_stream()
         self._audit_event("mission_complete_runtime", msg=task.name)
+        self._update_suggestions()
 
 
     def _on_cancel_mission(self):
@@ -1405,6 +1387,24 @@ class VisibilityWindow(QMainWindow):
         dlg = ParentalControlsInfoDialog(self)
         dlg.exec()
 
+    def _check_backend(self):
+        status = self._nexus_ai_runtime.health_check()
+        msg = status.get("message", "Unknown backend status")
+        self._thought_pane.append(f"[SYSTEM] Backend check: {msg}")
+        self._audit_event("backend_health_check", msg=msg)
+        if not status.get("reachable"):
+            self._set_presence(PresenceState.BACKEND_NOT_CONNECTED, "Backend not connected")
+        else:
+            self._set_presence(PresenceState.IDLE, f"Backend ready ({status.get('backend')})")
+
+    def _show_backend_config(self):
+        dlg = BackendConfigDialog(self._settings, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            # Recreate runtimes with updated settings so changes take effect immediately
+            self._nexus_ai_runtime = NexusAIRuntime(self._settings)
+            self._runtime_executor = LocalRuntimeExecutor(self._settings)
+            self._thought_pane.append("[SYSTEM] AI backend configuration updated. New settings will be used for the next mission.")
+            self._audit_event("backend_config_updated", msg="AI backend settings changed")
 
     def set_owner_console(self, console):
         """Wire the owner-only Aegis Console (hidden access)."""
@@ -1761,6 +1761,176 @@ class ParentalControlsInfoDialog(QDialog):
             QPushButton{background:#30363d;color:#fff;border:none;border-radius:8px;padding:12px;}
         """)
 
+
+# ---------------------------------------------------------------------------
+# Backend Configuration Dialog
+# ---------------------------------------------------------------------------
+class BackendConfigDialog(QDialog):
+    """
+    Configure the AI model backend used by Command Nexus missions.
+    Defaults to local Ollama for privacy-first operation; OpenAI optional.
+    """
+
+    def __init__(self, settings: SettingsManager, parent=None):
+        super().__init__(parent)
+        self._settings = settings
+        self._settings.initialize()
+        self.setWindowTitle("AI Backend Configuration")
+        self.setMinimumSize(520, 420)
+        self._setup_ui()
+        self._apply_dark_theme()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        header = QLabel("AI BACKEND")
+        header.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        header.setStyleSheet("color: #58a6ff;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+
+        sub = QLabel("Choose how Command Nexus runs AI missions. Local Ollama is recommended for privacy.")
+        sub.setFont(QFont("Segoe UI", 9))
+        sub.setStyleSheet("color: #8b949e;")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setWordWrap(True)
+        layout.addWidget(sub)
+
+        s = self._settings.get()
+
+        # Backend selector
+        backend_row = QHBoxLayout()
+        backend_row.addWidget(QLabel("Backend:"))
+        self._backend_combo = QComboBox()
+        self._backend_combo.addItems(["ollama", "openai"])
+        self._backend_combo.setCurrentText(s.ai_backend)
+        backend_row.addWidget(self._backend_combo, stretch=1)
+        layout.addLayout(backend_row)
+
+        # Ollama URL
+        url_row = QHBoxLayout()
+        url_row.addWidget(QLabel("Ollama URL:"))
+        self._ollama_url = QLineEdit(s.ollama_url)
+        self._ollama_url.setPlaceholderText("http://127.0.0.1:11434")
+        url_row.addWidget(self._ollama_url, stretch=1)
+        layout.addLayout(url_row)
+
+        # Ollama model
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("Ollama Model:"))
+        self._ollama_model = QLineEdit(s.ollama_model)
+        self._ollama_model.setPlaceholderText("llama3.1")
+        model_row.addWidget(self._ollama_model, stretch=1)
+        layout.addLayout(model_row)
+
+        # OpenAI API key
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("OpenAI Key:"))
+        self._openai_key = QLineEdit(s.openai_api_key)
+        self._openai_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self._openai_key.setPlaceholderText("sk-...")
+        key_row.addWidget(self._openai_key, stretch=1)
+        layout.addLayout(key_row)
+
+        # OpenAI model
+        openai_model_row = QHBoxLayout()
+        openai_model_row.addWidget(QLabel("OpenAI Model:"))
+        self._openai_model = QLineEdit(s.openai_model)
+        self._openai_model.setPlaceholderText("gpt-4o-mini")
+        openai_model_row.addWidget(self._openai_model, stretch=1)
+        layout.addLayout(openai_model_row)
+
+        # Brave Search key (optional)
+        brave_row = QHBoxLayout()
+        brave_row.addWidget(QLabel("Brave Search Key:"))
+        self._brave_key = QLineEdit(s.brave_api_key)
+        self._brave_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self._brave_key.setPlaceholderText("Optional web search API")
+        brave_row.addWidget(self._brave_key, stretch=1)
+        layout.addLayout(brave_row)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_test = QPushButton("TEST CONNECTION")
+        btn_test.setStyleSheet("background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;")
+        btn_test.clicked.connect(self._on_test)
+        btn_row.addWidget(btn_test)
+
+        btn_save = QPushButton("SAVE")
+        btn_save.setStyleSheet("background:#238636;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;")
+        btn_save.clicked.connect(self._on_save)
+        btn_row.addWidget(btn_save)
+
+        btn_cancel = QPushButton("CANCEL")
+        btn_cancel.setStyleSheet("background:#30363d;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;")
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(btn_cancel)
+        layout.addLayout(btn_row)
+
+        self._status = QLabel("")
+        self._status.setStyleSheet("color: #8b949e; font-size: 12px;")
+        self._status.setWordWrap(True)
+        layout.addWidget(self._status)
+
+        layout.addStretch()
+
+    def _on_save(self):
+        self._settings.update(
+            ai_backend=self._backend_combo.currentText(),
+            ollama_url=self._ollama_url.text().strip() or "http://127.0.0.1:11434",
+            ollama_model=self._ollama_model.text().strip() or "llama3.1",
+            openai_api_key=self._openai_key.text().strip(),
+            openai_model=self._openai_model.text().strip() or "gpt-4o-mini",
+            brave_api_key=self._brave_key.text().strip(),
+        )
+        self.accept()
+
+    def _on_test(self):
+        backend = self._backend_combo.currentText()
+        self._status.setText("Testing connection...")
+        try:
+            if backend == "ollama":
+                url = (self._ollama_url.text().strip() or "http://127.0.0.1:11434") + "/api/tags"
+                import urllib.request
+                with urllib.request.urlopen(url, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                models = [m.get("name", "") for m in data.get("models", [])]
+                selected = self._ollama_model.text().strip() or "llama3.1"
+                if selected in models:
+                    self._status.setText(f"Connected. Model '{selected}' is available.")
+                else:
+                    self._status.setText(f"Connected. Available models: {', '.join(models[:5]) or 'none'}. '{selected}' not found.")
+            else:
+                key = self._openai_key.text().strip()
+                if not key:
+                    self._status.setText("OpenAI key is required.")
+                    return
+                import urllib.request
+                req = urllib.request.Request(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": "Bearer " + key},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                self._status.setText(f"Connected. OpenAI account active. Models available: {len(data.get('data', []))}")
+        except Exception as e:
+            self._status.setText(f"Connection test failed: {e}")
+
+    def _apply_dark_theme(self):
+        self.setStyleSheet("""
+            QDialog{background:#0d1117;color:#c9d1d9;}
+            QLabel{color:#c9d1d9;}
+            QPushButton{background:#30363d;color:#fff;border:none;border-radius:8px;padding:10px;}
+            QLineEdit{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
+            QComboBox{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
+        """)
+
+
+# ---------------------------------------------------------------------------
+# End Backend Configuration Dialog
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # End Parental Controls Dialog

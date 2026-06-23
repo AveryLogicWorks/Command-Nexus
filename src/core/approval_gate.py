@@ -74,6 +74,17 @@ class ApprovalGate:
                 self._history.append((req, True, "auto"))
                 return True
 
+        # Headless/script safety: if there is no QApplication and no parent widget,
+        # we cannot show a modal dialog. Deny the action rather than crash.
+        try:
+            from PyQt6.QtWidgets import QApplication
+            if parent is None and QApplication.instance() is None:
+                self._history.append((req, False, "headless_deny"))
+                return False
+        except Exception:
+            self._history.append((req, False, "headless_deny"))
+            return False
+
         dialog = ApprovalDialog(parent, req)
         result = dialog.exec()
         approved = (result == QDialog.DialogCode.Accepted)
