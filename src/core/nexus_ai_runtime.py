@@ -108,15 +108,27 @@ class NexusAIRuntime:
         self.archive_dir.mkdir(parents=True, exist_ok=True)
 
         # Model backend config: in-app Settings take priority, env vars are the fallback.
-        s = self._load_model_settings()
+        # When False, the runtime re-reads the latest saved settings before each model
+        # call so changes made in the AI Model Settings dialog take effect without a
+        # restart. Set True (e.g. by the Test Connection flow) to pin manual overrides.
+        self._manual_config = False
+        self._apply_model_settings(self._load_model_settings())
+
+        self.brave_api_key = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()
+
+    def _apply_model_settings(self, s: dict[str, Any]) -> None:
+        """Populate model backend attributes from a settings dict (env vars as fallback)."""
         self.model_backend = (s.get("model_backend") or "auto").strip().lower()
         self.openai_api_key = (s.get("openai_api_key") or os.environ.get("OPENAI_API_KEY", "")).strip()
         self.openai_model = (s.get("openai_model") or os.environ.get("COMMAND_NEXUS_OPENAI_MODEL", "gpt-4o-mini")).strip()
-
         self.ollama_url = (s.get("ollama_url") or os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
         self.ollama_model = (s.get("ollama_model") or os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL", "llama3.2:1b")).strip()
 
-        self.brave_api_key = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()
+    def _refresh_model_settings(self) -> None:
+        """Re-read saved settings so dialog changes apply without an app restart."""
+        if self._manual_config:
+            return
+        self._apply_model_settings(self._load_model_settings())
 
     def _load_model_settings(self) -> dict[str, Any]:
         """Read model backend settings from the app SettingsManager, if available."""
@@ -480,6 +492,7 @@ class NexusAIRuntime:
         offline/local_only -> Ollama only (learns-with-user, works offline)
         cloud      -> OpenAI only
         """
+        self._refresh_model_settings()
         backend = getattr(self, "model_backend", "auto")
         if backend == "cloud":
             return self._call_openai(prompt)

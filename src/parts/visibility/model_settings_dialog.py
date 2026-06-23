@@ -90,7 +90,7 @@ class ModelSettingsDialog(QDialog):
         form.addRow("Ollama URL:", self._ollama_url)
 
         self._ollama_model = QLineEdit()
-        self._ollama_model.setPlaceholderText("llama3.2")
+        self._ollama_model.setPlaceholderText("llama3.2:1b")
         form.addRow("Ollama model:", self._ollama_model)
 
         layout.addLayout(form)
@@ -126,7 +126,7 @@ class ModelSettingsDialog(QDialog):
         self._openai_key.setText(getattr(s, "openai_api_key", "") or "")
         self._openai_model.setText(getattr(s, "openai_model", "") or "gpt-4o-mini")
         self._ollama_url.setText(getattr(s, "ollama_url", "") or "http://127.0.0.1:11434")
-        self._ollama_model.setText(getattr(s, "ollama_model", "") or "llama3.2")
+        self._ollama_model.setText(getattr(s, "ollama_model", "") or "llama3.2:1b")
 
     def _save(self):
         self._mgr.update(
@@ -134,7 +134,7 @@ class ModelSettingsDialog(QDialog):
             openai_api_key=self._openai_key.text().strip(),
             openai_model=self._openai_model.text().strip() or "gpt-4o-mini",
             ollama_url=self._ollama_url.text().strip() or "http://127.0.0.1:11434",
-            ollama_model=self._ollama_model.text().strip() or "llama3.2",
+            ollama_model=self._ollama_model.text().strip() or "llama3.2:1b",
         )
         QMessageBox.information(
             self, "Saved",
@@ -149,6 +149,7 @@ class ModelSettingsDialog(QDialog):
         try:
             from ...core.nexus_ai_runtime import NexusAIRuntime
             rt = NexusAIRuntime()
+            rt._manual_config = True  # test the values entered here, not the saved ones
             rt.model_backend = self._backend.currentData()
             rt.openai_api_key = self._openai_key.text().strip() or rt.openai_api_key
             rt.openai_model = self._openai_model.text().strip() or rt.openai_model
