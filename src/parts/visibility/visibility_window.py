@@ -827,6 +827,9 @@ class VisibilityWindow(QMainWindow):
         # Menu bar
         menu = self.menuBar()
         file_menu = menu.addMenu("File")
+        act_model = file_menu.addAction("AI Model Settings…")
+        act_model.triggered.connect(self._show_model_settings)
+        file_menu.addSeparator()
         act_quit = file_menu.addAction("Quit")
         act_quit.triggered.connect(self.close)
 
@@ -1337,6 +1340,10 @@ class VisibilityWindow(QMainWindow):
     def _update_watcher_detail(self, watcher):
         state = watcher.get_state()
         self._watcher_detail.setText(f"Scans: {state.total_scans} | Violations: {state.violations_detected}")
+
+    def _show_model_settings(self):
+        from .model_settings_dialog import ModelSettingsDialog
+        ModelSettingsDialog(self).exec()
 
     def _show_policy(self):
         ok, msg = self._governance.verify_self_integrity()

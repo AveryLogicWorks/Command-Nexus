@@ -37,6 +37,13 @@ class NexusSettings:
     launch_on_startup: bool = False
     obfuscation_mode: bool = False  # Anti-inference layer — hides internal structures
 
+    # AI / Intelligence model backend configuration
+    model_backend: str = "auto"          # auto | offline | cloud | local_only
+    openai_api_key: str = ""             # Cloud model key (overrides OPENAI_API_KEY env if set)
+    openai_model: str = "gpt-4o-mini"
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "llama3.2:1b"
+
     def to_dict(self) -> dict:
         return asdict(self)
 

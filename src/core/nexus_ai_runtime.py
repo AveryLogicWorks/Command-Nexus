@@ -107,13 +107,31 @@ class NexusAIRuntime:
         self.notes_dir.mkdir(parents=True, exist_ok=True)
         self.archive_dir.mkdir(parents=True, exist_ok=True)
 
-        self.openai_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-        self.openai_model = os.environ.get("COMMAND_NEXUS_OPENAI_MODEL", "gpt-4o-mini").strip()
+        # Model backend config: in-app Settings take priority, env vars are the fallback.
+        s = self._load_model_settings()
+        self.model_backend = (s.get("model_backend") or "auto").strip().lower()
+        self.openai_api_key = (s.get("openai_api_key") or os.environ.get("OPENAI_API_KEY", "")).strip()
+        self.openai_model = (s.get("openai_model") or os.environ.get("COMMAND_NEXUS_OPENAI_MODEL", "gpt-4o-mini")).strip()
 
-        self.ollama_url = os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-        self.ollama_model = os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL", "llama3.1").strip()
+        self.ollama_url = (s.get("ollama_url") or os.environ.get("COMMAND_NEXUS_OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
+        self.ollama_model = (s.get("ollama_model") or os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL", "llama3.2:1b")).strip()
 
         self.brave_api_key = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()
+
+    def _load_model_settings(self) -> dict[str, Any]:
+        """Read model backend settings from the app SettingsManager, if available."""
+        try:
+            from src.core.settings_manager import SettingsManager
+            s = SettingsManager().get()
+            return {
+                "model_backend": getattr(s, "model_backend", ""),
+                "openai_api_key": getattr(s, "openai_api_key", ""),
+                "openai_model": getattr(s, "openai_model", ""),
+                "ollama_url": getattr(s, "ollama_url", ""),
+                "ollama_model": getattr(s, "ollama_model", ""),
+            }
+        except Exception:
+            return {}
 
     def run(self, task: str, ai_name: str = "AI", ai_uuid: str = "", ai_metadata: dict[str, Any] | None = None) -> RuntimeResult:
         task = (task or "").strip()
@@ -457,6 +475,17 @@ class NexusAIRuntime:
         )
 
     def _call_model(self, prompt: str) -> str:
+        """Route to a model backend per the user's preference.
+        auto       -> offline (Ollama) first, then cloud (OpenAI)
+        offline/local_only -> Ollama only (learns-with-user, works offline)
+        cloud      -> OpenAI only
+        """
+        backend = getattr(self, "model_backend", "auto")
+        if backend == "cloud":
+            return self._call_openai(prompt)
+        if backend in ("offline", "local_only"):
+            return self._call_ollama(prompt)
+        # auto
         out = self._call_ollama(prompt)
         if out:
             return out
