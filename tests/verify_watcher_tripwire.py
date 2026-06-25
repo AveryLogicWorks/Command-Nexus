@@ -185,6 +185,37 @@ def test_repair_from_baseline_verified():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_watcher_engine_startup_path():
+    """Follow the exact WatcherEngine instantiation path used by the EXE."""
+    from PyQt6.QtWidgets import QApplication
+    # A QApplication is required for any QObject to be instantiated.
+    app = QApplication.instance() or QApplication([])
+
+    tmp = make_temp_workspace()
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+
+        from src.parts.watcher.watcher_window import WatcherEngine
+        from src.core.tripwire_manager import TripwireManager
+
+        # The EXE calls WatcherEngine with the mode returned by TripwireManager.recommended_mode().
+        mode = TripwireManager.recommended_mode().value
+        engine = WatcherEngine(
+            mode=mode,
+            audit_logger=AuditLogger(s),
+            license_manager=None,
+        )
+        assert engine.get_mode() == mode
+        assert engine.get_state().mode == mode
+        assert engine.get_trust_status() is True
+        assert engine.is_locked_down() is False
+        print("[PASS] WatcherEngine startup path (EXE-style) works")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main() -> int:
     tests = [
         test_dev_mode_does_not_punish_source_edit,
@@ -194,6 +225,7 @@ def main() -> int:
         test_license_change_blocked_in_lockdown,
         test_audit_records_written,
         test_repair_from_baseline_verified,
+        test_watcher_engine_startup_path,
     ]
     passed = []
     failed = []

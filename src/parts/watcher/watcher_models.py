@@ -53,6 +53,7 @@ class SecurityAlert:
 class WatcherState:
     """Current operational state of The Watcher."""
     active: bool = True
+    mode: str = "dev"
     scan_interval_seconds: int = 5
     protected_files: List[str] = field(default_factory=list)
     alerts: List[SecurityAlert] = field(default_factory=list)
