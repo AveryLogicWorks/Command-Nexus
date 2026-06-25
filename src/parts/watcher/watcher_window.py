@@ -425,7 +425,8 @@ class WatcherWindow(QMainWindow):
         """Establish baseline hashes for all protected source files."""
         project_root = Path(__file__).resolve().parent.parent.parent
         protected = []
-        for pattern in ["core/*.py", "parts/*/*.py", "main.py"]:
+        # Source tree lives under src/; PyInstaller also extracts the bundled src tree.
+        for pattern in ["src/core/*.py", "src/parts/*/*.py", "src/main.py"]:
             for f in project_root.glob(pattern):
                 protected.append(str(f))
 

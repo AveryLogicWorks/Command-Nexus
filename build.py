@@ -180,7 +180,8 @@ def main() -> int:
         clean_dist()
         build_main_app(release=release)
         build_keygen()
-        copy_to_desktop()
+        # PowerKeys is an owner-only key generator. Do not copy it to public
+        # paths like the Desktop. It stays in dist/ for the owner build flow.
         print("\nBuild complete. Output:")
         print(f"  {PROJECT_ROOT / 'dist' / 'CommandNexus.exe'}")
         print(f"  {PROJECT_ROOT / 'dist' / 'PowerKeys.exe'}")
