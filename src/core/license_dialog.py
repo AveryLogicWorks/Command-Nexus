@@ -22,9 +22,10 @@ class LicenseActivationDialog(QDialog):
     Non-blocking in the sense that Demo Mode is always an option.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, watcher=None):
         super().__init__(parent)
         self._lm = get_license_manager()
+        self._watcher = watcher
         self._activated = False
         self._demo_mode = False
         self.setWindowTitle("Command Nexus™ — License Activation")
@@ -184,6 +185,10 @@ class LicenseActivationDialog(QDialog):
         self._key_input.blockSignals(False)
 
     def _on_activate(self):
+        if self._watcher is not None and not self._watcher.check_action("license_activation"):
+            self._result_label.setText("<span style='color: #f44336;'>License activation blocked by Watcher tripwire.</span>")
+            return
+
         key = self._key_input.text().strip()
         if not key:
             self._result_label.setText("<span style='color: #f44336;'>Please enter a license key.</span>")

@@ -1,4 +1,3 @@
-import hashlib
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +10,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QFrame, QProgressBar, QListWidget, QListWidgetItem
 )
 
+from ...core.tripwire_manager import TripwireManager, WatcherMode, WatcherTrust
 from .watcher_models import (
     WatcherState, SecurityAlert, AlertSeverity,
     IntegrityRecord, IntegrityStatus
@@ -19,8 +19,13 @@ from .watcher_models import (
 
 class WatcherEngine(QObject):
     """
-    Background defensive engine — passive/active depending on mode.
-    Modes: STABILIZATION/REPAIR/CREATION/DEMO (passive), RUNTIME_PROTECTED (active).
+    PyQt-facing wrapper around the core TripwireManager.
+
+    Modes:
+      DEV           — log only, no license impact, no blocking.
+      STABILIZATION — report trust, warn, pause risky actions if degraded.
+      RELEASE       — armed; protected tampering enters lockdown.
+      LOCKDOWN      — risky actions blocked.
     """
 
     alert_logged = pyqtSignal(object)       # SecurityAlert
@@ -28,206 +33,55 @@ class WatcherEngine(QObject):
     trust_status_changed = pyqtSignal(bool) # True = trusted, False = breach
     mode_changed = pyqtSignal(str)           # New mode name
 
-    # Critical files that must never change
-    _CRITICAL_FILES = {
-        "governance.py", "approval_gate.py", "watcher_window.py",
-        "main.py", "launch.bat", "requirements.txt"
-    }
-
-    def __init__(self, parent=None, mode: str = "STABILIZATION"):
+    def __init__(self, parent=None, mode: str = "dev", settings=None, audit_logger=None, license_manager=None):
         super().__init__(parent)
-        self._mode = mode
-        passive_modes = {"STABILIZATION", "REPAIR", "CREATION", "DEMO"}
-        self._state = WatcherState(active=self._mode not in passive_modes)
-        self._project_root = Path(__file__).resolve().parent.parent.parent
-        self._init_baseline()
-        self._start_scanning()
-        self._trust_status = True  # True until proven otherwise
-        self._owner_paused = False  # Owner can pause alerts during upgrades
+        # Map old UI mode names to the canonical mode names.
+        canonical = self._canonical_mode(mode)
+        self._core = TripwireManager(
+            mode=canonical,
+            audit_logger=audit_logger,
+            license_manager=license_manager,
+        )
+        self._core.add_callback(self._on_core_trust_changed)
+        self._state = WatcherState(active=self._core._state.active, mode=self._core.get_mode().value)
+        self._trust_status = self._core.is_trusted()
+        self._owner_paused = False
+        self._poll_timer = QTimer(self)
+        self._poll_timer.timeout.connect(self._poll_state)
+        self._poll_timer.start(2000)
 
-    def _hash_file(self, path: str) -> str:
-        try:
-            content = Path(path).read_bytes()
-            return hashlib.sha256(content).hexdigest()[:24]
-        except FileNotFoundError:
-            return "DELETED"
-        except PermissionError:
-            return "BLOCKED"
-        except Exception:
-            return "UNREADABLE"
+    @staticmethod
+    def _canonical_mode(mode: str) -> str:
+        m = mode.lower()
+        if m in {"stabilization", "repair", "creation", "demo"}:
+            return "stabilization"
+        if m in {"release", "runtime_protected", "armed"}:
+            return "release"
+        if m == "lockdown":
+            return "lockdown"
+        return "dev"
 
-    def _is_critical(self, path: str) -> bool:
-        return Path(path).name in self._CRITICAL_FILES
+    def _on_core_trust_changed(self, trust: WatcherTrust):
+        trusted = trust == WatcherTrust.TRUSTED
+        if trusted != self._trust_status:
+            self._trust_status = trusted
+            self.trust_status_changed.emit(trusted)
+        if not trusted:
+            alert = self._create_alert(
+                AlertSeverity.CRITICAL,
+                "tripwire",
+                f"Watcher trust changed to {trust.value}",
+                "system",
+                "Tripwire engaged if in release mode.",
+            )
+            self.alert_logged.emit(alert)
 
-    def _init_baseline(self):
-        """Establish baseline for ALL project files, not just source code."""
-        patterns = [
-            "*.py", "*.bat", "*.txt", "*.md", "*.json",
-            "core/*.py", "core/*.json",
-            "parts/*/*.py", "parts/*/*.json",
-        ]
-        for pattern in patterns:
-            for f in self._project_root.glob(pattern):
-                if "__pycache__" in str(f):
-                    continue
-                h = self._hash_file(str(f))
-                rec = IntegrityRecord(
-                    filepath=str(f), expected_hash=h,
-                    last_seen_hash=h, status=IntegrityStatus.VERIFIED
-                )
-                self._state.integrity_records.append(rec)
-        # Also watch the parent directory for unexpected new files
-        self._known_files = {str(f) for f in self._project_root.rglob("*") if f.is_file() and "__pycache__" not in str(f)}
-
-    def _start_scanning(self):
-        self._scan_timer = QTimer(self)
-        self._scan_timer.timeout.connect(self._scan_cycle)
-        self._scan_timer.start(5000)
-
-    def _scan_cycle(self):
-        passive_modes = {"STABILIZATION", "REPAIR", "CREATION", "DEMO"}
-        if self._mode in passive_modes:
-            # Passive: record maintenance drift without breach semantics
-            self._state.total_scans += 1
-            self._state.last_scan = datetime.now()
-            for rec in self._state.integrity_records:
-                current_hash = self._hash_file(rec.filepath)
-                rec.last_checked = datetime.now()
-                rec.last_seen_hash = current_hash
-                if current_hash != rec.expected_hash:
-                    rec.status = IntegrityStatus.MODIFIED
-                    maint_alert = self._create_alert(
-                        AlertSeverity.INFO,
-                        "maintenance_change",
-                        f"Maintenance change detected: {Path(rec.filepath).name}",
-                        rec.filepath,
-                        "Baseline drift during stabilization. Review then accept baseline if approved."
-                    )
-                    self.alert_logged.emit(maint_alert)
-                self.integrity_changed.emit(rec)
-            if not self._trust_status:
-                self._trust_status = True
-                self.trust_status_changed.emit(True)
-            return
-        if not self._state.active:
-            return
-        self._state.total_scans += 1
-        self._state.last_scan = datetime.now()
-
-        breach_detected = False
-        current_files = set()
-        owner_paused = getattr(self, "_owner_paused", False)
-
-        # Check all baseline files
-        for rec in self._state.integrity_records:
-            current_hash = self._hash_file(rec.filepath)
-            rec.last_checked = datetime.now()
-            rec.last_seen_hash = current_hash
-            current_files.add(rec.filepath)
-
-            if current_hash == "DELETED":
-                if rec.status != IntegrityStatus.MODIFIED:
-                    rec.status = IntegrityStatus.MODIFIED
-                    if not owner_paused:
-                        self._state.violations_detected += 1
-                        breach_detected = True
-                        is_critical = self._is_critical(rec.filepath)
-                        severity = AlertSeverity.EMERGENCY if is_critical else AlertSeverity.CRITICAL
-                        alert = self._create_alert(
-                            severity,
-                            "file_integrity",
-                            f"{'CRITICAL: ' if is_critical else ''}File '{Path(rec.filepath).name}' has been DELETED!",
-                            rec.filepath,
-                            "Immediate review required. Reverse sandbox active."
-                        )
-                        self.alert_logged.emit(alert)
-            elif current_hash == "BLOCKED":
-                if rec.status != IntegrityStatus.MODIFIED:
-                    rec.status = IntegrityStatus.MODIFIED
-                    if not owner_paused:
-                        self._state.violations_detected += 1
-                        breach_detected = True
-                        alert = self._create_alert(
-                            AlertSeverity.EMERGENCY,
-                            "access_denial",
-                            f"Access to '{Path(rec.filepath).name}' was blocked during scan. Possible locking/interference.",
-                            rec.filepath,
-                            "Possible hostile process. Investigate immediately."
-                        )
-                        self.alert_logged.emit(alert)
-            elif current_hash != rec.expected_hash:
-                if rec.status != IntegrityStatus.MODIFIED:
-                    rec.status = IntegrityStatus.MODIFIED
-                    if owner_paused:
-                        # Owner paused: log as INFO-level maintenance change instead of breach
-                        maint_alert = self._create_alert(
-                            AlertSeverity.INFO,
-                            "maintenance_change",
-                            f"Maintenance change detected: {Path(rec.filepath).name}",
-                            rec.filepath,
-                            "Baseline drift during owner-paused watcher. Review then accept baseline if approved."
-                        )
-                        self.alert_logged.emit(maint_alert)
-                    else:
-                        self._state.violations_detected += 1
-                        breach_detected = True
-                        is_critical = self._is_critical(rec.filepath)
-                        severity = AlertSeverity.EMERGENCY if is_critical else AlertSeverity.CRITICAL
-                        wording = "Unexpected file change detected"
-                        alert = self._create_alert(
-                            severity,
-                            "file_integrity",
-                            f"{wording}: '{Path(rec.filepath).name}'",
-                            rec.filepath,
-                            "Review required. Reverse sandbox active."
-                        )
-                        self.alert_logged.emit(alert)
-            else:
-                rec.status = IntegrityStatus.VERIFIED
-            self.integrity_changed.emit(rec)
-
-        # Detect NEW unauthorized files (infiltration)
-        new_files = set()
-        for f in self._project_root.rglob("*"):
-            if f.is_file() and "__pycache__" not in str(f):
-                fp = str(f)
-                current_files.add(fp)
-                if fp not in self._known_files:
-                    new_files.add(fp)
-                    self._known_files.add(fp)
-
-        for nf in new_files:
-            if owner_paused:
-                # During owner pause, log new files as INFO only
-                alert = self._create_alert(
-                    AlertSeverity.INFO,
-                    "new_file",
-                    f"New file detected: '{Path(nf).name}'",
-                    nf,
-                    "New file during owner-paused watcher. Verify origin."
-                )
-                self.alert_logged.emit(alert)
-            else:
-                breach_detected = True
-                alert = self._create_alert(
-                    AlertSeverity.CRITICAL,
-                    "infiltration",
-                    f"Unauthorized new file detected: '{Path(nf).name}'",
-                    nf,
-                    "New files in the project directory are flagged. Verify origin."
-                )
-                self.alert_logged.emit(alert)
-
-        if not owner_paused:
-            if breach_detected and self._trust_status:
-                self._trust_status = False
-                self.trust_status_changed.emit(False)
-            elif not breach_detected and not self._trust_status:
-                # Only restore trust if all files are back to verified
-                all_clean = all(r.status == IntegrityStatus.VERIFIED for r in self._state.integrity_records)
-                if all_clean:
-                    self._trust_status = True
-                    self.trust_status_changed.emit(True)
+    def _poll_state(self):
+        core_state = self._core.get_state()
+        self._state.total_scans = core_state.total_scans
+        self._state.violations_detected = core_state.violations_detected
+        self._state.last_scan = datetime.fromtimestamp(core_state.last_scan) if core_state.last_scan else datetime.now()
+        self._state.active = core_state.active
 
     def _create_alert(self, severity: AlertSeverity, source: str, description: str, target: str, action: str) -> SecurityAlert:
         alert = SecurityAlert(
@@ -243,29 +97,40 @@ class WatcherEngine(QObject):
         return alert
 
     def get_state(self) -> WatcherState:
+        self._poll_state()
         return self._state
 
     def get_trust_status(self) -> bool:
-        return self._trust_status
+        return self._core.is_trusted()
 
     def get_mode(self) -> str:
-        return self._mode
+        return self._core.get_mode().value
 
     def set_mode(self, mode: str):
-        self._mode = mode
-        passive_modes = {"STABILIZATION", "REPAIR", "CREATION", "DEMO"}
-        self._state.active = mode not in passive_modes
-        self.mode_changed.emit(mode)
+        canonical = self._canonical_mode(mode)
+        self._core.set_mode(canonical)
+        self._state.mode = canonical
+        self._state.active = self._core._state.active
+        self._trust_status = self._core.is_trusted()
+        self.mode_changed.emit(canonical)
+
+    def check_action(self, action_name: str, target: str = "") -> bool:
+        return self._core.check_action(action_name, target)
+
+    def is_locked_down(self) -> bool:
+        return self._core.is_locked_down()
 
     def accept_current_baseline(self):
-        """Accept current hashes as baseline (use after approved maintenance)."""
-        for rec in self._state.integrity_records:
-            if rec.last_seen_hash:
-                rec.expected_hash = rec.last_seen_hash
-                rec.status = IntegrityStatus.VERIFIED
-        self._state.violations_detected = 0
+        """Accept current protected file hashes as the new trusted baseline."""
+        self._core.accept_current_baseline()
         self._trust_status = True
         self.trust_status_changed.emit(True)
+
+    def repair_from_baseline(self, target_pattern: str) -> bool:
+        return self._core.repair_from_baseline(target_pattern)
+
+    def report(self) -> str:
+        return self._core.report()
 
 
 class ReverseSandboxWidget(QFrame):

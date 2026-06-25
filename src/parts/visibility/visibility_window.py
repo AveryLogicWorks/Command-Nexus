@@ -579,7 +579,7 @@ class NavigationBar(QWidget):
 class VisibilityWindow(QMainWindow):
     """Command Nexus™ Part 1 — The Visibility Window."""
 
-    def __init__(self, router=None, registry=None, audit=None, approval=None):
+    def __init__(self, router=None, registry=None, audit=None, approval=None, watcher=None):
         super().__init__()
         self.setWindowTitle("Command Nexus™ — Visibility Window")
         self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
@@ -590,11 +590,13 @@ class VisibilityWindow(QMainWindow):
         self._approval = approval or ApprovalGate()
         self._settings = SettingsManager()
         self._settings.initialize()
+        self._watcher = watcher
         self._nexus_ai_runtime = NexusAIRuntime(
             self._settings,
             approval_gate=self._approval,
             audit_logger=self._audit,
             parent_widget=self,
+            watcher=watcher,
         )
         self._runtime_executor = LocalRuntimeExecutor(self._settings)
         self._mode = "IDLE"  # IDLE | DEMO | MISSION | PAUSED | ERROR
@@ -1020,6 +1022,11 @@ class VisibilityWindow(QMainWindow):
         return self._session_selector.currentData()
 
     def _on_start_mission(self):
+        if self._watcher is not None and not self._watcher.check_action("mission_start"):
+            QMessageBox.critical(self, "Tripwire Lockdown", "Mission start blocked because the Watcher detected a trust issue. Restore protected files or contact support.")
+            self._audit_event("mission_start_blocked", msg="Tripwire blocked mission start")
+            return
+
         uuid = self._get_selected_uuid()
         if not uuid or uuid not in self._sessions:
             QMessageBox.warning(self, "No AI Selected", "Select an active AI from the dropdown.")
@@ -1406,6 +1413,10 @@ class VisibilityWindow(QMainWindow):
             self._set_presence(PresenceState.IDLE, f"Backend ready ({status.get('backend')})")
 
     def _show_backend_config(self):
+        if self._watcher is not None and not self._watcher.check_action("backend_config_change"):
+            self._thought_pane.append("[SYSTEM] Backend configuration change blocked by Watcher tripwire.")
+            self._audit_event("backend_config_blocked", msg="Tripwire blocked backend configuration change")
+            return
         dlg = BackendConfigDialog(self._settings, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             # Recreate runtimes with updated settings so changes take effect immediately
@@ -1414,6 +1425,7 @@ class VisibilityWindow(QMainWindow):
                 approval_gate=self._approval,
                 audit_logger=self._audit,
                 parent_widget=self,
+                watcher=self._watcher,
             )
             self._runtime_executor = LocalRuntimeExecutor(self._settings)
             self._thought_pane.append("[SYSTEM] AI backend configuration updated. New settings will be used for the next mission.")

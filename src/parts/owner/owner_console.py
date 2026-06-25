@@ -314,7 +314,20 @@ class OwnerConsole(QDialog):
     # Bypass toggles
     # ------------------------------------------------------------------
 
+    def _check_owner_tripwire(self, action_name: str) -> bool:
+        if self._watcher is None:
+            return True
+        try:
+            if not self._watcher.check_action(action_name):
+                self._log(f"[TRIPWIRE] {action_name} blocked: trust degraded or lockdown.")
+                return False
+        except Exception:
+            return False
+        return True
+
     def _on_toggle_governance_bypass(self, state: int):
+        if not self._check_owner_tripwire("owner_security_change"):
+            return
         active = state == Qt.CheckState.Checked.value
         self._governance._owner_bypass_active = active
         self._audit_owner_action(
@@ -325,6 +338,8 @@ class OwnerConsole(QDialog):
         self._refresh_guardrail_table()
 
     def _on_toggle_approval_bypass(self, state: int):
+        if not self._check_owner_tripwire("owner_security_change"):
+            return
         active = state == Qt.CheckState.Checked.value
         self._approval._owner_bypass_active = active
         self._audit_owner_action(
@@ -335,6 +350,8 @@ class OwnerConsole(QDialog):
         self._refresh_guardrail_table()
 
     def _on_toggle_watcher_pause(self, state: int):
+        if not self._check_owner_tripwire("owner_security_change"):
+            return
         paused = state == Qt.CheckState.Checked.value
         self._watcher._owner_paused = paused
         self._audit_owner_action(
@@ -345,6 +362,8 @@ class OwnerConsole(QDialog):
         self._refresh_guardrail_table()
 
     def _on_toggle_obfuscation(self, state: int):
+        if not self._check_owner_tripwire("owner_security_change"):
+            return
         active = state == Qt.CheckState.Checked.value
         obs = get_obfuscation_manager()
         if active:

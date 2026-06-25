@@ -62,6 +62,7 @@ class NexusAIRuntime:
         approval_gate: Any | None = None,
         audit_logger: Any | None = None,
         parent_widget: Any | None = None,
+        watcher: Any | None = None,
     ):
         self.home = Path.home() / ".command_nexus"
         self.notes_dir = self.home / "notes"
@@ -81,6 +82,7 @@ class NexusAIRuntime:
         self._approval_gate = approval_gate
         self._audit_logger = audit_logger
         self._parent_widget = parent_widget
+        self._watcher = watcher
 
         self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
 
@@ -100,6 +102,15 @@ class NexusAIRuntime:
             return self._approval_gate.request_approval(self._parent_widget, req)
         except Exception:
             # If approval machinery fails, deny rather than execute blindly.
+            return False
+
+    def _tripwire_ok(self, action_name: str) -> bool:
+        """Return True if the watcher allows the protected action."""
+        if self._watcher is None:
+            return True
+        try:
+            return self._watcher.check_action(action_name)
+        except Exception:
             return False
 
     def _log_tool_audit(self, *, tool: str, action: str, target: str, approved: bool, status: str, error: str | None = None):
@@ -251,6 +262,15 @@ class NexusAIRuntime:
                 ["[SYSTEM] No task was entered."],
                 ["[SYSTEM] Runtime refused to fake an empty task."],
                 ["Next: enter a real mission/task and start again."],
+            )
+
+        if not self._tripwire_ok("mission_start"):
+            return RuntimeResult(
+                RuntimeStatus.PAUSED,
+                "Tripwire lockdown",
+                ["[SYSTEM] Watcher tripwire is in lockdown or breach."],
+                ["[SYSTEM] Mission execution blocked until trust is restored."],
+                ["Next: restore protected files or switch to development mode."],
             )
 
         abilities = self._canonical_abilities(meta)
@@ -615,6 +635,16 @@ class NexusAIRuntime:
         the system usable on small local models (7B/8B and below) and avoids
         loading larger models just to route file commands.
         """
+        if not self._tripwire_ok("tool_execution"):
+            return RuntimeResult(
+                RuntimeStatus.PAUSED,
+                "Tripwire lockdown",
+                thought + [f"[{ai_name}] Tool execution blocked by Watcher tripwire."],
+                ["[SYSTEM] Tool execution paused until trust is restored."],
+                ["Next: restore protected files or switch to development mode."],
+                "",
+            )
+
         t = task.lower()
         ai_uuid = str(meta.get("uuid", ""))
 

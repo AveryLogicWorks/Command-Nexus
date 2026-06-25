@@ -25,7 +25,7 @@ from src.core.audit_logger import AuditLogger
 from src.core.command_router import CommandRouter, ToolRegistry, LocalCommandServer
 from src.core.license_manager import get_license_manager
 from src.core.license_dialog import LicenseActivationDialog
-from src.core.tripwire_manager import TripwireManager
+from src.core.tripwire_manager import TripwireManager, WatcherMode
 
 
 class CommandNexusApp:
@@ -73,7 +73,7 @@ class CommandNexusApp:
         
         if not self._license.is_activated:
             try:
-                dlg = LicenseActivationDialog()
+                dlg = LicenseActivationDialog(watcher=self._watcher)
                 dlg.exec()
             except Exception as e:
                 QMessageBox.critical(None, "License Error", f"License dialog failed: {e}")
@@ -91,35 +91,35 @@ class CommandNexusApp:
                 # Non-fatal: just log to console
                 print(f"Warning: Failed to log startup mode: {e}")
 
-        # ── Anti-Tamper Tripwire ─────────────────────────────────────────
-        # Founder mode bypasses ALL tripwire checks — what the founder does
-        # is NOT tampering. It is upgrading, repairing, or testing.
+        # ── Watcher / Anti-Tamper Tripwire ───────────────────────────────
+        # Release/customer builds auto-start the Watcher armed. Source builds
+        # default to DEV mode so normal development does not trip anything.
         try:
-            is_founder = self._license.is_founder_mode if self._license.is_activated else False
-            is_internal = self._license.is_internal_mode if self._license.is_activated else False
-            self._tripwire = TripwireManager(
+            watcher_mode = TripwireManager.recommended_mode().value
+            self._watcher = WatcherEngine(
+                mode=watcher_mode,
+                audit_logger=self._audit,
                 license_manager=self._license,
-                founder_mode=is_founder,
             )
-            # Tripwire stays paused while watcher is in passive (STABILIZATION/REPAIR) mode.
-            # Prevents false trips during development and legitimate source modifications.
-            self._tripwire.pause()
-            if not self._tripwire.check_all():
-                QMessageBox.critical(
-                    None,
-                    "Security Alert",
-                    "Command Nexus has detected unauthorized modification or tampering.\n\n"
-                    "Your license has been voided and the program cannot continue.\n"
-                    "Contact support@averylogicworks.com if you believe this is an error.\n\n"
-                    "Any attempt to bypass this protection may result in permanent data loss.",
-                )
-                try:
-                    self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_TRIGGERED", target=str(self._tripwire.report()), approved=False, status="critical")
-                except Exception:
-                    pass
-                sys.exit(1)
+            self._tripwire = self._watcher._core
+
+            # In release mode, a failed startup check must not silently continue.
+            if watcher_mode == WatcherMode.RELEASE.value:
+                if not self._tripwire.is_trusted():
+                    QMessageBox.critical(
+                        None,
+                        "Security Alert",
+                        "Command Nexus has detected unauthorized modification or tampering.\n\n"
+                        "The application is entering lockdown and cannot continue.\n"
+                        "Contact support@averylogicworks.com if you believe this is an error.",
+                    )
+                    try:
+                        self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_STARTUP_LOCKDOWN", target=self._tripwire.report(), approved=False, status="critical")
+                    except Exception:
+                        pass
+                    sys.exit(1)
         except Exception as e:
-            QMessageBox.critical(None, "Security Error", f"Tripwire initialization failed: {e}")
+            QMessageBox.critical(None, "Security Error", f"Watcher/tripwire initialization failed: {e}")
             sys.exit(1)
         # ──────────────────────────────────────────────────────────────────
 
@@ -132,7 +132,7 @@ class CommandNexusApp:
 
         # Main window
         try:
-            self._visibility = VisibilityWindow(self._router, self._registry, self._audit, self._approval)
+            self._visibility = VisibilityWindow(self._router, self._registry, self._audit, self._approval, watcher=self._watcher)
             self._visibility.show()
         except Exception as e:
             QMessageBox.critical(None, "Window Error", f"Failed to create main window: {e}")
@@ -155,15 +155,13 @@ class CommandNexusApp:
             self._cleanup()
             sys.exit(1)
 
-        # Background defensive engine — passive during stabilization/repair
+        # Wire the already-created Watcher to the UI and owner console.
         try:
-            self._watcher = WatcherEngine(mode="STABILIZATION")
             self._watcher.mode_changed.connect(self._on_watcher_mode_changed)
             self._visibility.connect_watcher(self._watcher)
-            # Sync tripwire to watcher initial state (passive mode = tripwire paused)
-            self._on_watcher_mode_changed("STABILIZATION")
+            self._on_watcher_mode_changed(self._watcher.get_mode())
         except Exception as e:
-            QMessageBox.critical(None, "Watcher Error", f"Failed to initialize watcher engine: {e}")
+            QMessageBox.critical(None, "Watcher Error", f"Failed to wire watcher engine: {e}")
             self._cleanup()
             sys.exit(1)
 
@@ -281,14 +279,8 @@ class CommandNexusApp:
             self._forge._on_book_defaults_edited(uuid, edited)
 
     def _on_watcher_mode_changed(self, mode: str):
-        """Sync tripwire to watcher state: passive modes pause tripwire, active modes resume it."""
-        passive_modes = {"STABILIZATION", "REPAIR", "CREATION", "DEMO"}
-        if mode in passive_modes:
-            self._tripwire.pause()
-            self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_PAUSED", target=f"Watcher entered {mode} mode; tripwire paused.", approved=True, status="info")
-        else:
-            self._tripwire.resume()
-            self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_RESUMED", target=f"Watcher entered {mode} mode; tripwire resumed.", approved=True, status="info")
+        """Log and reflect watcher mode changes. Modes are now canonical (dev/stabilization/release/lockdown)."""
+        self._audit.log(tool="CommandNexusApp", action="WATCHER_MODE_CHANGED", target=f"Watcher mode is now {mode}", approved=True, status="info")
 
     def _open_book(self):
         if self._book is None:

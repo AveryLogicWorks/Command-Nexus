@@ -1,54 +1,53 @@
 """
-Command Nexus Anti-Tamper & Tripwire System
-============================================
-Multi-layer defense against license tampering, binary patching, and
-runtime manipulation. Designed so attackers either:
-  1) Void their license early (graceful lockout), OR
-  2) Corrupt their own installation trying to bypass checks.
+Command Nexus Watcher / Tripwire System
+========================================
+Non-invasive tamper detection and release-mode lockdown coordinator.
 
-Layers:
-  L1 — Source Integrity:    SHA-256 hashes of critical modules verified at startup.
-  L2 — License File Seal:   HMAC seal on license.json; tamper = instant invalidation.
-  L3 — Memory Integrity:    Runtime checksums of loaded class/code objects.
-  L4 — Self-Healing Trap:   If L1/L2/L3 fails, overwrite license with VOID state.
-  L5 — Delayed Tripwire:    Corrupt internal data structures on next save if tampered.
-  L6 — Debugger Detection:   Refuse to run under common debuggers/proxies.
-  L7 — Environment Scan:   Detect VM/sandbox/common RE tools.
+Design principles:
+  - Development/source mode must NOT deactivate licenses or block coding.
+  - Customer/release mode protects the installed app from tampering.
+  - No system-wide malware-like behavior (no debugger injection, no process
+    scanning, no environment blacklisting).
+  - All actions are audited.
+  - A trusted manifest of protected files is used as the baseline.
+  - Repair only uses a verified local baseline or signed source.
 
-Integration:
-    from src.core.tripwire_manager import TripwireManager
-    tw = TripwireManager()
-    if not tw.check_all():
-        sys.exit(1)  # License voided or program locked
+Modes:
+  DEV           — log-only, no blocking, no license impact.
+  STABILIZATION — report trust, warn, pause risky actions if degraded.
+  RELEASE       — armed; tampering enters lockdown.
+  LOCKDOWN      — risky actions are blocked.
 """
 from __future__ import annotations
 
 import hashlib
-import hmac
 import json
 import os
+import shutil
 import sys
+import threading
 import time
-import ctypes
-import inspect
-import types
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Any, Callable, Optional
 
-# ---------------------------------------------------------------------------
-# Configuration — BUMP these constants on every release build
-# ---------------------------------------------------------------------------
-TRIPWIRE_VERSION = "1.0.0"
-SEED_BYTES = b"PANTHEON_NEXUS_TRIPWIRE_2026_DO_NOT_TOUCH"
 
-# Files we absolutely will not tolerate being modified.
-# These are hashed at build time and the expected hashes are embedded.
-# In production, this dict is populated by the build script.
-CRITICAL_FILES: dict[str, str] = {
-    # Populated at build time by _generate_manifest()
-}
+class WatcherMode(str, Enum):
+    DEV = "dev"
+    STABILIZATION = "stabilization"
+    RELEASE = "release"
+    LOCKDOWN = "lockdown"
 
-# ---------------------------------------------------------------------------
+
+class WatcherTrust(str, Enum):
+    TRUSTED = "trusted"
+    DEGRADED = "degraded"
+    BREACH = "breach"
+    UNKNOWN = "unknown"
+
+
+@dataclass
 class TamperEvent:
     """Immutable record of a tampering detection event."""
     __slots__ = ("layer", "detail", "timestamp", "severity")
@@ -60,353 +59,389 @@ class TamperEvent:
         self.severity = severity
 
 
+@dataclass
+class WatcherState:
+    """Runtime state snapshot for UI/reporting."""
+    active: bool = False
+    mode: str = "dev"
+    trust: str = "unknown"
+    total_scans: int = 0
+    violations_detected: int = 0
+    last_scan: float = 0.0
+    events: list[TamperEvent] = field(default_factory=list)
+
+
 class TripwireManager:
     """
-    Central coordinator for all anti-tamper layers.
-    Call check_all() at app startup (before any user-facing window appears).
+    Central Watcher and Tripwire coordinator.
+
+    Monitors protected files using a trusted manifest. In release mode, any
+    change to a protected file enters lockdown and optionally deactivates the
+    license. In development mode, changes are logged only and the license is
+    never touched.
     """
 
-    def __init__(self, license_manager=None, founder_mode: bool = False):
+    # Files that enforce the trust boundary. These are protected in release mode.
+    PROTECTED_PATTERNS = (
+        "src/core/nexus_ai_runtime.py",
+        "src/core/tool_executor.py",
+        "src/core/runtime_executor.py",
+        "src/core/approval_gate.py",
+        "src/core/audit_logger.py",
+        "src/core/backend_manager.py",
+        "src/core/capability_registry.py",
+        "src/core/tripwire_manager.py",
+        "src/core/license_manager.py",
+        "src/core/settings_manager.py",
+        "src/core/watcher_service.py",
+        "src/core/watcher_engine.py",
+        "src/parts/visibility/visibility_window.py",
+        "src/parts/owner/owner_console.py",
+        "src/parts/watcher/watcher_window.py",
+        "src/parts/watcher/watcher_models.py",
+        "src/main.py",
+        "build.py",
+    )
+
+    def __init__(
+        self,
+        mode: WatcherMode | str = WatcherMode.DEV,
+        license_manager: Any | None = None,
+        audit_logger: Any | None = None,
+        founder_mode: bool = False,
+    ):
+        self._mode = mode if isinstance(mode, WatcherMode) else WatcherMode(str(mode).lower())
         self._lm = license_manager
-        self._events: list[TamperEvent] = []
-        self._tripped = False
-        self._manifest: dict[str, str] = {}
+        self._audit = audit_logger
         self._founder_mode = founder_mode
-        self._paused = False  # Development pause - disables destructive checks
+        self._events: list[TamperEvent] = []
+        self._trust = WatcherTrust.UNKNOWN
+        self._lock = threading.Lock()
+        self._callbacks: list[Callable[[WatcherTrust], None]] = []
+        self._project_root = Path(__file__).resolve().parent.parent.parent
+        self._workspace = self._get_workspace()
+        self._baseline_dir = self._workspace / "baseline"
+        self._baseline_dir.mkdir(parents=True, exist_ok=True)
+        self._manifest_path = self._baseline_dir / "tripwire_manifest.json"
+        self._manifest: dict[str, str] = {}
+        self._scan_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._scan_interval = 10.0
+        self._state = WatcherState(active=False, mode=self._mode.value)
 
-    def pause(self):
-        """Pause tripwire for development/repair. Only effective in founder mode."""
-        self._paused = True
+        self._audit_log("tripwire_init", f"TripwireManager initialized mode={self._mode.value}")
+        self._load_or_build_manifest()
+        self._state.active = self._mode in (WatcherMode.RELEASE, WatcherMode.STABILIZATION)
+        self._run_check()
 
-    def resume(self):
-        """Resume tripwire checks."""
-        self._paused = False
+        if self._mode in (WatcherMode.RELEASE, WatcherMode.STABILIZATION):
+            self.start()
 
-    def is_paused(self) -> bool:
-        return self._paused
-
-    # =====================================================================
+    # ------------------------------------------------------------------
     # Public API
-    # =====================================================================
+    # ------------------------------------------------------------------
+    def get_mode(self) -> WatcherMode:
+        return self._mode
 
-    def check_all(self) -> bool:
-        """
-        Run every layer. Returns True only if the system is clean.
-        If ANY layer trips, the license is voided and the app should exit.
-        """
-        try:
-            self._events.clear()
-            self._tripped = False
-        except Exception as e:
-            self._events.append(TamperEvent("check_all", f"Failed to clear state: {e}", "critical"))
-            return False
+    def set_mode(self, mode: WatcherMode | str) -> None:
+        new_mode = mode if isinstance(mode, WatcherMode) else WatcherMode(str(mode).lower())
+        old_mode = self._mode
+        self._mode = new_mode
+        self._state.mode = new_mode.value
+        self._state.active = new_mode in (WatcherMode.RELEASE, WatcherMode.STABILIZATION)
+        self._audit_log("tripwire_mode_changed", f"{old_mode.value} -> {new_mode.value}")
+        if new_mode == WatcherMode.LOCKDOWN:
+            self._trust = WatcherTrust.BREACH
+            self._notify(WatcherTrust.BREACH)
+        elif new_mode == WatcherMode.DEV:
+            self._update_trust(WatcherTrust.TRUSTED)
+        elif new_mode in (WatcherMode.RELEASE, WatcherMode.STABILIZATION):
+            if not self._scan_thread:
+                self.start()
+            self._run_check()
 
-        # ── Founder absolute bypass ──
-        if self._founder_mode:
-            self._events.append(TamperEvent("FOUNDER", "Tripwire bypassed — founder mode active", severity="info"))
-            return True
+    def get_trust(self) -> WatcherTrust:
+        if self._mode == WatcherMode.DEV:
+            return WatcherTrust.TRUSTED
+        return self._trust
 
-        # ── Development pause ──
-        if self._paused:
-            self._events.append(TamperEvent("PAUSED", "Tripwire paused for development/repair", severity="info"))
-            return True
+    def is_trusted(self) -> bool:
+        return self.get_trust() == WatcherTrust.TRUSTED
 
-        # Order matters: early layers are forgiving, later layers are destructive
-        checks: list[tuple[str, Callable[[], bool]]] = [
-            ("L6_debugger", self._check_debugger),
-            ("L7_environment", self._check_environment),
-            ("L1_source_integrity", self._check_source_integrity),
-            ("L2_license_seal", self._check_license_seal),
-            ("L3_memory_integrity", self._check_memory_integrity),
-        ]
+    def is_degraded(self) -> bool:
+        return self.get_trust() in (WatcherTrust.DEGRADED, WatcherTrust.BREACH, WatcherTrust.UNKNOWN)
 
-        for name, check_fn in checks:
-            try:
-                passed = check_fn()
-            except Exception as exc:
-                # If a check itself crashes, treat it as a trip
-                self._trip(name, f"Check threw exception: {exc}", severity="critical")
-                passed = False
+    def is_locked_down(self) -> bool:
+        return self._mode == WatcherMode.LOCKDOWN or self._trust == WatcherTrust.BREACH
 
-            if not passed:
-                self._trip(name, f"Layer {name} failed.", severity="critical")
-                # After L1/L2/L3 failure, void license immediately
-                if name in ("L1_source_integrity", "L2_license_seal", "L3_memory_integrity"):
-                    self._void_license("Tampering detected: " + name)
-                # After L6/L7, just refuse to run (no voiding needed)
-                break
+    def add_callback(self, callback: Callable[[WatcherTrust], None]) -> None:
+        self._callbacks.append(callback)
 
-        if self._tripped:
-            self._apply_delayed_tripwire()
-            return False
-
-        return True
-
-    def get_manifest_path(self) -> Path:
-        """Path to the integrity manifest JSON file."""
-        base = Path.home() / ".command_nexus"
-        base.mkdir(parents=True, exist_ok=True)
-        return base / "integrity_manifest.json"
-
-    def load_manifest(self) -> dict[str, str]:
-        """Load the file-integrity manifest (generated at build time)."""
-        p = self.get_manifest_path()
-        if not p.exists():
-            return {}
-        try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
-
-    def generate_manifest(self, source_dir: str | Path, output_path: Optional[Path] = None) -> dict[str, str]:
-        """
-        Build-time helper: hash every .py file under source_dir and write manifest.
-        Call this BEFORE compiling/shipping the app.
-        """
-        manifest: dict[str, str] = {}
-        root = Path(source_dir)
-        for py_file in root.rglob("*.py"):
-            rel = str(py_file.relative_to(root)).replace("\\", "/")
-            digest = self._file_hash(py_file)
-            manifest[rel] = digest
-
-        out = output_path or self.get_manifest_path()
-        out.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-        return manifest
-
-    def seal_license(self, license_data: dict, secret: bytes) -> str:
-        """
-        Create an HMAC seal for the license file contents.
-        Store this seal alongside license.json under the key '_seal'.
-        """
-        payload = json.dumps(license_data, sort_keys=True, separators=(",", ":"))
-        return hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:32]
-
-    def verify_license_seal(self, license_data: dict, seal: str, secret: bytes) -> bool:
-        """Verify the HMAC seal on license data."""
-        expected = self.seal_license(license_data, secret)
-        return hmac.compare_digest(seal, expected)
-
-    # =====================================================================
-    # Layer Implementations
-    # =====================================================================
-
-    def _check_debugger(self) -> bool:
-        """L6 — Detect common debuggers and analysis tools on Windows."""
-        if sys.platform != "win32":
-            return True  # Linux/mac detection omitted for brevity
-
-        # IsDebuggerPresent
-        try:
-            if ctypes.windll.kernel32.IsDebuggerPresent():
-                self._trip("L6", "IsDebuggerPresent() returned TRUE", severity="warning")
-                return False
-        except Exception:
-            pass
-
-        # CheckRemoteDebuggerPresent
-        try:
-            debugger_active = ctypes.c_bool(False)
-            ctypes.windll.kernel32.CheckRemoteDebuggerPresent(
-                ctypes.c_void_p(-1), ctypes.byref(debugger_active)
+    def get_state(self) -> WatcherState:
+        with self._lock:
+            return WatcherState(
+                active=self._state.active,
+                mode=self._mode.value,
+                trust=self._trust.value,
+                total_scans=self._state.total_scans,
+                violations_detected=self._state.violations_detected,
+                last_scan=self._state.last_scan,
+                events=list(self._events),
             )
-            if debugger_active.value:
-                self._trip("L6", "CheckRemoteDebuggerPresent detected debugger", severity="warning")
-                return False
-        except Exception:
-            pass
-
-        # Common debugger process names (lightweight check)
-        suspicious = {"x64dbg", "x32dbg", "ollydbg", "windbg", "cheatengine", "frida",
-                      "idaq", "idaq64", "ida", "idag", "idag64", "radare2", "ghidra",
-                      "dnspy", "ilspy", "de4dot"}
-        try:
-            import psutil
-            for proc in psutil.process_iter(["name"]):
-                try:
-                    name = proc.info.get("name", "").lower().replace(".exe", "")
-                    if name in suspicious:
-                        self._trip("L6", f"Suspicious process detected: {name}", severity="warning")
-                        return False
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-        except ImportError:
-            pass
-
-        return True
-
-    def _check_environment(self) -> bool:
-        """L7 — Detect VM/sandbox/common reverse-engineering environments."""
-        # VM indicators in environment
-        env_lower = {k.lower(): str(v).lower() for k, v in os.environ.items()}
-        vm_markers = ["vbox", "vmware", "virtualbox", "qemu", "xen", "hyper-v",
-                      "sandbox", "cuckoo", "analysis", "malware", "avtest"]
-        for marker in vm_markers:
-            for v in env_lower.values():
-                if marker in v:
-                    self._trip("L7", f"VM/sandbox marker in env: {marker}", severity="warning")
-                    return False
-
-        # Common sandbox usernames
-        sandbox_users = {"sandbox", "vmware", "test", "malware", "virus", "john doe",
-                         "currentuser", "user", "administrator", "azure", "docker"}
-        user = os.getlogin().lower() if hasattr(os, "getlogin") else ""
-        if user in sandbox_users:
-            self._trip("L7", f"Suspicious username: {user}", severity="warning")
-            return False
-
-        return True
-
-    def _check_source_integrity(self) -> bool:
-        """L1 — Compare current .py file hashes against the build manifest."""
-        manifest = self.load_manifest()
-        if not manifest:
-            # No manifest = first run after install; generate silently then trust
-            project_root = Path(__file__).resolve().parent.parent.parent
-            self.generate_manifest(project_root)
-            return True
-
-        project_root = Path(__file__).resolve().parent.parent.parent
-        all_ok = True
-        for rel_path, expected_hash in manifest.items():
-            full = project_root / rel_path
-            if not full.exists():
-                self._trip("L1", f"Critical file missing: {rel_path}", severity="critical")
-                all_ok = False
-                continue
-            actual = self._file_hash(full)
-            if actual != expected_hash:
-                self._trip("L1", f"Hash mismatch: {rel_path}", severity="critical")
-                all_ok = False
-
-        return all_ok
-
-    def _check_license_seal(self) -> bool:
-        """L2 — Verify the HMAC seal on license.json."""
-        if self._lm is None:
-            return True  # No license manager = can't check
-
-        license_path = self._lm._license_file
-        if not license_path.exists():
-            return True  # No license yet = nothing to tamper
-
-        try:
-            data = json.loads(license_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            self._trip("L2", "License file unreadable or corrupt JSON", severity="critical")
-            return False
-
-        seal = data.pop("_seal", None)
-        if seal is None:
-            # No seal present; first run. Generate seal now.
-            new_seal = self.seal_license(data, SEED_BYTES)
-            data["_seal"] = new_seal
-            license_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            return True
-
-        # Verify
-        if not self.verify_license_seal(data, seal, SEED_BYTES):
-            self._trip("L2", "License seal verification FAILED", severity="critical")
-            return False
-
-        return True
-
-    def _check_memory_integrity(self) -> bool:
-        """L3 — Simple runtime checksum of key class objects."""
-        # We compute a lightweight checksum of the LicenseManager class source
-        try:
-            from src.core.license_manager import LicenseManager
-            src = inspect.getsource(LicenseManager)
-            actual = hashlib.sha256(src.encode()).hexdigest()[:16]
-            # Expected hash is embedded at build time; here we just ensure
-            # the source hasn't been monkey-patched into emptiness.
-            if len(src) < 500:
-                self._trip("L3", "LicenseManager source suspiciously short (patched?)", severity="critical")
-                return False
-        except Exception:
-            self._trip("L3", "Could not inspect LicenseManager source", severity="critical")
-            return False
-
-        return True
-
-    # =====================================================================
-    # Enforcement / Destruction
-    # =====================================================================
-
-    def _trip(self, layer: str, detail: str, severity: str = "critical"):
-        """Record a tamper event and mark the system as tripped."""
-        self._events.append(TamperEvent(layer, detail, severity))
-        self._tripped = True
-
-    def _void_license(self, reason: str):
-        """Overwrite the license file with a VOID state."""
-        if self._lm is None:
-            return
-        try:
-            void_data = {
-                "_void": True,
-                "_void_reason": reason,
-                "_void_at": time.time(),
-                "_void_version": TRIPWIRE_VERSION,
-                "key": "VOID",
-                "tier": "void",
-            }
-            self._lm._license_file.write_text(json.dumps(void_data, indent=2), encoding="utf-8")
-            self._lm._license_data = void_data
-            self._lm._status = type(self._lm)._instance._status.__class__.INVALID
-        except Exception:
-            pass
-
-    def _apply_delayed_tripwire(self):
-        """
-        L5 — Plant delayed corruption into settings / store files.
-        Next time the app saves anything, it'll silently corrupt its own data.
-        This ensures that even if the attacker patches out the early exit,
-        the program becomes unusable very quickly.
-        """
-        try:
-            from src.core.settings_manager import SettingsManager
-            sm = SettingsManager()
-            sm.initialize()
-            # Plant a hidden flag that tells the next save to scramble
-            settings = sm.get()
-            settings._tamper_flag = hashlib.sha256(
-                b"TRIPWIRE_TRIGGERED" + str(time.time()).encode()
-            ).hexdigest()[:16]
-            sm.save()
-        except Exception:
-            pass
-
-    # =====================================================================
-    # Helpers
-    # =====================================================================
-
-    @staticmethod
-    def _file_hash(path: Path) -> str:
-        """SHA-256 hash of file contents."""
-        h = hashlib.sha256()
-        h.update(path.read_bytes())
-        return h.hexdigest()
 
     def report(self) -> str:
-        """Human-readable report of all detected tamper events."""
-        lines = ["Tripwire Report", "=" * 40]
-        for ev in self._events:
+        state = self.get_state()
+        lines = [
+            "Tripwire Report",
+            "=" * 40,
+            f"Mode: {state.mode}",
+            f"Trust: {state.trust}",
+            f"Scans: {state.total_scans} | Violations: {state.violations_detected}",
+        ]
+        for ev in state.events:
             ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ev.timestamp))
             lines.append(f"[{ts}] {ev.layer} ({ev.severity}): {ev.detail}")
-        if not self._events:
-            lines.append("No tamper events detected.")
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+    def start(self) -> None:
+        if self._scan_thread and self._scan_thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._scan_thread = threading.Thread(target=self._scan_loop, daemon=True)
+        self._scan_thread.start()
+        self._audit_log("watcher_start", "Background file scan started")
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._scan_thread:
+            self._scan_thread.join(timeout=2.0)
+        self._audit_log("watcher_stop", "Background file scan stopped")
+
+    def _scan_loop(self) -> None:
+        while not self._stop_event.wait(self._scan_interval):
+            self._run_check()
+
+    # ------------------------------------------------------------------
+    # Manifest / hash
+    # ------------------------------------------------------------------
+    def _get_workspace(self) -> Path:
+        try:
+            from src.core.settings_manager import SettingsManager
+            s = SettingsManager()
+            return Path(s.get().workspace_path or str(Path.home() / "CommandNexusWorkspace"))
+        except Exception:
+            return Path.home() / "CommandNexusWorkspace"
+
+    def _load_or_build_manifest(self) -> None:
+        if self._manifest_path.exists():
+            try:
+                self._manifest = json.loads(self._manifest_path.read_text(encoding="utf-8"))
+                self._audit_log("watcher_manifest_load", f"Loaded {len(self._manifest)} entries")
+                return
+            except Exception as e:
+                self._audit_log("watcher_manifest_load_error", str(e))
+        self._build_manifest()
+
+    def _build_manifest(self) -> None:
+        self._manifest = {}
+        for pattern in self.PROTECTED_PATTERNS:
+            path = self._project_root / pattern
+            if path.exists():
+                self._manifest[pattern] = self._hash_file(path)
+        try:
+            self._manifest_path.write_text(json.dumps(self._manifest, indent=2, sort_keys=True), encoding="utf-8")
+            self._audit_log("watcher_manifest_build", f"Built baseline with {len(self._manifest)} files")
+        except Exception as e:
+            self._audit_log("watcher_manifest_build_error", str(e))
+
+    @staticmethod
+    def _hash_file(path: Path) -> str:
+        try:
+            return hashlib.sha256(path.read_bytes()).hexdigest()
+        except Exception:
+            return ""
+
+    def _run_check(self) -> None:
+        if self._mode == WatcherMode.DEV:
+            self._state.total_scans += 1
+            self._state.last_scan = time.time()
+            return
+
+        self._state.total_scans += 1
+        self._state.last_scan = time.time()
+        all_ok = True
+
+        for pattern, expected in self._manifest.items():
+            path = self._project_root / pattern
+            if not path.exists():
+                all_ok = False
+                self._record_event("protected_file_missing", pattern, "critical")
+                continue
+            actual = self._hash_file(path)
+            if actual != expected:
+                all_ok = False
+                self._record_event("protected_file_changed", pattern, "critical")
+
+        trust = WatcherTrust.TRUSTED if all_ok else WatcherTrust.BREACH
+        self._update_trust(trust)
+
+    def _update_trust(self, trust: WatcherTrust) -> None:
+        if self._mode == WatcherMode.DEV:
+            trust = WatcherTrust.TRUSTED
+        if trust == self._trust:
+            return
+        self._trust = trust
+        self._state.trust = trust.value
+        self._notify(trust)
+        if trust == WatcherTrust.BREACH:
+            self._state.violations_detected += 1
+            self._audit_log("tripwire_fail", "Protected file integrity breach")
+            if self._mode == WatcherMode.RELEASE:
+                self._enter_lockdown("protected file tampered in release mode")
+        elif trust == WatcherTrust.TRUSTED:
+            self._audit_log("tripwire_pass", "Protected files verified")
+
+    def _notify(self, trust: WatcherTrust) -> None:
+        for cb in self._callbacks:
+            try:
+                cb(trust)
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # Repair
+    # ------------------------------------------------------------------
+    def repair_from_baseline(self, target_pattern: str) -> bool:
+        """Restore a protected file from the verified baseline copy."""
+        self._audit_log("watcher_repair_attempt", target_pattern)
+        baseline_path = self._baseline_dir / target_pattern
+        target_path = self._project_root / target_pattern
+        if not baseline_path.exists() or not target_path.exists():
+            self._audit_log("watcher_repair_failed", target_pattern, "baseline or target missing")
+            return False
+        expected = self._manifest.get(target_pattern)
+        actual_baseline = self._hash_file(baseline_path)
+        if expected and actual_baseline != expected:
+            self._audit_log("watcher_repair_failed", target_pattern, "baseline hash mismatch")
+            return False
+        try:
+            shutil.copy2(baseline_path, target_path)
+            self._audit_log("watcher_repair_succeeded", target_pattern, "restored from baseline")
+            self._run_check()
+            return True
+        except Exception as e:
+            self._audit_log("watcher_repair_failed", target_pattern, str(e))
+            return False
+
+    def accept_current_baseline(self) -> None:
+        """Accept current hashes as the new trusted baseline."""
+        self._build_manifest()
+        for pattern in self._manifest:
+            src = self._project_root / pattern
+            dst = self._baseline_dir / pattern
+            if src.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+        self._audit_log("watcher_baseline_accepted", "New baseline accepted and copied")
+        self._update_trust(WatcherTrust.TRUSTED)
+
+    # ------------------------------------------------------------------
+    # Lockdown / tripwire guards
+    # ------------------------------------------------------------------
+    def _enter_lockdown(self, reason: str) -> None:
+        if self._mode == WatcherMode.DEV:
+            return
+        self._mode = WatcherMode.LOCKDOWN
+        self._state.mode = WatcherMode.LOCKDOWN.value
+        self._trust = WatcherTrust.BREACH
+        self._state.trust = WatcherTrust.BREACH.value
+        self._audit_log("tripwire_lockdown_entered", reason)
+        self._record_event("lockdown_entered", "system", "critical")
+        if self._lm is not None and self._mode != WatcherMode.STABILIZATION:
+            try:
+                self._lm.deactivate()
+                self._audit_log("tripwire_license_deactivated", "License deactivated due to tampering")
+            except Exception as e:
+                self._audit_log("tripwire_license_deactivate_error", str(e))
+
+    def check_action(self, action_name: str, target: str = "") -> bool:
+        """
+        Guard for protected actions. Returns True if the action may proceed.
+        In LOCKDOWN or BREACH, returns False and logs.
+        """
+        if self._mode == WatcherMode.DEV:
+            self._audit_log("tripwire_pass", action_name, target)
+            return True
+        if self._mode == WatcherMode.LOCKDOWN:
+            self._audit_log("tripwire_fail", action_name, f"LOCKDOWN: {target}")
+            return False
+        if self._trust in (WatcherTrust.BREACH, WatcherTrust.UNKNOWN):
+            self._audit_log("tripwire_fail", action_name, f"trust={self._trust.value}: {target}")
+            return False
+        if self._trust == WatcherTrust.DEGRADED:
+            self._audit_log("tripwire_warn", action_name, f"trust=degraded: {target}")
+            return self._mode == WatcherMode.STABILIZATION
+        self._audit_log("tripwire_pass", action_name, target)
+        return True
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _record_event(self, layer: str, detail: str, severity: str) -> None:
+        ev = TamperEvent(layer, detail, severity)
+        with self._lock:
+            self._events.append(ev)
+
+    def _audit_log(self, action: str, target: str, status: str = "") -> None:
+        if self._audit is None:
+            return
+        try:
+            self._audit.log(tool="TripwireManager", action=action, target=target, agent="tripwire", approved=True, status=status)
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Build / release detection
+    # ------------------------------------------------------------------
+    @staticmethod
+    def is_release_build() -> bool:
+        return getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
+    @classmethod
+    def recommended_mode(cls) -> WatcherMode:
+        return WatcherMode.RELEASE if cls.is_release_build() else WatcherMode.DEV
+
+    # ------------------------------------------------------------------
+    # Legacy compatibility
+    # ------------------------------------------------------------------
+    def pause(self):
+        """Legacy no-op; modes are now the canonical control."""
+        pass
+
+    def resume(self):
+        """Legacy no-op."""
+        pass
+
+    def is_paused(self) -> bool:
+        return self._mode == WatcherMode.DEV
+
+    def check_all(self) -> bool:
+        """Legacy entry point used by main.py."""
+        self._run_check()
+        return self._mode != WatcherMode.LOCKDOWN
 
 
 # ---------------------------------------------------------------------------
-# Convenience: run tripwire standalone
+# Convenience: standalone check
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     tw = TripwireManager()
     if tw.check_all():
-        print("Tripwire: CLEAN")
+        print("Tripwire: TRUSTED")
     else:
-        print("Tripwire: TRIPPED")
+        print("Tripwire: LOCKDOWN")
         print(tw.report())
         sys.exit(1)
