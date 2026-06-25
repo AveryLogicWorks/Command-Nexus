@@ -278,7 +278,7 @@ def test_health_check():
         s.initialize(config_path=str(tmp / "config.json"))
         runtime = NexusAIRuntime(s)
         status = runtime.health_check()
-        assert "backend" in status
+        assert "provider_id" in status
         assert "reachable" in status
         assert "message" in status
         print("[OK] Health check")

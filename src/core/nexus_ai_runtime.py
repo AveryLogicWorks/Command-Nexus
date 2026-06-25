@@ -18,6 +18,7 @@ from .adaptive_memory import AdaptiveMemoryStore
 from .tool_executor import ToolExecutor, ToolResult
 from .model_registry import ModelRegistry
 from .capability_registry import canonical_intent, capability_status, is_paused, ImplementationStatus
+from .backend_manager import BackendManager
 
 
 _BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
@@ -71,15 +72,8 @@ class NexusAIRuntime:
         self._settings = settings or SettingsManager()
         s = self._settings.get()
 
-        self.ai_backend = (os.environ.get("COMMAND_NEXUS_AI_BACKEND") or s.ai_backend or "ollama").strip().lower()
-        self.openai_api_key = (os.environ.get("OPENAI_API_KEY") or s.openai_api_key or "").strip()
-        self.openai_model = (os.environ.get("COMMAND_NEXUS_OPENAI_MODEL") or s.openai_model or "gpt-4o-mini").strip()
-
-        self.ollama_url = (os.environ.get("COMMAND_NEXUS_OLLAMA_URL") or s.ollama_url or "http://127.0.0.1:11434").rstrip("/")
-        self.ollama_model = (os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL") or s.ollama_model or "llama3.1").strip()
-
-        self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
-
+        # All model backend interactions go through the trust boundary.
+        self._backend = BackendManager(self._settings)
         self._memory = AdaptiveMemoryStore(self._settings)
         self._tools = ToolExecutor(self._settings)
         self._models = ModelRegistry(self._settings)
@@ -87,6 +81,8 @@ class NexusAIRuntime:
         self._approval_gate = approval_gate
         self._audit_logger = audit_logger
         self._parent_widget = parent_widget
+
+        self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
 
     def _request_tool_approval(self, action_type: str, description: str, targets: list[str], risk_level: Any) -> bool:
         """Ask the human approval gate before executing a risky tool action."""
@@ -242,50 +238,7 @@ class NexusAIRuntime:
 
     def health_check(self) -> dict[str, Any]:
         """Return the current backend reachability and selected model status."""
-        result: dict[str, Any] = {
-            "backend": self.ai_backend,
-            "reachable": False,
-            "message": "",
-            "models": [],
-            "selected_model": "",
-        }
-        try:
-            if self.ai_backend == "openai":
-                if not self.openai_api_key:
-                    result["message"] = "OpenAI backend selected but no API key configured."
-                    return result
-                req = urllib.request.Request(
-                    "https://api.openai.com/v1/models",
-                    headers={"Authorization": "Bearer " + self.openai_api_key},
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                models = [m.get("id", "") for m in data.get("data", [])]
-                result["reachable"] = True
-                result["models"] = models
-                result["selected_model"] = self.openai_model
-                result["message"] = (
-                    f"OpenAI connected. Model '{self.openai_model}' is available."
-                    if self.openai_model in models
-                    else f"OpenAI connected. Model '{self.openai_model}' not found in available models."
-                )
-            else:
-                url = self.ollama_url + "/api/tags"
-                req = urllib.request.Request(url, method="GET")
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                models = [m.get("name", "") for m in data.get("models", [])]
-                result["reachable"] = True
-                result["models"] = models
-                result["selected_model"] = self.ollama_model
-                result["message"] = (
-                    f"Ollama connected. Model '{self.ollama_model}' is available."
-                    if self.ollama_model in models
-                    else f"Ollama connected. Model '{self.ollama_model}' not found. Available: {', '.join(models[:5]) or 'none'}."
-                )
-        except Exception as e:
-            result["message"] = f"{self.ai_backend} backend unreachable: {e}"
-        return result
+        return self._backend.health_check()
 
     def run(self, task: str, ai_name: str = "AI", ai_uuid: str = "", ai_metadata: dict[str, Any] | None = None) -> RuntimeResult:
         task = (task or "").strip()
@@ -842,68 +795,15 @@ class NexusAIRuntime:
         )
 
     def _call_model(self, prompt: str, model: str | None = None) -> str:
-        cache_key = f"{model or self.ollama_model}:{hash(prompt) & 0xFFFFFFFF}"
+        """Route the model call through the BackendManager trust boundary."""
+        cache_key = f"{model or self._backend.get_active_provider().model}:{hash(prompt) & 0xFFFFFFFF}"
         if cache_key in self._response_cache:
             return self._response_cache[cache_key]
 
-        if self.ai_backend == "openai":
-            out = self._call_openai(prompt)
-            if out and not out.startswith("OpenAI backend error"):
-                self._response_cache[cache_key] = out
-                return out
-            out = self._call_ollama(prompt, model=model)
-            if out:
-                self._response_cache[cache_key] = out
-            return out
-
-        # Default / ollama: local-first, fall back to OpenAI if configured
-        out = self._call_ollama(prompt, model=model)
-        if out:
-            self._response_cache[cache_key] = out
-            return out
-        out = self._call_openai(prompt)
+        out = self._backend.call_model(prompt, model=model)
         if out:
             self._response_cache[cache_key] = out
         return out
-
-    def _call_ollama(self, prompt: str, model: str | None = None) -> str:
-        try:
-            payload = {"model": model or self.ollama_model, "prompt": prompt, "stream": False}
-            req = urllib.request.Request(
-                self.ollama_url + "/api/generate",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            return (data.get("response") or "").strip()
-        except Exception:
-            return ""
-
-    def _call_openai(self, prompt: str) -> str:
-        if not self.openai_api_key:
-            return ""
-        try:
-            payload = {
-                "model": self.openai_model,
-                "messages": [
-                    {"role": "system", "content": "You are a governed Command Nexus runtime backend. Be honest about what was actually done."},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.4,
-            }
-            req = urllib.request.Request(
-                "https://api.openai.com/v1/chat/completions",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.openai_api_key},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            return data["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            return f"OpenAI backend error: {e}"
 
     def _brave_search(self, query: str) -> list[dict[str, str]]:
         try:

@@ -40,6 +40,7 @@ from ...core.approval_gate import ApprovalGate, ActionRequest, RiskLevel
 from ...core.nexus_moirai import check_action_allowed, MoiraiHealthReport
 from ...core.nexus_ai_runtime import NexusAIRuntime, RuntimeStatus as NexusRuntimeStatus
 from ...core.runtime_executor import LocalRuntimeExecutor, RuntimeStatus
+from ...core.backend_manager import BackendManager, BackendPolicyError, TrustLevel
 from ...core.constants import (
     SpeedLevel, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
     AUDIT_PANE_MAX_LINES, PresenceState
@@ -1781,14 +1782,16 @@ class BackendConfigDialog(QDialog):
     """
     Configure the AI model backend used by Command Nexus missions.
     Defaults to local Ollama for privacy-first operation; OpenAI optional.
+    All backends are treated as untrusted intelligence sources.
     """
 
     def __init__(self, settings: SettingsManager, parent=None):
         super().__init__(parent)
         self._settings = settings
         self._settings.initialize()
+        self._backend = BackendManager(self._settings)
         self.setWindowTitle("AI Backend Configuration")
-        self.setMinimumSize(520, 420)
+        self.setMinimumSize(560, 540)
         self._setup_ui()
         self._apply_dark_theme()
 
@@ -1803,7 +1806,11 @@ class BackendConfigDialog(QDialog):
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
 
-        sub = QLabel("Choose how Command Nexus runs AI missions. Local Ollama is recommended for privacy.")
+        sub = QLabel(
+            "Choose how Command Nexus runs AI missions. Local backends are default and recommended. "
+            "All backends are treated as untrusted: they may suggest text, but they cannot execute tools, "
+            "change files, settings, license, or approvals."
+        )
         sub.setFont(QFont("Segoe UI", 9))
         sub.setStyleSheet("color: #8b949e;")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1811,17 +1818,26 @@ class BackendConfigDialog(QDialog):
         layout.addWidget(sub)
 
         s = self._settings.get()
+        providers = self._backend.list_providers()
+        active = self._backend.get_active_provider()
 
-        # Backend selector
-        backend_row = QHBoxLayout()
-        backend_row.addWidget(QLabel("Backend:"))
-        self._backend_combo = QComboBox()
-        self._backend_combo.addItems(["ollama", "openai"])
-        self._backend_combo.setCurrentText(s.ai_backend)
-        backend_row.addWidget(self._backend_combo, stretch=1)
-        layout.addLayout(backend_row)
+        # Provider selector with trust levels
+        provider_row = QHBoxLayout()
+        provider_row.addWidget(QLabel("Active Provider:"))
+        self._provider_combo = QComboBox()
+        for pid, p in providers.items():
+            self._provider_combo.addItem(f"{p.display_name} [{p.trust_level.value}]", pid)
+        self._provider_combo.setCurrentText(f"{active.display_name} [{active.trust_level.value}]")
+        provider_row.addWidget(self._provider_combo, stretch=1)
+        layout.addLayout(provider_row)
 
-        # Ollama URL
+        self._trust_label = QLabel(f"Trust level: {active.trust_level.value}")
+        self._trust_label.setStyleSheet("color: #8b949e; font-size: 12px;")
+        self._trust_label.setWordWrap(True)
+        layout.addWidget(self._trust_label)
+        self._provider_combo.currentIndexChanged.connect(self._update_trust_label)
+
+        # Legacy Ollama/OpenAI fields (still editable for convenience)
         url_row = QHBoxLayout()
         url_row.addWidget(QLabel("Ollama URL:"))
         self._ollama_url = QLineEdit(s.ollama_url)
@@ -1829,7 +1845,6 @@ class BackendConfigDialog(QDialog):
         url_row.addWidget(self._ollama_url, stretch=1)
         layout.addLayout(url_row)
 
-        # Ollama model
         model_row = QHBoxLayout()
         model_row.addWidget(QLabel("Ollama Model:"))
         self._ollama_model = QLineEdit(s.ollama_model)
@@ -1837,7 +1852,6 @@ class BackendConfigDialog(QDialog):
         model_row.addWidget(self._ollama_model, stretch=1)
         layout.addLayout(model_row)
 
-        # OpenAI API key
         key_row = QHBoxLayout()
         key_row.addWidget(QLabel("OpenAI Key:"))
         self._openai_key = QLineEdit(s.openai_api_key)
@@ -1846,7 +1860,6 @@ class BackendConfigDialog(QDialog):
         key_row.addWidget(self._openai_key, stretch=1)
         layout.addLayout(key_row)
 
-        # OpenAI model
         openai_model_row = QHBoxLayout()
         openai_model_row.addWidget(QLabel("OpenAI Model:"))
         self._openai_model = QLineEdit(s.openai_model)
@@ -1854,7 +1867,6 @@ class BackendConfigDialog(QDialog):
         openai_model_row.addWidget(self._openai_model, stretch=1)
         layout.addLayout(openai_model_row)
 
-        # Brave Search key (optional)
         brave_row = QHBoxLayout()
         brave_row.addWidget(QLabel("Brave Search Key:"))
         self._brave_key = QLineEdit(s.brave_api_key)
@@ -1862,6 +1874,40 @@ class BackendConfigDialog(QDialog):
         self._brave_key.setPlaceholderText("Optional web search API")
         brave_row.addWidget(self._brave_key, stretch=1)
         layout.addLayout(brave_row)
+
+        # Advanced mode / custom provider
+        advanced = QGroupBox("Custom Cloud Provider (Advanced mode required)")
+        advanced_layout = QVBoxLayout(advanced)
+        self._advanced_check = QCheckBox("Advanced mode (allows custom remote endpoints)")
+        self._advanced_check.setChecked(s.advanced_mode)
+        advanced_layout.addWidget(self._advanced_check)
+
+        custom_endpoint_row = QHBoxLayout()
+        custom_endpoint_row.addWidget(QLabel("Custom Endpoint:"))
+        self._custom_endpoint = QLineEdit(s.custom_api_endpoint)
+        self._custom_endpoint.setPlaceholderText("https://api.example.com/v1")
+        custom_endpoint_row.addWidget(self._custom_endpoint, stretch=1)
+        advanced_layout.addLayout(custom_endpoint_row)
+
+        custom_key_row = QHBoxLayout()
+        custom_key_row.addWidget(QLabel("Custom Key:"))
+        self._custom_key = QLineEdit(s.custom_api_key)
+        self._custom_key.setEchoMode(QLineEdit.EchoMode.Password)
+        custom_key_row.addWidget(self._custom_key, stretch=1)
+        advanced_layout.addLayout(custom_key_row)
+
+        custom_model_row = QHBoxLayout()
+        custom_model_row.addWidget(QLabel("Custom Model:"))
+        self._custom_model = QLineEdit()
+        self._custom_model.setPlaceholderText("model-name")
+        custom_model_row.addWidget(self._custom_model, stretch=1)
+        advanced_layout.addLayout(custom_model_row)
+
+        btn_add_custom = QPushButton("ADD CUSTOM PROVIDER")
+        btn_add_custom.setStyleSheet("background:#5e35b1;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;")
+        btn_add_custom.clicked.connect(self._on_add_custom)
+        advanced_layout.addWidget(btn_add_custom)
+        layout.addWidget(advanced)
 
         # Buttons
         btn_row = QHBoxLayout()
@@ -1888,55 +1934,83 @@ class BackendConfigDialog(QDialog):
 
         layout.addStretch()
 
+    def _update_trust_label(self):
+        pid = self._provider_combo.currentData()
+        provider = self._backend.list_providers().get(pid)
+        if provider:
+            self._trust_label.setText(
+                f"Trust level: {provider.trust_level.value} — "
+                f"{'local-only' if provider.kind.value == 'local' else 'remote cloud'}"
+            )
+
     def _on_save(self):
+        # Apply legacy fields first so the provider definitions stay in sync.
         self._settings.update(
-            ai_backend=self._backend_combo.currentText(),
             ollama_url=self._ollama_url.text().strip() or "http://127.0.0.1:11434",
             ollama_model=self._ollama_model.text().strip() or "llama3.1",
             openai_api_key=self._openai_key.text().strip(),
             openai_model=self._openai_model.text().strip() or "gpt-4o-mini",
             brave_api_key=self._brave_key.text().strip(),
+            advanced_mode=self._advanced_check.isChecked(),
+            custom_api_endpoint=self._custom_endpoint.text().strip(),
+            custom_api_key=self._custom_key.text().strip(),
         )
+        # Reload backend manager with the updated settings and set active provider.
+        self._backend = BackendManager(self._settings)
+        pid = self._provider_combo.currentData()
+        try:
+            self._backend.set_active_provider(pid)
+        except BackendPolicyError as e:
+            self._status.setText(f"Policy error: {e}")
+            return
+        self._backend.save_to_settings()
         self.accept()
 
     def _on_test(self):
-        backend = self._backend_combo.currentText()
         self._status.setText("Testing connection...")
+        # Reload so any unsaved field edits are picked up for the test.
+        self._backend = BackendManager(self._settings)
+        pid = self._provider_combo.currentData()
         try:
-            if backend == "ollama":
-                url = (self._ollama_url.text().strip() or "http://127.0.0.1:11434") + "/api/tags"
-                import urllib.request
-                with urllib.request.urlopen(url, timeout=5) as resp:
-                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                models = [m.get("name", "") for m in data.get("models", [])]
-                selected = self._ollama_model.text().strip() or "llama3.1"
-                if selected in models:
-                    self._status.setText(f"Connected. Model '{selected}' is available.")
-                else:
-                    self._status.setText(f"Connected. Available models: {', '.join(models[:5]) or 'none'}. '{selected}' not found.")
-            else:
-                key = self._openai_key.text().strip()
-                if not key:
-                    self._status.setText("OpenAI key is required.")
-                    return
-                import urllib.request
-                req = urllib.request.Request(
-                    "https://api.openai.com/v1/models",
-                    headers={"Authorization": "Bearer " + key},
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                self._status.setText(f"Connected. OpenAI account active. Models available: {len(data.get('data', []))}")
-        except Exception as e:
-            self._status.setText(f"Connection test failed: {e}")
+            self._backend.set_active_provider(pid)
+        except BackendPolicyError as e:
+            self._status.setText(f"Policy error: {e}")
+            return
+        result = self._backend.health_check()
+        safe_message = self._backend.redact(result.get("message", ""))
+        self._status.setText(f"[{result['provider_id']}] {safe_message}")
+
+    def _on_add_custom(self):
+        if not self._advanced_check.isChecked():
+            self._status.setText("Advanced mode must be enabled to add a custom cloud provider.")
+            return
+        name = self._custom_endpoint.text().strip()
+        if not name:
+            name = "custom"
+        try:
+            self._backend.add_custom_provider(
+                display_name=name,
+                endpoint=self._custom_endpoint.text().strip(),
+                api_key=self._custom_key.text().strip(),
+                model=self._custom_model.text().strip(),
+                advanced_mode=True,
+            )
+            self._status.setText(f"Custom provider added: {self._backend.redact(name)}")
+            self._provider_combo.clear()
+            for pid, p in self._backend.list_providers().items():
+                self._provider_combo.addItem(f"{p.display_name} [{p.trust_level.value}]", pid)
+        except BackendPolicyError as e:
+            self._status.setText(f"Policy error: {e}")
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
             QDialog{background:#0d1117;color:#c9d1d9;}
             QLabel{color:#c9d1d9;}
+            QGroupBox{color:#c9d1d9;border:1px solid #30363d;border-radius:8px;margin-top:8px;padding-top:8px;}
             QPushButton{background:#30363d;color:#fff;border:none;border-radius:8px;padding:10px;}
             QLineEdit{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
             QComboBox{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
+            QCheckBox{color:#c9d1d9;}
         """)
 
 

@@ -11,6 +11,7 @@ import urllib.request
 import uuid
 
 from .settings_manager import SettingsManager
+from .backend_manager import BackendManager
 
 
 @dataclass
@@ -63,6 +64,7 @@ class AdaptiveMemoryStore:
         s = self._settings.get()
         self._memory_dir = Path(s.memory_path)
         self._memory_dir.mkdir(parents=True, exist_ok=True)
+        self._backend = BackendManager(self._settings)
         self._ollama_url = (s.ollama_url or "http://127.0.0.1:11434").rstrip("/")
         self._ollama_model = s.ollama_model or "llama3.1"
         self._lock = threading.Lock()
@@ -91,26 +93,11 @@ class AdaptiveMemoryStore:
         tmp.replace(path)
 
     def _embed(self, text: str) -> list[float] | None:
-        """Compute a local embedding vector via Ollama. Returns None if unavailable."""
+        """Compute an embedding vector via the configured backend. Returns None if unavailable."""
         text = (text or "").strip()[:2000]
         if not text:
             return None
-        try:
-            payload = json.dumps({"model": self._ollama_model, "prompt": text}).encode("utf-8")
-            req = urllib.request.Request(
-                self._ollama_url + "/api/embeddings",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            vec = data.get("embedding")
-            if isinstance(vec, list) and len(vec) > 0 and all(isinstance(x, (int, float)) for x in vec):
-                return [float(x) for x in vec]
-        except Exception:
-            pass
-        return None
+        return self._backend.embed(text, model=self._ollama_model)
 
     @staticmethod
     def _cosine_similarity(a: list[float], b: list[float]) -> float:

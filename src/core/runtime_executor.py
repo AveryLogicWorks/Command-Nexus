@@ -11,6 +11,7 @@ import webbrowser
 from typing import Any
 
 from .settings_manager import SettingsManager
+from .backend_manager import BackendManager
 
 
 class RuntimeStatus(str, Enum):
@@ -49,12 +50,8 @@ class LocalRuntimeExecutor:
         self._settings.initialize()
         s = self._settings.get()
 
-        self.ai_backend = (os.environ.get("COMMAND_NEXUS_AI_BACKEND") or s.ai_backend or "ollama").strip().lower()
-        self.openai_api_key = (os.environ.get("OPENAI_API_KEY") or s.openai_api_key or "").strip()
-        self.openai_model = (os.environ.get("COMMAND_NEXUS_OPENAI_MODEL") or s.openai_model or "gpt-4o-mini").strip()
-
-        self.ollama_url = (os.environ.get("COMMAND_NEXUS_OLLAMA_URL") or s.ollama_url or "http://127.0.0.1:11434").rstrip("/")
-        self.ollama_model = (os.environ.get("COMMAND_NEXUS_OLLAMA_MODEL") or s.ollama_model or "llama3.1").strip()
+        # All model backend interactions go through the trust boundary.
+        self._backend = BackendManager(self._settings)
 
         self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
 
@@ -248,67 +245,12 @@ class LocalRuntimeExecutor:
         )
 
     def _call_model(self, prompt: str) -> str:
-        if self.ai_backend == "openai":
-            text = self._call_openai(prompt)
-            if text and not text.startswith("OpenAI backend error"):
-                return text
-            return self._call_ollama(prompt)
-        text = self._call_ollama(prompt)
-        if text:
-            return text
-        return self._call_openai(prompt)
+        """Route the model call through the BackendManager trust boundary."""
+        return self._backend.call_model(prompt)
 
-    def _call_ollama(self, prompt: str) -> str:
-        payload = {
-            "model": self.ollama_model,
-            "prompt": prompt,
-            "stream": False,
-        }
-
-        try:
-            req = urllib.request.Request(
-                self.ollama_url + "/api/generate",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            return (data.get("response") or "").strip()
-        except Exception:
-            return ""
-
-    def _call_openai(self, prompt: str) -> str:
-        if not self.openai_api_key:
-            return ""
-
-        payload = {
-            "model": self.openai_model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are the execution backend for Command Nexus. Be honest about what was actually done."
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.4,
-        }
-
-        try:
-            req = urllib.request.Request(
-                "https://api.openai.com/v1/chat/completions",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + self.openai_api_key,
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            return data["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            return f"OpenAI backend error: {e}"
+    def health_check(self) -> dict[str, Any]:
+        """Return the current backend reachability and selected model status."""
+        return self._backend.health_check()
 
     def _brave_search(self, query: str) -> list[dict[str, str]]:
         if not self.brave_api_key:

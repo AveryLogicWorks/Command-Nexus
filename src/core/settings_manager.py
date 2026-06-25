@@ -46,6 +46,14 @@ class NexusSettings:
     openai_model: str = "gpt-4o-mini"
     brave_api_key: str = ""  # Optional web search API
 
+    # Backend trust boundary / policy layer
+    advanced_mode: bool = False  # Required for custom cloud providers
+    active_provider: str = "ollama"
+    backend_providers: str = ""  # JSON list of ModelProvider dicts
+    custom_api_endpoint: str = ""
+    custom_api_key: str = ""
+    backend_timeout: float = 30.0
+
     def to_dict(self) -> dict:
         return asdict(self)
 
