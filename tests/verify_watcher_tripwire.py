@@ -380,14 +380,15 @@ def test_stabilization_degraded_allows_safe_mission_start():
     print("[PASS] STABILIZATION DEGRADED allows safe/no-tool actions")
 
 
-def test_stabilization_degraded_blocks_risky_actions():
-    """In STABILIZATION DEGRADED, risky actions must still be paused/blocked."""
+def test_stabilization_degraded_does_not_block_risky_actions():
+    """In STABILIZATION DEGRADED, local demo builds are NOT ARMED; risky actions are allowed but logged."""
     tmp = make_temp_workspace()
     try:
         s = SettingsManager()
         s.initialize(config_path=str(tmp / "config.json"))
         s.update(workspace_path=str(tmp))
-        watcher = TripwireManager(mode=WatcherMode.STABILIZATION, audit_logger=AuditLogger(s))
+        audit = AuditLogger(s)
+        watcher = TripwireManager(mode=WatcherMode.STABILIZATION, audit_logger=audit)
         _force_stabilization_degraded(watcher)
 
         risky_actions = [
@@ -400,11 +401,14 @@ def test_stabilization_degraded_blocks_risky_actions():
             "owner_security_change",
         ]
         for action in risky_actions:
-            assert not watcher.check_action(action, risk_level="risky"), f"{action} should be blocked in STABILIZATION DEGRADED"
+            assert watcher.check_action(action, risk_level="risky"), f"{action} should be allowed in STABILIZATION DEGRADED"
         assert not watcher.is_locked_down(), "STABILIZATION DEGRADED should not be a lockdown"
+        # Verify the Watcher is still present (audit log contains warnings).
+        log_text = audit.path().read_text(encoding="utf-8")
+        assert "tripwire_warn" in log_text or "local stabilization degraded" in log_text, "Watcher should log warnings in STABILIZATION DEGRADED"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    print("[PASS] STABILIZATION DEGRADED blocks risky actions")
+    print("[PASS] STABILIZATION DEGRADED does not block risky actions (Watcher not armed)")
 
 
 def test_release_breach_blocks_mission_start():
@@ -526,7 +530,7 @@ def main() -> int:
         test_local_dist_test_build_does_not_lockdown_on_startup,
         test_public_release_marker_lockdown_if_tampered,
         test_stabilization_degraded_allows_safe_mission_start,
-        test_stabilization_degraded_blocks_risky_actions,
+        test_stabilization_degraded_does_not_block_risky_actions,
         test_release_breach_blocks_mission_start,
         test_customer_lockdown_message_not_shown_for_local_stabilization,
         test_local_stabilization_auto_accepts_baseline,

@@ -411,29 +411,26 @@ class TripwireManager:
         """
         Guard for protected actions. Returns True if the action may proceed.
 
-        risk_level:
-          "safe"  — allowed in STABILIZATION even when trust is DEGRADED
-                    (e.g. starting a no-tool mission or chat).
-          "risky" — paused/blocked in STABILIZATION when trust is DEGRADED
-                    (e.g. tool execution, file changes, backend/license/owner
-                    changes). Always blocked in LOCKDOWN or BREACH.
+        risk_level is advisory only and is used for audit logging.
+
+        Policy:
+          DEV            — always allow; log only.
+          STABILIZATION  — present and visible but NOT ARMED for local/manual-test
+                           builds. Always allow, even if trust is DEGRADED.
+          RELEASE        — armed; BREACH/LOCKDOWN blocks all actions.
+          LOCKDOWN       — blocks all actions.
         """
-        if self._mode == WatcherMode.DEV:
-            self._audit_log("tripwire_pass", action_name, target)
+        if self._mode in (WatcherMode.DEV, WatcherMode.STABILIZATION):
+            if self._trust == WatcherTrust.DEGRADED and self._mode == WatcherMode.STABILIZATION:
+                self._audit_log("tripwire_warn", action_name, f"local stabilization degraded (not armed): {target}")
+            else:
+                self._audit_log("tripwire_pass", action_name, target)
             return True
         if self._mode == WatcherMode.LOCKDOWN:
             self._audit_log("tripwire_fail", action_name, f"LOCKDOWN: {target}")
             return False
         if self._trust in (WatcherTrust.BREACH, WatcherTrust.UNKNOWN):
             self._audit_log("tripwire_fail", action_name, f"trust={self._trust.value}: {target}")
-            return False
-        if self._trust == WatcherTrust.DEGRADED:
-            self._audit_log("tripwire_warn", action_name, f"trust=degraded: {target}")
-            # In STABILIZATION, degraded trust allows safe actions but pauses
-            # risky actions without entering full release lockdown.
-            if risk_level == "safe":
-                self._audit_log("tripwire_pass", action_name, f"safe action allowed despite degraded trust: {target}")
-                return True
             return False
         self._audit_log("tripwire_pass", action_name, target)
         return True
