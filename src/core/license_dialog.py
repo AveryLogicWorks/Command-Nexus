@@ -79,8 +79,8 @@ class LicenseActivationDialog(QDialog):
         key_input_layout = QHBoxLayout()
         self._key_input = QLineEdit()
         self._key_input.setPlaceholderText("Paste your 36-character license key here")
-        # 40 raw characters displayed as 9 groups of 4 = 49 visible chars including 9 dashes.
-        self._key_input.setMaxLength(49)
+        # 36 raw characters displayed as 9 groups of 4 = 44 visible chars including 8 dashes.
+        self._key_input.setMaxLength(44)
         self._key_input.setStyleSheet("font-size: 13px; padding: 6px;")
         self._key_input.textChanged.connect(self._format_key_input)
         key_input_layout.addWidget(self._key_input)
