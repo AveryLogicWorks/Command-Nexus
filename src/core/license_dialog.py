@@ -185,8 +185,12 @@ class LicenseActivationDialog(QDialog):
         self._key_input.blockSignals(False)
 
     def _on_activate(self):
-        if self._watcher is not None and not self._watcher.check_action("license_activation"):
-            self._result_label.setText("<span style='color: #f44336;'>License activation blocked by Watcher tripwire.</span>")
+        if self._watcher is not None and not self._watcher.check_action("license_activation", risk_level="risky"):
+            if self._watcher.is_locked_down():
+                msg = "<span style='color: #f44336;'>License activation blocked by security tripwire. Restore protected files or contact support.</span>"
+            else:
+                msg = "<span style='color: #f44336;'>Watcher detected a local test-build trust issue. License activation is paused until trust is restored.</span>"
+            self._result_label.setText(msg)
             return
 
         key = self._key_input.text().strip()

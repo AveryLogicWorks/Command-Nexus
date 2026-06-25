@@ -348,6 +348,136 @@ def test_public_release_marker_lockdown_if_tampered():
     print("[PASS] Public release marker build locks down when tampered")
 
 
+def _force_stabilization_degraded(watcher: TripwireManager) -> None:
+    """Tamper a protected file and run a check to force DEGRADED trust in STABILIZATION."""
+    protected = watcher._project_root / "src" / "core" / "nexus_ai_runtime.py"
+    if protected.exists():
+        original = protected.read_text(encoding="utf-8")
+        try:
+            protected.write_text(original + "\n# TAMPER_DEGRADED", encoding="utf-8")
+            watcher._run_check()
+            assert watcher.get_trust() == WatcherTrust.DEGRADED, f"Expected DEGRADED, got {watcher.get_trust()}"
+        finally:
+            protected.write_text(original, encoding="utf-8")
+
+
+def test_stabilization_degraded_allows_safe_mission_start():
+    """In STABILIZATION DEGRADED, safe/no-tool missions must still be allowed."""
+    tmp = make_temp_workspace()
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        watcher = TripwireManager(mode=WatcherMode.STABILIZATION, audit_logger=AuditLogger(s))
+        assert watcher.get_mode() == WatcherMode.STABILIZATION
+        _force_stabilization_degraded(watcher)
+
+        assert watcher.check_action("mission_start", risk_level="safe"), "Safe mission start should be allowed in STABILIZATION DEGRADED"
+        assert watcher.check_action("chat", risk_level="safe"), "Safe chat should be allowed in STABILIZATION DEGRADED"
+        assert watcher.is_locked_down() is False, "STABILIZATION DEGRADED is not a lockdown"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] STABILIZATION DEGRADED allows safe/no-tool actions")
+
+
+def test_stabilization_degraded_blocks_risky_actions():
+    """In STABILIZATION DEGRADED, risky actions must still be paused/blocked."""
+    tmp = make_temp_workspace()
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        watcher = TripwireManager(mode=WatcherMode.STABILIZATION, audit_logger=AuditLogger(s))
+        _force_stabilization_degraded(watcher)
+
+        risky_actions = [
+            "tool_execution",
+            "file_write",
+            "file_delete",
+            "shell_action",
+            "backend_config_change",
+            "license_activation",
+            "owner_security_change",
+        ]
+        for action in risky_actions:
+            assert not watcher.check_action(action, risk_level="risky"), f"{action} should be blocked in STABILIZATION DEGRADED"
+        assert not watcher.is_locked_down(), "STABILIZATION DEGRADED should not be a lockdown"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] STABILIZATION DEGRADED blocks risky actions")
+
+
+def test_release_breach_blocks_mission_start():
+    """In RELEASE BREACH, even safe mission start must be blocked."""
+    tmp = make_temp_workspace()
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        watcher = TripwireManager(mode=WatcherMode.RELEASE, audit_logger=AuditLogger(s))
+        assert watcher.is_trusted(), "Initial release state should be trusted"
+
+        protected = watcher._project_root / "src" / "core" / "nexus_ai_runtime.py"
+        if protected.exists():
+            original = protected.read_text(encoding="utf-8")
+            try:
+                protected.write_text(original + "\n# TAMPER_RELEASE_BREACH", encoding="utf-8")
+                watcher._run_check()
+                assert watcher.is_locked_down(), "RELEASE tamper should enter lockdown"
+                assert not watcher.check_action("mission_start", risk_level="safe"), "Safe mission start must be blocked in RELEASE lockdown"
+            finally:
+                protected.write_text(original, encoding="utf-8")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] RELEASE breach blocks even safe mission start")
+
+
+def test_customer_lockdown_message_not_shown_for_local_stabilization():
+    """A local STABILIZATION DEGRADED build should not trigger the customer lockdown path for safe actions."""
+    tmp = make_temp_workspace()
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        watcher = TripwireManager(mode=WatcherMode.STABILIZATION, audit_logger=AuditLogger(s))
+        _force_stabilization_degraded(watcher)
+
+        # Safe mission start is allowed, so the UI would not show the lockdown dialog.
+        assert watcher.check_action("mission_start", risk_level="safe")
+        assert watcher.get_mode() == WatcherMode.STABILIZATION
+        assert watcher.get_trust() == WatcherTrust.DEGRADED
+        assert watcher.is_locked_down() is False
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Customer lockdown message path is not triggered for local STABILIZATION degradation")
+
+
+def test_local_stabilization_auto_accepts_baseline():
+    """A local STABILIZATION build should not start degraded from a stale baseline."""
+    tmp = make_temp_workspace()
+    old_frozen, old_meipass = _patch_frozen_state(True, str(tmp))
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        # Write a stale baseline manifest that will not match the current source files.
+        manifest_path = Path(tmp) / "baseline" / "tripwire_manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps({"src/core/nexus_ai_runtime.py": "stale_hash"}), encoding="utf-8")
+        (tmp / "release_manifest.json").write_text(
+            json.dumps({"command_nexus_release_build": False, "release_channel": "development"}),
+            encoding="utf-8",
+        )
+        watcher = TripwireManager(audit_logger=AuditLogger(s))
+        assert watcher.get_mode() == WatcherMode.STABILIZATION
+        assert watcher.is_trusted(), "Local STABILIZATION build should auto-accept baseline and be trusted"
+        assert watcher.get_trust() == WatcherTrust.TRUSTED
+    finally:
+        _restore_frozen_state(old_frozen, old_meipass)
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Local STABILIZATION build auto-accepts current baseline")
+
+
 def main() -> int:
     tests = [
         test_dev_mode_does_not_punish_source_edit,
@@ -363,6 +493,11 @@ def main() -> int:
         test_public_release_marker_mode,
         test_local_dist_test_build_does_not_lockdown_on_startup,
         test_public_release_marker_lockdown_if_tampered,
+        test_stabilization_degraded_allows_safe_mission_start,
+        test_stabilization_degraded_blocks_risky_actions,
+        test_release_breach_blocks_mission_start,
+        test_customer_lockdown_message_not_shown_for_local_stabilization,
+        test_local_stabilization_auto_accepts_baseline,
     ]
     passed = []
     failed = []

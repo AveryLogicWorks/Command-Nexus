@@ -104,12 +104,12 @@ class NexusAIRuntime:
             # If approval machinery fails, deny rather than execute blindly.
             return False
 
-    def _tripwire_ok(self, action_name: str) -> bool:
+    def _tripwire_ok(self, action_name: str, risk_level: str = "risky") -> bool:
         """Return True if the watcher allows the protected action."""
         if self._watcher is None:
             return True
         try:
-            return self._watcher.check_action(action_name)
+            return self._watcher.check_action(action_name, risk_level=risk_level)
         except Exception:
             return False
 
@@ -264,13 +264,22 @@ class NexusAIRuntime:
                 ["Next: enter a real mission/task and start again."],
             )
 
-        if not self._tripwire_ok("mission_start"):
+        if not self._tripwire_ok("mission_start", risk_level="safe"):
+            is_lockdown = self._watcher is not None and self._watcher.is_locked_down()
+            if is_lockdown:
+                return RuntimeResult(
+                    RuntimeStatus.PAUSED,
+                    "Tripwire lockdown",
+                    ["[SYSTEM] Watcher tripwire is in lockdown or breach."],
+                    ["[SYSTEM] Mission execution blocked until trust is restored."],
+                    ["Next: restore protected files or contact support."],
+                )
             return RuntimeResult(
                 RuntimeStatus.PAUSED,
-                "Tripwire lockdown",
-                ["[SYSTEM] Watcher tripwire is in lockdown or breach."],
-                ["[SYSTEM] Mission execution blocked until trust is restored."],
-                ["Next: restore protected files or switch to development mode."],
+                "Watcher trust degraded",
+                ["[SYSTEM] Watcher detected a local test-build trust issue."],
+                ["[SYSTEM] Safe missions are allowed, but this mission cannot start while trust is degraded."],
+                ["Next: restore protected files or accept the current baseline in the Watcher view."],
             )
 
         abilities = self._canonical_abilities(meta)
@@ -635,7 +644,7 @@ class NexusAIRuntime:
         the system usable on small local models (7B/8B and below) and avoids
         loading larger models just to route file commands.
         """
-        if not self._tripwire_ok("tool_execution"):
+        if not self._tripwire_ok("tool_execution", risk_level="risky"):
             return RuntimeResult(
                 RuntimeStatus.PAUSED,
                 "Tripwire lockdown",

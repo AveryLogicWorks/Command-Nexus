@@ -318,8 +318,11 @@ class OwnerConsole(QDialog):
         if self._watcher is None:
             return True
         try:
-            if not self._watcher.check_action(action_name):
-                self._log(f"[TRIPWIRE] {action_name} blocked: trust degraded or lockdown.")
+            if not self._watcher.check_action(action_name, risk_level="risky"):
+                if self._watcher.is_locked_down():
+                    self._log(f"[TRIPWIRE] {action_name} blocked: security tripwire lockdown.")
+                else:
+                    self._log(f"[TRIPWIRE] {action_name} paused: local test-build trust degraded. Restore protected files or accept the current baseline.")
                 return False
         except Exception:
             return False

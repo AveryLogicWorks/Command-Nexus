@@ -136,6 +136,18 @@ class TripwireManager:
         self._state.active = self._mode in (WatcherMode.RELEASE, WatcherMode.STABILIZATION)
         self._run_check()
 
+        # Local test/stabilization builds should not start degraded just because
+        # the workspace still holds a stale development baseline. Accept the
+        # current protected files as the local baseline. Public release builds
+        # must never auto-accept; they rely on the bundled release manifest.
+        if (
+            self._mode == WatcherMode.STABILIZATION
+            and self._trust == WatcherTrust.DEGRADED
+            and not self.is_public_release_build()
+        ):
+            self.accept_current_baseline()
+            self._audit_log("watcher_baseline_auto_accepted", "Local stabilization build accepted current files as baseline")
+
         if self._mode in (WatcherMode.RELEASE, WatcherMode.STABILIZATION):
             self.start()
 
@@ -395,10 +407,16 @@ class TripwireManager:
             except Exception as e:
                 self._audit_log("tripwire_license_deactivate_error", str(e))
 
-    def check_action(self, action_name: str, target: str = "") -> bool:
+    def check_action(self, action_name: str, target: str = "", risk_level: str = "risky") -> bool:
         """
         Guard for protected actions. Returns True if the action may proceed.
-        In LOCKDOWN or BREACH, returns False and logs.
+
+        risk_level:
+          "safe"  — allowed in STABILIZATION even when trust is DEGRADED
+                    (e.g. starting a no-tool mission or chat).
+          "risky" — paused/blocked in STABILIZATION when trust is DEGRADED
+                    (e.g. tool execution, file changes, backend/license/owner
+                    changes). Always blocked in LOCKDOWN or BREACH.
         """
         if self._mode == WatcherMode.DEV:
             self._audit_log("tripwire_pass", action_name, target)
@@ -411,8 +429,11 @@ class TripwireManager:
             return False
         if self._trust == WatcherTrust.DEGRADED:
             self._audit_log("tripwire_warn", action_name, f"trust=degraded: {target}")
-            # In STABILIZATION, degraded trust pauses risky actions without
-            # entering full release lockdown.
+            # In STABILIZATION, degraded trust allows safe actions but pauses
+            # risky actions without entering full release lockdown.
+            if risk_level == "safe":
+                self._audit_log("tripwire_pass", action_name, f"safe action allowed despite degraded trust: {target}")
+                return True
             return False
         self._audit_log("tripwire_pass", action_name, target)
         return True

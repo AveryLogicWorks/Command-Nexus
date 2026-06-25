@@ -1022,8 +1022,21 @@ class VisibilityWindow(QMainWindow):
         return self._session_selector.currentData()
 
     def _on_start_mission(self):
-        if self._watcher is not None and not self._watcher.check_action("mission_start"):
-            QMessageBox.critical(self, "Tripwire Lockdown", "Mission start blocked because the Watcher detected a trust issue. Restore protected files or contact support.")
+        if self._watcher is not None and not self._watcher.check_action("mission_start", risk_level="safe"):
+            if self._watcher.is_locked_down():
+                QMessageBox.critical(
+                    self,
+                    "Tripwire Lockdown",
+                    "Mission start blocked by security tripwire.\n\n"
+                    "Restore protected files or contact support.",
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Watcher Stabilization Notice",
+                    "Watcher detected a local test-build trust issue.\n\n"
+                    "Safe missions are allowed, but risky actions are paused until trust is restored.",
+                )
             self._audit_event("mission_start_blocked", msg="Tripwire blocked mission start")
             return
 
@@ -1413,9 +1426,13 @@ class VisibilityWindow(QMainWindow):
             self._set_presence(PresenceState.IDLE, f"Backend ready ({status.get('backend')})")
 
     def _show_backend_config(self):
-        if self._watcher is not None and not self._watcher.check_action("backend_config_change"):
-            self._thought_pane.append("[SYSTEM] Backend configuration change blocked by Watcher tripwire.")
-            self._audit_event("backend_config_blocked", msg="Tripwire blocked backend configuration change")
+        if self._watcher is not None and not self._watcher.check_action("backend_config_change", risk_level="risky"):
+            if self._watcher.is_locked_down():
+                msg = "[SYSTEM] Backend configuration change blocked by security tripwire. Restore protected files or contact support."
+            else:
+                msg = "[SYSTEM] Watcher detected a local test-build trust issue. Backend configuration changes are paused until trust is restored."
+            self._thought_pane.append(msg)
+            self._audit_event("backend_config_blocked", msg=msg)
             return
         dlg = BackendConfigDialog(self._settings, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:

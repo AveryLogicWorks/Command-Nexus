@@ -114,8 +114,8 @@ class WatcherEngine(QObject):
         self._trust_status = self._core.is_trusted()
         self.mode_changed.emit(canonical)
 
-    def check_action(self, action_name: str, target: str = "") -> bool:
-        return self._core.check_action(action_name, target)
+    def check_action(self, action_name: str, target: str = "", risk_level: str = "risky") -> bool:
+        return self._core.check_action(action_name, target, risk_level=risk_level)
 
     def is_locked_down(self) -> bool:
         return self._core.is_locked_down()
