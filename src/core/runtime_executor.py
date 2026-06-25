@@ -11,7 +11,7 @@ import webbrowser
 from typing import Any
 
 from .settings_manager import SettingsManager
-from .backend_manager import BackendManager
+from .backend_manager import BackendManager, BackendResponse
 
 
 class RuntimeStatus(str, Enum):
@@ -98,20 +98,41 @@ class LocalRuntimeExecutor:
             )
 
         prompt = self._build_prompt(task, ai_name, ai_metadata, kind)
-        model_text = self._call_model(prompt)
+        response = self._call_model(prompt)
 
-        if model_text:
+        if response.error:
+            provider_name = response.display_name or response.provider_id or "selected backend"
+            return RuntimeResult(
+                RuntimeStatus.FAILED,
+                f"{ai_name}'s backend is offline",
+                base_thought + [
+                    f"[{ai_name}] AI exists and capability routing worked.",
+                    f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
+                    f"[{ai_name}] Error: {response.error}",
+                ],
+                [f"[{ai_name}] Task did not complete because the model backend could not be reached."],
+                [
+                    "Next: start the selected backend, choose a different backend, or configure Backend settings.",
+                    "Backend config is in the Visibility Window: Backend > Configure Backend.",
+                ],
+                f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+                f"Provider: {provider_name}\n"
+                f"Error: {response.error}\n\n"
+                "Start the selected backend, choose a different backend, or configure Backend settings.",
+            )
+
+        if response.text:
             return RuntimeResult(
                 RuntimeStatus.COMPLETED,
                 "Model response completed",
                 base_thought + [f"[{ai_name}] A real model backend returned output."],
                 [f"[{ai_name}] Generated response using connected runtime backend."],
                 ["Next: review result. Approve any real outward action separately."],
-                model_text,
+                response.text,
             )
 
         return RuntimeResult(
-            RuntimeStatus.PAUSED,
+            RuntimeStatus.FAILED,
             "No model backend connected",
             base_thought + [
                 f"[{ai_name}] No Ollama/OpenAI model backend answered.",
@@ -125,7 +146,8 @@ class LocalRuntimeExecutor:
                 "Next: connect Ollama or OpenAI.",
                 "Then retry the mission.",
             ],
-            "Command Nexus routed the task, but no actual model executor is connected. Task paused instead of fake-completed.",
+            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
         )
 
     def _classify(self, text: str) -> str:
@@ -173,9 +195,30 @@ class LocalRuntimeExecutor:
                 f"Return a concise research answer and include the source list."
             )
 
-            model_text = self._call_model(prompt)
+            response = self._call_model(prompt)
 
-            if model_text:
+            if response.error:
+                provider_name = response.display_name or response.provider_id or "selected backend"
+                return RuntimeResult(
+                    RuntimeStatus.FAILED,
+                    f"{ai_name}'s backend is offline",
+                    base_thought + [
+                        f"[{ai_name}] AI exists and search sources were collected.",
+                        f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
+                        f"[{ai_name}] Error: {response.error}",
+                    ],
+                    [f"[{ai_name}] Task did not complete because the model backend could not be reached."],
+                    [
+                        "Next: start the selected backend, choose a different backend, or configure Backend settings.",
+                        "Backend config is in the Visibility Window: Backend > Configure Backend.",
+                    ],
+                    f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+                    f"Provider: {provider_name}\n"
+                    f"Error: {response.error}\n\n"
+                    "Start the selected backend, choose a different backend, or configure Backend settings.",
+                )
+
+            if response.text:
                 return RuntimeResult(
                     RuntimeStatus.COMPLETED,
                     "Research completed with source candidates",
@@ -185,7 +228,7 @@ class LocalRuntimeExecutor:
                     ],
                     [f"[{ai_name}] Collected {len(sources[:8])} source candidates."],
                     ["Next: user reviews source quality before relying on the result."],
-                    model_text + "\n\nCollected sources:\n" + source_text,
+                    response.text + "\n\nCollected sources:\n" + source_text,
                 )
 
             return RuntimeResult(
@@ -244,7 +287,7 @@ class LocalRuntimeExecutor:
             f"Answer usefully. Do not claim you performed external actions unless a tool actually performed them."
         )
 
-    def _call_model(self, prompt: str) -> str:
+    def _call_model(self, prompt: str) -> BackendResponse:
         """Route the model call through the BackendManager trust boundary."""
         return self._backend.call_model(prompt)
 

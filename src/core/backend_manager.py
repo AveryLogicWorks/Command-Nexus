@@ -145,6 +145,29 @@ class BackendPolicyError(Exception):
     pass
 
 
+@dataclass
+class BackendResponse:
+    """
+    Result of a model backend call.
+
+    Either `text` contains a sanitized model response, or `error` contains a
+    safe, redacted reason the backend could not answer. A response is truthy
+    only when it has text and no error.
+    """
+    text: str = ""
+    error: str = ""
+    provider_id: str = ""
+    display_name: str = ""
+
+    def __bool__(self) -> bool:
+        return bool(self.text) and not self.error
+
+    def to_display(self) -> str:
+        if self.error:
+            return f"[{self.display_name or self.provider_id or 'Backend'} error: {self.error}]"
+        return self.text
+
+
 class BackendManager:
     """
     Central backend trust boundary.
@@ -357,10 +380,10 @@ class BackendManager:
     # ------------------------------------------------------------------
     # Model calling (untrusted boundary)
     # ------------------------------------------------------------------
-    def call_model(self, prompt: str, model: str | None = None) -> str:
+    def call_model(self, prompt: str, model: str | None = None) -> BackendResponse:
         """
         Call the active backend with the configured timeout.
-        Returns the sanitized text, or an empty string on safe failure.
+        Returns a BackendResponse: either sanitized text or a safe failure reason.
         """
         provider = self.get_active_provider()
         self._validate_provider(provider)
@@ -374,9 +397,17 @@ class BackendManager:
             else:
                 text = self._call_ollama_compatible(provider, prompt, model)
         except Exception as e:
-            return f"[Backend error: {self.redact(str(e))}]"
+            return BackendResponse(
+                error=f"{provider.display_name} unreachable: {self.redact(str(e))}",
+                provider_id=provider.provider_id,
+                display_name=provider.display_name,
+            )
 
-        return self._validate_model_output(text)
+        return BackendResponse(
+            text=self._validate_model_output(text),
+            provider_id=provider.provider_id,
+            display_name=provider.display_name,
+        )
 
     def _call_ollama_compatible(self, provider: ModelProvider, prompt: str, model: str | None = None) -> str:
         payload = {

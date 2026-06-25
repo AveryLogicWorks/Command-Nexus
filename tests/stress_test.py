@@ -92,6 +92,29 @@ def test_runtime_intents_and_learning():
         s.update(memory_path=str(tmp / "memory"))
 
         runtime = NexusAIRuntime(s)
+
+        # Simulate a backend that is offline to prove the runtime does NOT fake completion.
+        r_fail = runtime.run("hello", "Lily", str(uuid.uuid4()), {
+            "uuid": str(uuid.uuid4()),
+            "use_case": "Individual",
+            "abilities": ["Chatbot"],
+            "libraries": [],
+            "guardrails": [],
+        })
+        assert r_fail.status == RuntimeStatus.FAILED, f"Expected FAILED when backend offline, got {r_fail.status}: {r_fail.title}"
+        assert "offline" in (r_fail.result_text or "").lower() or "unavailable" in (r_fail.result_text or "").lower()
+        assert "completed" not in (r_fail.result_text or "").lower()
+
+        # Now wire a mocked backend that returns real-looking text so the success path is also tested.
+        from src.core.backend_manager import BackendResponse
+        def fake_call_model(prompt, model=None):
+            return BackendResponse(
+                text="Mock model response for: " + prompt[:80],
+                provider_id="mock",
+                display_name="Mock Backend",
+            )
+        runtime._backend.call_model = fake_call_model
+
         ai = str(uuid.uuid4())
         meta = {
             "uuid": ai,
@@ -117,9 +140,9 @@ def test_runtime_intents_and_learning():
         r4 = runtime.run("Plan a project to build a website", "TestAI", ai, meta)
         assert r4.status == RuntimeStatus.COMPLETED
 
-        # Preference extraction even when capability gate pauses
+        # Preference extraction with a working backend should complete
         r5 = runtime.run("I prefer short answers. What is Rust?", "TestAI", ai, meta)
-        assert r5.status in (RuntimeStatus.COMPLETED, RuntimeStatus.PAUSED)
+        assert r5.status == RuntimeStatus.COMPLETED
 
         # All completed/paused missions should have produced memories
         memories = runtime._memory.get_for_ai(ai)

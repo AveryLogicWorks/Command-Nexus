@@ -18,7 +18,7 @@ from .adaptive_memory import AdaptiveMemoryStore
 from .tool_executor import ToolExecutor, ToolResult
 from .model_registry import ModelRegistry
 from .capability_registry import canonical_intent, capability_status, is_paused, ImplementationStatus
-from .backend_manager import BackendManager
+from .backend_manager import BackendManager, BackendResponse
 
 
 _BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
@@ -229,8 +229,8 @@ class NexusAIRuntime:
         )
 
         model_response = self._call_model(prompt)
-        if model_response:
-            suggestions = [line.strip("-• ").strip() for line in model_response.splitlines() if line.strip()]
+        if model_response.text and not model_response.error:
+            suggestions = [line.strip("-• ").strip() for line in model_response.text.splitlines() if line.strip()]
             return [s for s in suggestions if s][:5]
 
         # Offline heuristic fallback.
@@ -462,18 +462,43 @@ class NexusAIRuntime:
             total += len(entry)
         return "\n".join(lines)
 
+    def _backend_failure_result(self, ai_name: str, thought: list[str], backend_response: BackendResponse) -> RuntimeResult:
+        """Honest FAILED result when the model backend is offline, unreachable, or unconfigured."""
+        provider_name = backend_response.display_name or backend_response.provider_id or "selected backend"
+        return RuntimeResult(
+            RuntimeStatus.FAILED,
+            f"{ai_name}'s backend is offline",
+            thought + [
+                f"[{ai_name}] AI exists and capability routing worked.",
+                f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
+                f"[{ai_name}] Error: {backend_response.error}",
+            ],
+            [f"[{ai_name}] Task did not complete because the model backend could not be reached."],
+            [
+                "Next: start the selected backend, choose a different backend, or configure Backend settings.",
+                "Backend config is in the Visibility Window: Backend > Configure Backend.",
+            ],
+            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            f"Provider: {provider_name}\n"
+            f"Error: {backend_response.error}\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
+        )
+
     def _run_chat(self, task, ai_name, meta, knowledge, thought):
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "chat"))
-        if model:
-            return RuntimeResult(RuntimeStatus.COMPLETED, "Chat completed", thought + [f"[{ai_name}] Model backend answered using Knowledge/Intelligence context."], [f"[{ai_name}] Returned chat response."], ["Next: continue conversation or approve outward action."], model)
+        if model.error:
+            return self._backend_failure_result(ai_name, thought, model)
+        if model.text:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Chat completed", thought + [f"[{ai_name}] Model backend answered using Knowledge/Intelligence context."], [f"[{ai_name}] Returned chat response."], ["Next: continue conversation or approve outward action."], model.text)
 
         return RuntimeResult(
-            RuntimeStatus.COMPLETED,
-            "Local chat fallback completed",
-            thought + [f"[{ai_name}] No model backend connected; using governed local fallback."],
-            [f"[{ai_name}] Produced basic local response from task and Knowledge metadata."],
-            ["Next: connect Ollama/OpenAI for full AI answers."],
-            f"{ai_name} received: {task}\n\nKnowledge connected: {'yes' if knowledge else 'no'}\n\nLocal fallback: I can clarify, plan, draft, code-triage, or research-gate this. Connect Ollama or OPENAI_API_KEY for full model reasoning.",
+            RuntimeStatus.FAILED,
+            "No model backend connected",
+            thought + [f"[{ai_name}] No model backend connected; cannot produce a real response."],
+            [f"[{ai_name}] Task did not complete because no backend answered."],
+            ["Next: connect Ollama/OpenAI or configure Backend settings."],
+            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
         )
 
     def _run_research(self, task, ai_name, meta, knowledge, thought):
@@ -490,14 +515,16 @@ class NexusAIRuntime:
                     ai_name, meta, knowledge, "research"
                 )
             )
-            if model:
+            if model.error:
+                return self._backend_failure_result(ai_name, thought, model)
+            if model.text:
                 return RuntimeResult(
                     RuntimeStatus.COMPLETED,
                     "Research completed with source candidates",
                     thought + [f"[{ai_name}] Search backend returned source candidates.", f"[{ai_name}] Model summarized sources."],
                     [f"[{ai_name}] Collected {len(sources[:8])} source candidates."],
                     ["Next: user reviews source quality."],
-                    model + "\n\nCollected sources:\n" + source_text,
+                    model.text + "\n\nCollected sources:\n" + source_text,
                 )
             return RuntimeResult(
                 RuntimeStatus.PAUSED,
@@ -522,35 +549,37 @@ class NexusAIRuntime:
 
     def _run_coder(self, task, ai_name, meta, knowledge, thought):
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "coding"))
-        if model:
-            return RuntimeResult(RuntimeStatus.COMPLETED, "Coder completed", thought + [f"[{ai_name}] Model backend produced coding output using Knowledge context."], [f"[{ai_name}] Returned code analysis/draft."], ["Next: review before applying changes."], model)
+        if model.error:
+            return self._backend_failure_result(ai_name, thought, model)
+        if model.text:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Coder completed", thought + [f"[{ai_name}] Model backend produced coding output using Knowledge context."], [f"[{ai_name}] Returned code analysis/draft."], ["Next: review before applying changes."], model.text)
 
-        result = (
-            "Local Coder fallback:\n"
-            "1. I can analyze pasted code or error text.\n"
-            "2. I can draft a patch plan.\n"
-            "3. I will not edit files or run commands without approval.\n\n"
-            f"Task received:\n{task}\n\n"
-            "Suggested next action: paste the exact error/log or file path and ask for a patch."
+        return RuntimeResult(
+            RuntimeStatus.FAILED,
+            "No model backend connected",
+            thought + [f"[{ai_name}] No model backend connected; cannot produce a real code response."],
+            [f"[{ai_name}] Task did not complete because no backend answered."],
+            ["Next: connect Ollama/OpenAI or configure Backend settings."],
+            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Coder local fallback completed", thought + [f"[{ai_name}] No model backend; using safe code fallback."], [f"[{ai_name}] Produced code-task triage."], ["Next: provide file/error for deeper patch."], result)
 
     def _run_writer(self, task, ai_name, meta, knowledge, thought):
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "writing"))
-        if model:
-            return RuntimeResult(RuntimeStatus.COMPLETED, "Writer completed", thought + [f"[{ai_name}] Model backend produced writing output using Knowledge context."], [f"[{ai_name}] Returned draft/rewrite."], ["Next: revise tone or export after approval."], model)
+        if model.error:
+            return self._backend_failure_result(ai_name, thought, model)
+        if model.text:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Writer completed", thought + [f"[{ai_name}] Model backend produced writing output using Knowledge context."], [f"[{ai_name}] Returned draft/rewrite."], ["Next: revise tone or export after approval."], model.text)
 
-        result = (
-            "Local Writing fallback:\n"
-            f"Working title: {task[:80]}\n\n"
-            "Outline:\n"
-            "1. Purpose / main idea\n"
-            "2. Key points\n"
-            "3. Draft body\n"
-            "4. Closing / call to action\n\n"
-            "Connect Ollama/OpenAI for full prose generation."
+        return RuntimeResult(
+            RuntimeStatus.FAILED,
+            "No model backend connected",
+            thought + [f"[{ai_name}] No model backend connected; cannot produce a real writing response."],
+            [f"[{ai_name}] Task did not complete because no backend answered."],
+            ["Next: connect Ollama/OpenAI or configure Backend settings."],
+            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Writer local fallback completed", thought + [f"[{ai_name}] No model backend; produced writing scaffold."], [f"[{ai_name}] Built outline scaffold."], ["Next: connect model for full draft."], result)
 
     def _run_planner(self, task, ai_name, meta, knowledge, thought):
         result = (
@@ -833,15 +862,16 @@ class NexusAIRuntime:
             "Do not claim external actions were performed unless a tool actually performed them."
         )
 
-    def _call_model(self, prompt: str, model: str | None = None) -> str:
+    def _call_model(self, prompt: str, model: str | None = None) -> BackendResponse:
         """Route the model call through the BackendManager trust boundary."""
         cache_key = f"{model or self._backend.get_active_provider().model}:{hash(prompt) & 0xFFFFFFFF}"
         if cache_key in self._response_cache:
-            return self._response_cache[cache_key]
+            cached = self._response_cache[cache_key]
+            return BackendResponse(text=cached)
 
         out = self._backend.call_model(prompt, model=model)
-        if out:
-            self._response_cache[cache_key] = out
+        if out.text and not out.error:
+            self._response_cache[cache_key] = out.text
         return out
 
     def _brave_search(self, query: str) -> list[dict[str, str]]:

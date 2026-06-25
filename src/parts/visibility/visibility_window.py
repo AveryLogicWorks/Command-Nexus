@@ -1872,6 +1872,19 @@ class BackendConfigDialog(QDialog):
         layout.addWidget(self._trust_label)
         self._provider_combo.currentIndexChanged.connect(self._update_trust_label)
 
+        # Current endpoint / status summary
+        self._endpoint_label = QLabel(f"Endpoint: {active.endpoint}")
+        self._endpoint_label.setStyleSheet("color: #8b949e; font-size: 12px;")
+        self._endpoint_label.setWordWrap(True)
+        layout.addWidget(self._endpoint_label)
+
+        self._provider_combo.currentIndexChanged.connect(self._update_endpoint_label)
+
+        self._health_status = QLabel("Status: unknown — click TEST CONNECTION")
+        self._health_status.setStyleSheet("color: #ffab70; font-size: 12px; font-weight: bold;")
+        self._health_status.setWordWrap(True)
+        layout.addWidget(self._health_status)
+
         # Legacy Ollama/OpenAI fields (still editable for convenience)
         url_row = QHBoxLayout()
         url_row.addWidget(QLabel("Ollama URL:"))
@@ -1978,6 +1991,12 @@ class BackendConfigDialog(QDialog):
                 f"{'local-only' if provider.kind.value == 'local' else 'remote cloud'}"
             )
 
+    def _update_endpoint_label(self):
+        pid = self._provider_combo.currentData()
+        provider = self._backend.list_providers().get(pid)
+        if provider:
+            self._endpoint_label.setText(f"Endpoint: {provider.endpoint}")
+
     def _on_save(self):
         # Apply legacy fields first so the provider definitions stay in sync.
         self._settings.update(
@@ -2010,10 +2029,25 @@ class BackendConfigDialog(QDialog):
             self._backend.set_active_provider(pid)
         except BackendPolicyError as e:
             self._status.setText(f"Policy error: {e}")
+            self._health_status.setText("Status: policy error — check endpoint/localhost rules")
+            self._health_status.setStyleSheet("color: #f85149; font-size: 12px; font-weight: bold;")
             return
+        provider = self._backend.get_active_provider()
         result = self._backend.health_check()
         safe_message = self._backend.redact(result.get("message", ""))
         self._status.setText(f"[{result['provider_id']}] {safe_message}")
+        if result.get("reachable"):
+            self._health_status.setText(
+                f"Status: ONLINE — {provider.display_name} / model: {provider.model}"
+            )
+            self._health_status.setStyleSheet("color: #3fb950; font-size: 12px; font-weight: bold;")
+        else:
+            self._health_status.setText(
+                f"Status: OFFLINE — {provider.display_name} / model: {provider.model}\n"
+                f"{safe_message}\n"
+                "Start the backend, check the endpoint, or select a different provider."
+            )
+            self._health_status.setStyleSheet("color: #f85149; font-size: 12px; font-weight: bold;")
 
     def _on_add_custom(self):
         if not self._advanced_check.isChecked():

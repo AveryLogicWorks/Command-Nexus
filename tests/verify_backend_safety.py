@@ -192,7 +192,7 @@ def test_backend_timeout_does_not_freeze():
         out = bm.call_model("hello")
         elapsed = __import__("time").time() - start
         assert elapsed < 5, f"Timeout not respected: {elapsed:.1f}s"
-        assert out == "" or "error" in out.lower()
+        assert not out or out.error or "error" in out.error.lower()
 
         server.shutdown()
         print("[PASS] Backend timeout prevents UI freeze")
