@@ -478,6 +478,38 @@ def test_local_stabilization_auto_accepts_baseline():
     print("[PASS] Local STABILIZATION build auto-accepts current baseline")
 
 
+def test_safe_no_tool_mission_runs_in_stabilization_degraded():
+    """The exact safe mission described in the visual test must complete in STABILIZATION DEGRADED."""
+    tmp = make_temp_workspace()
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        audit = AuditLogger(s)
+        watcher = TripwireManager(mode=WatcherMode.STABILIZATION, audit_logger=audit)
+        _force_stabilization_degraded(watcher)
+        assert watcher.get_trust() == WatcherTrust.DEGRADED
+
+        runtime = NexusAIRuntime(s, watcher=watcher)
+        task = "Visual launch test. Confirm that Command Nexus is running, describe the active AI status, and do not use tools."
+        ai_name = "TestAI"
+        ai_uuid = "ai-test-001"
+        meta = {
+            "uuid": ai_uuid,
+            "use_case": "Individual",
+            "abilities": ["Chatbot"],
+            "libraries": [],
+            "guardrails": [],
+        }
+        result = runtime.run(task, ai_name, ai_uuid, meta)
+        assert result.status != RuntimeStatus.PAUSED, f"Safe mission was paused: {result.title}"
+        assert "tripwire" not in result.title.lower() and "lockdown" not in result.title.lower(), f"Unexpected tripwire result: {result.title}"
+        assert result.title, "Mission should have produced a title"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Safe no-tool mission completes in STABILIZATION DEGRADED")
+
+
 def main() -> int:
     tests = [
         test_dev_mode_does_not_punish_source_edit,
@@ -498,6 +530,7 @@ def main() -> int:
         test_release_breach_blocks_mission_start,
         test_customer_lockdown_message_not_shown_for_local_stabilization,
         test_local_stabilization_auto_accepts_baseline,
+        test_safe_no_tool_mission_runs_in_stabilization_degraded,
     ]
     passed = []
     failed = []
