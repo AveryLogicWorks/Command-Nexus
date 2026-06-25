@@ -70,28 +70,9 @@ class CommandNexusApp:
         except Exception as e:
             QMessageBox.critical(None, "Initialization Error", f"Failed to initialize license manager: {e}")
             sys.exit(1)
-        
-        if not self._license.is_activated:
-            try:
-                dlg = LicenseActivationDialog(watcher=self._watcher)
-                dlg.exec()
-            except Exception as e:
-                QMessageBox.critical(None, "License Error", f"License dialog failed: {e}")
-                sys.exit(1)
-            if not self._license.is_activated and not dlg.demo_mode:
-                # User closed dialog without activating or selecting demo
-                sys.exit(0)
-            # Audit log the startup mode
-            try:
-                if dlg.demo_mode:
-                    self._audit.log(tool="CommandNexusApp", action="DEMO_MODE_STARTUP", target="User started in demo mode (no license)", approved=True, status="info")
-                elif self._license.is_activated:
-                    self._audit.log(tool="CommandNexusApp", action="LICENSE_ACTIVATED_STARTUP", target=f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}", approved=True, status="info")
-            except Exception as e:
-                # Non-fatal: just log to console
-                print(f"Warning: Failed to log startup mode: {e}")
 
         # ── Watcher / Anti-Tamper Tripwire ───────────────────────────────
+        # Initialize the Watcher before any protected UI (license dialog).
         # Release/customer builds auto-start the Watcher armed. Source builds
         # default to DEV mode so normal development does not trip anything.
         try:
@@ -122,6 +103,26 @@ class CommandNexusApp:
             QMessageBox.critical(None, "Security Error", f"Watcher/tripwire initialization failed: {e}")
             sys.exit(1)
         # ──────────────────────────────────────────────────────────────────
+
+        if not self._license.is_activated:
+            try:
+                dlg = LicenseActivationDialog(watcher=self._watcher)
+                dlg.exec()
+            except Exception as e:
+                QMessageBox.critical(None, "License Error", f"License dialog failed: {e}")
+                sys.exit(1)
+            if not self._license.is_activated and not dlg.demo_mode:
+                # User closed dialog without activating or selecting demo
+                sys.exit(0)
+            # Audit log the startup mode
+            try:
+                if dlg.demo_mode:
+                    self._audit.log(tool="CommandNexusApp", action="DEMO_MODE_STARTUP", target="User started in demo mode (no license)", approved=True, status="info")
+                elif self._license.is_activated:
+                    self._audit.log(tool="CommandNexusApp", action="LICENSE_ACTIVATED_STARTUP", target=f"Tier: {self._license.get_tier_label()}, Days: {self._license.get_days_remaining()}", approved=True, status="info")
+            except Exception as e:
+                # Non-fatal: just log to console
+                print(f"Warning: Failed to log startup mode: {e}")
 
         try:
             self._server = LocalCommandServer(self._settings)

@@ -333,39 +333,43 @@ class TestLicenseGenerator:
     
     @staticmethod
     def generate_test_key(tier: str = "TRIAL", days: int = 30) -> str:
-        """Generate a test license key for the specified tier."""
+        """Generate a test license key for the specified tier.
+
+        Uses the same signing secret as LicenseManager so the displayed keys
+        actually work when entered in the license dialog. Test keys only appear
+        in test/tour mode and are never shipped in public builds.
+        """
         import hashlib
         import hmac
         import random
         import time
-        
-        # Test secret (different from production)
-        TEST_SECRET = b"TEST_NEXUS_KEY_GENERATOR_2026_DO_NOT_USE_IN_PRODUCTION"
-        
+
+        from ...core.license_manager import LicenseManager
+
         tier_codes = {
             "TRIAL": "TR",
-            "STARTER": "ST", 
+            "STARTER": "ST",
             "PRO": "PR",
             "BUSINESS": "BU",
             "UNLIMITED": "UN",
         }
-        
+
         tier_code = tier_codes.get(tier.upper(), "TR")
         expiry = int(time.time()) + (days * 86400)
         expiry_hex = f"{expiry:010X}"
         random_part = f"{random.randint(0, 0xFFFFFFFF):08X}"
-        
+
         payload = f"{tier_code}{expiry_hex}{random_part}"
         hmac_value = hmac.new(
-            TEST_SECRET,
+            LicenseManager._SECRET_KEY,
             payload.encode(),
             hashlib.sha256
         ).hexdigest()[:16].upper()
-        
+
         key = f"{tier_code}{expiry_hex}{random_part}{hmac_value}"
-        
-        # Format with dashes for readability
-        formatted = "-".join([key[i:i+4] for i in range(0, 40, 4)])
+
+        # Format with dashes for readability (36 raw chars -> 44 formatted chars)
+        formatted = "-".join([key[i:i + 4] for i in range(0, len(key), 4)])
         return formatted
     
     @staticmethod

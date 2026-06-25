@@ -946,7 +946,13 @@ class VisibilityWindow(QMainWindow):
             self._set_presence(PresenceState.RUNNING_MISSION, "Mission running")
 
     def _on_redirect(self):
-        self._thought_pane.append("[SYSTEM] Redirect requested. Awaiting user demonstration or new instruction...")
+        self._thought_pane.append("[SYSTEM] Redirect is not yet available in this build.")
+        QMessageBox.information(
+            self,
+            "Redirect",
+            "Redirect is not yet available.\n\n"
+            "Use the mission input to send a new instruction to a running AI.",
+        )
 
     def _on_demonstrate(self):
         self._mode = "DEMO"
