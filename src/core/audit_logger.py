@@ -11,7 +11,6 @@ class AuditLogger:
 
     def __init__(self, settings: Optional[SettingsManager] = None):
         self._settings = settings or SettingsManager()
-        self._settings.initialize()
         audit_dir = self._settings.get_path("audit_path")
         self._log_file = Path(audit_dir) / "audit.log"
         self._log_file.parent.mkdir(parents=True, exist_ok=True)

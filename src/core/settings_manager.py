@@ -71,9 +71,16 @@ class SettingsManager:
 
     def initialize(self, config_path: str | None = None):
         if config_path:
-            self._config_file = Path(config_path)
-        else:
+            new_path = Path(config_path)
+            if self._config_file and self._config_file.resolve() == new_path.resolve() and self._settings is not None:
+                return
+            self._config_file = new_path
+        elif self._config_file is None:
             self._config_file = Path.home() / "CommandNexus" / "config.json"
+        else:
+            # Already initialized with a config file; do not reload and clobber
+            # caller-configured in-memory settings.
+            return
         self._config_file.parent.mkdir(parents=True, exist_ok=True)
         self._load()
 

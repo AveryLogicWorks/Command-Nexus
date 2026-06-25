@@ -589,7 +589,12 @@ class VisibilityWindow(QMainWindow):
         self._approval = approval or ApprovalGate()
         self._settings = SettingsManager()
         self._settings.initialize()
-        self._nexus_ai_runtime = NexusAIRuntime(self._settings)
+        self._nexus_ai_runtime = NexusAIRuntime(
+            self._settings,
+            approval_gate=self._approval,
+            audit_logger=self._audit,
+            parent_widget=self,
+        )
         self._runtime_executor = LocalRuntimeExecutor(self._settings)
         self._mode = "IDLE"  # IDLE | DEMO | MISSION | PAUSED | ERROR
         self._resume_mode = None
@@ -1401,7 +1406,12 @@ class VisibilityWindow(QMainWindow):
         dlg = BackendConfigDialog(self._settings, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             # Recreate runtimes with updated settings so changes take effect immediately
-            self._nexus_ai_runtime = NexusAIRuntime(self._settings)
+            self._nexus_ai_runtime = NexusAIRuntime(
+                self._settings,
+                approval_gate=self._approval,
+                audit_logger=self._audit,
+                parent_widget=self,
+            )
             self._runtime_executor = LocalRuntimeExecutor(self._settings)
             self._thought_pane.append("[SYSTEM] AI backend configuration updated. New settings will be used for the next mission.")
             self._audit_event("backend_config_updated", msg="AI backend settings changed")

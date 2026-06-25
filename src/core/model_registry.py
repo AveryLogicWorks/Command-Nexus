@@ -29,7 +29,6 @@ class ModelRegistry:
 
     def __init__(self, settings: SettingsManager | None = None):
         self._settings = settings or SettingsManager()
-        self._settings.initialize()
         self._map: dict[str, str] = dict(self.DEFAULT_MAP)
         self._load()
 

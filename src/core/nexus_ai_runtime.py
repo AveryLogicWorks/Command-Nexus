@@ -104,7 +104,13 @@ class NexusAIRuntime:
     It must never fake-complete external, research, browser, file, or tool actions.
     """
 
-    def __init__(self, settings: SettingsManager | None = None):
+    def __init__(
+        self,
+        settings: SettingsManager | None = None,
+        approval_gate: Any | None = None,
+        audit_logger: Any | None = None,
+        parent_widget: Any | None = None,
+    ):
         self.home = Path.home() / ".command_nexus"
         self.notes_dir = self.home / "notes"
         self.archive_dir = self.home / "runtime_archive"
@@ -112,7 +118,6 @@ class NexusAIRuntime:
         self.archive_dir.mkdir(parents=True, exist_ok=True)
 
         self._settings = settings or SettingsManager()
-        self._settings.initialize()
         s = self._settings.get()
 
         self.ai_backend = (os.environ.get("COMMAND_NEXUS_AI_BACKEND") or s.ai_backend or "ollama").strip().lower()
@@ -128,6 +133,44 @@ class NexusAIRuntime:
         self._tools = ToolExecutor(self._settings)
         self._models = ModelRegistry(self._settings)
         self._response_cache: dict[str, str] = {}
+        self._approval_gate = approval_gate
+        self._audit_logger = audit_logger
+        self._parent_widget = parent_widget
+
+    def _request_tool_approval(self, action_type: str, description: str, targets: list[str], risk_level: Any) -> bool:
+        """Ask the human approval gate before executing a risky tool action."""
+        if self._approval_gate is None:
+            return True
+        try:
+            from .approval_gate import ActionRequest, RiskLevel
+            req = ActionRequest(
+                action_type=action_type,
+                description=description,
+                rationale="User-initiated local tool action classified by Nexus AI Runtime.",
+                targets=targets,
+                risk_level=risk_level,
+            )
+            return self._approval_gate.request_approval(self._parent_widget, req)
+        except Exception:
+            # If approval machinery fails, deny rather than execute blindly.
+            return False
+
+    def _log_tool_audit(self, *, tool: str, action: str, target: str, approved: bool, status: str, error: str | None = None):
+        """Write a tool action record to the audit logger if available."""
+        if self._audit_logger is None:
+            return
+        try:
+            self._audit_logger.log(
+                tool=tool,
+                action=action,
+                target=target,
+                agent="NexusAIRuntime",
+                approved=approved,
+                status=status,
+                error=error,
+            )
+        except Exception:
+            pass
 
     def save_memory(
         self,
@@ -637,23 +680,60 @@ class NexusAIRuntime:
         )
         return RuntimeResult(RuntimeStatus.COMPLETED, "Business workflow completed", thought + [f"[{ai_name}] Business workflow executed locally."], [f"[{ai_name}] Produced draft-safe workflow."], ["Next: review and approve outward actions."], result)
 
+    def _classify_tool_risk(self, action_type: str):
+        """Return RiskLevel for a tool action."""
+        from .approval_gate import RiskLevel
+        if action_type in ("execute", "shell"):
+            return RiskLevel.CRITICAL
+        if action_type in ("file_delete", "file_move"):
+            return RiskLevel.HIGH
+        if action_type in ("file_write", "file_overwrite"):
+            return RiskLevel.MEDIUM
+        return RiskLevel.LOW
+
     def _run_tool_user(self, task, ai_name, meta, knowledge, thought):
         """
         Fast, rule-based local tool execution.
 
         No model call is made here. We extract the action and target from the
-        user's text using simple heuristics, execute through ToolExecutor, and
-        report exactly what happened. This keeps the system usable on small local
-        models (7B/8B and below) and avoids loading larger models just to route
-        file commands.
+        user's text using simple heuristics, request approval for risky actions,
+        execute through ToolExecutor, and report exactly what happened. This keeps
+        the system usable on small local models (7B/8B and below) and avoids
+        loading larger models just to route file commands.
         """
         t = task.lower()
+        ai_uuid = str(meta.get("uuid", ""))
 
-        # Shell commands (high risk — kept inside workspace by default)
+        def _approve_or_pause(action_type: str, description: str, targets: list[str]):
+            risk = self._classify_tool_risk(action_type)
+            if not self._request_tool_approval(action_type, description, targets, risk):
+                self._log_tool_audit(
+                    tool="ToolExecutor", action=action_type, target=", ".join(targets),
+                    approved=False, status="denied",
+                )
+                return RuntimeResult(
+                    RuntimeStatus.PAUSED,
+                    "Approval denied",
+                    thought + [f"[{ai_name}] {action_type} blocked: approval denied."],
+                    [f"{description} — denied."],
+                    ["Next: approve the action or rephrase the request."],
+                    "",
+                ), None
+            return None, risk
+
+        # Shell commands (critical risk — kept inside workspace by default)
         if any(x in t for x in ["run command", "run shell", "execute ", "shell command", "terminal "]):
             cmd = re.sub(r"^(?:run|execute|shell|command|terminal)[:\s]*", "", task, flags=re.I).strip()
             if cmd:
+                pause, risk = _approve_or_pause("shell", f"Run shell command: {cmd}", [cmd])
+                if pause:
+                    return pause
+                self._log_tool_audit(tool="ToolExecutor", action="shell", target=cmd, approved=True, status="executing")
                 res = self._tools.run_shell(cmd)
+                status = "completed" if res.ok else "failed"
+                self._log_tool_audit(tool="ToolExecutor", action="shell", target=cmd, approved=True, status=status, error=res.error if not res.ok else None)
+                if res.ok:
+                    self._memory.add(ai_uuid, f"Executed shell command: {cmd}", tags=["shell", "tool"], source="tool", importance=0.6)
                 return RuntimeResult(
                     RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
                     res.action,
@@ -671,7 +751,15 @@ class NexusAIRuntime:
                 return RuntimeResult(RuntimeStatus.PAUSED, "No file path found", thought + [f"[{ai_name}] Could not determine which file to write."], ["Provide a file path or filename, e.g. 'write file notes.txt content: hello'"], [], "")
             if not content:
                 return RuntimeResult(RuntimeStatus.PAUSED, "No content found", thought + [f"[{ai_name}] Could not determine what content to write."], ["Provide content after 'content:' or in quotes."], [], "")
+            pause, _ = _approve_or_pause("file_write", f"Write file: {path}", [str(path)])
+            if pause:
+                return pause
+            self._log_tool_audit(tool="ToolExecutor", action="file_write", target=str(path), approved=True, status="executing")
             res = self._tools.write_file(path, content)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="file_write", target=str(path), approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Wrote file '{path}' with content starting: {content[:80]!r}", tags=["file_write", "tool"], source="tool", importance=0.6)
             return RuntimeResult(
                 RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
                 res.action,
@@ -686,7 +774,15 @@ class NexusAIRuntime:
             path = self._extract_path(task)
             if not path:
                 return RuntimeResult(RuntimeStatus.PAUSED, "No path found", thought + [f"[{ai_name}] Could not determine which file or folder to delete."], ["Provide a path, e.g. 'delete file old.txt'"], [], "")
+            pause, _ = _approve_or_pause("file_delete", f"Delete file/folder: {path}", [str(path)])
+            if pause:
+                return pause
+            self._log_tool_audit(tool="ToolExecutor", action="file_delete", target=str(path), approved=True, status="executing")
             res = self._tools.delete_file(path)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="file_delete", target=str(path), approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Deleted file/folder '{path}'", tags=["file_delete", "tool"], source="tool", importance=0.6)
             return RuntimeResult(
                 RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
                 res.action,
@@ -701,7 +797,16 @@ class NexusAIRuntime:
             paths = re.findall(r'["\']([^"\']+)["\']', task)
             if len(paths) < 2:
                 return RuntimeResult(RuntimeStatus.PAUSED, "Move needs two paths", thought + [f"[{ai_name}] Need source and destination paths."], ["Use quotes, e.g. 'move file \"a.txt\" to \"b.txt\"'"], [], "")
-            res = self._tools.move_file(paths[0], paths[1])
+            src, dst = paths[0], paths[1]
+            pause, _ = _approve_or_pause("file_move", f"Move file from {src} to {dst}", [src, dst])
+            if pause:
+                return pause
+            self._log_tool_audit(tool="ToolExecutor", action="file_move", target=f"{src} -> {dst}", approved=True, status="executing")
+            res = self._tools.move_file(src, dst)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="file_move", target=f"{src} -> {dst}", approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Moved file '{src}' to '{dst}'", tags=["file_move", "tool"], source="tool", importance=0.6)
             return RuntimeResult(
                 RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
                 res.action,
@@ -716,7 +821,12 @@ class NexusAIRuntime:
             path = self._extract_path(task)
             if not path:
                 return RuntimeResult(RuntimeStatus.PAUSED, "No file path found", thought + [f"[{ai_name}] Could not determine which file to read."], ["Provide a file path, e.g. 'read file notes.txt'"], [], "")
+            self._log_tool_audit(tool="ToolExecutor", action="file_read", target=str(path), approved=True, status="executing")
             res = self._tools.read_file(path)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="file_read", target=str(path), approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Read file '{path}'", tags=["file_read", "tool"], source="tool", importance=0.4)
             return RuntimeResult(
                 RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
                 res.action,
@@ -729,7 +839,12 @@ class NexusAIRuntime:
         # List directory
         if any(x in t for x in ["list directory", "list files", "list folder", "list dir", "show files", "dir "]):
             path = self._extract_path(task) or "."
+            self._log_tool_audit(tool="ToolExecutor", action="list_dir", target=str(path), approved=True, status="executing")
             res = self._tools.list_dir(path)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="list_dir", target=str(path), approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Listed directory '{path}'", tags=["list_dir", "tool"], source="tool", importance=0.4)
             return RuntimeResult(
                 RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
                 res.action,

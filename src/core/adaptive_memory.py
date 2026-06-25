@@ -60,7 +60,6 @@ class AdaptiveMemoryStore:
 
     def __init__(self, settings: SettingsManager | None = None):
         self._settings = settings or SettingsManager()
-        self._settings.initialize()
         s = self._settings.get()
         self._memory_dir = Path(s.memory_path)
         self._memory_dir.mkdir(parents=True, exist_ok=True)
