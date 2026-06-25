@@ -8,9 +8,16 @@ Builds two Windows executables:
 
 Run:  python build.py
 Output is written to ./dist.
+
+Public release packages:
+  python build.py --release
+This bundles a release_manifest.json with the protected-file hashes so the
+Watcher/Tripwire runs in armed RELEASE mode for customer packages.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -52,10 +59,72 @@ def clean_dist() -> None:
     dist.mkdir(parents=True, exist_ok=True)
 
 
-def build_main_app() -> None:
+# Protected files that match TripwireManager.PROTECTED_PATTERNS.
+PROTECTED_PATTERNS = (
+    "src/core/nexus_ai_runtime.py",
+    "src/core/tool_executor.py",
+    "src/core/runtime_executor.py",
+    "src/core/approval_gate.py",
+    "src/core/audit_logger.py",
+    "src/core/backend_manager.py",
+    "src/core/capability_registry.py",
+    "src/core/tripwire_manager.py",
+    "src/core/license_manager.py",
+    "src/core/settings_manager.py",
+    "src/core/watcher_service.py",
+    "src/core/watcher_engine.py",
+    "src/parts/visibility/visibility_window.py",
+    "src/parts/owner/owner_console.py",
+    "src/parts/watcher/watcher_window.py",
+    "src/parts/watcher/watcher_models.py",
+    "src/main.py",
+    "build.py",
+)
+
+
+def _hash_file(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except Exception:
+        return ""
+
+
+def generate_release_manifest() -> Path:
+    """Create a release manifest with the current protected-file hashes."""
+    manifest: dict[str, str] = {}
+    for pattern in PROTECTED_PATTERNS:
+        path = PROJECT_ROOT / pattern
+        if path.exists():
+            manifest[pattern] = _hash_file(path)
+    release_manifest = {
+        "command_nexus_release_build": True,
+        "release_channel": "public",
+        "manifest": manifest,
+    }
+    marker_path = PROJECT_ROOT / "release_manifest.json"
+    marker_path.write_text(json.dumps(release_manifest, indent=2, sort_keys=True), encoding="utf-8")
+    return marker_path
+
+
+def build_main_app(release: bool = False) -> None:
     main_script = PROJECT_ROOT / "src" / "main.py"
     if not main_script.exists():
         raise FileNotFoundError(main_script)
+
+    if release:
+        marker_path = generate_release_manifest()
+        print(f"[RELEASE] Generated {marker_path} with {len(json.loads(marker_path.read_text(encoding='utf-8'))['manifest'])} entries")
+    else:
+        # Reset to a non-release marker so local builds are not treated as public releases.
+        marker_path = PROJECT_ROOT / "release_manifest.json"
+        marker_path.write_text(
+            json.dumps(
+                {"command_nexus_release_build": False, "release_channel": "development", "manifest": {}},
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
 
     icon = PROJECT_ROOT / "assets" / "icon.ico"
     cmd = [
@@ -67,6 +136,7 @@ def build_main_app() -> None:
         "--workpath", str(PROJECT_ROOT / "build" / "main"),
         "--add-data", f"src{os.pathsep}src",
         "--add-data", f"assets{os.pathsep}assets",
+        "--add-data", f"release_manifest.json{os.pathsep}.",
         str(main_script),
     ]
     if icon.exists():
@@ -104,15 +174,20 @@ def copy_to_desktop() -> None:
 
 
 def main() -> int:
+    release = "--release" in sys.argv
     try:
         backup_existing_exes()
         clean_dist()
-        build_main_app()
+        build_main_app(release=release)
         build_keygen()
         copy_to_desktop()
         print("\nBuild complete. Output:")
         print(f"  {PROJECT_ROOT / 'dist' / 'CommandNexus.exe'}")
         print(f"  {PROJECT_ROOT / 'dist' / 'PowerKeys.exe'}")
+        if release:
+            print("  [RELEASE] Public release marker bundled.")
+        else:
+            print("  [LOCAL] Stabilization mode marker bundled.")
         return 0
     except Exception as e:
         print(f"Build failed: {e}", file=sys.stderr)

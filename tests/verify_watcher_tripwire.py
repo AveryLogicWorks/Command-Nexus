@@ -13,6 +13,7 @@ Tests:
 """
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import tempfile
@@ -216,6 +217,137 @@ def test_watcher_engine_startup_path():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _patch_frozen_state(frozen: bool, meipass: str | None):
+    """Temporarily patch sys.frozen/sys._MEIPASS for a single test."""
+    old_frozen = getattr(sys, "frozen", None)
+    old_meipass = getattr(sys, "_MEIPASS", None)
+    if frozen:
+        sys.frozen = True  # type: ignore[attr-defined]
+        sys._MEIPASS = meipass  # type: ignore[attr-defined]
+    else:
+        if hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+        if hasattr(sys, "_MEIPASS"):
+            delattr(sys, "_MEIPASS")
+    return old_frozen, old_meipass
+
+
+def _restore_frozen_state(old_frozen, old_meipass):
+    if old_frozen is None:
+        if hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+    else:
+        sys.frozen = old_frozen  # type: ignore[attr-defined]
+    if old_meipass is None:
+        if hasattr(sys, "_MEIPASS"):
+            delattr(sys, "_MEIPASS")
+    else:
+        sys._MEIPASS = old_meipass  # type: ignore[attr-defined]
+
+
+def test_source_dev_mode():
+    """Running from source must resolve to DEV mode."""
+    old_frozen, old_meipass = _patch_frozen_state(False, None)
+    try:
+        mode = TripwireManager.resolve_tripwire_mode()
+        assert mode == WatcherMode.DEV, f"Expected DEV, got {mode}"
+        assert not TripwireManager.is_public_release_build()
+    finally:
+        _restore_frozen_state(old_frozen, old_meipass)
+    print("[PASS] Source/dev run resolves to DEV mode")
+
+
+def test_local_dist_test_build_mode():
+    """A local rebuilt onefile EXE without a public release marker resolves to STABILIZATION."""
+    tmp = make_temp_workspace()
+    old_frozen, old_meipass = _patch_frozen_state(True, str(tmp))
+    try:
+        # Write a non-release marker into the fake MEIPASS.
+        (tmp / "release_manifest.json").write_text(
+            json.dumps({"command_nexus_release_build": False, "release_channel": "development"}),
+            encoding="utf-8",
+        )
+        mode = TripwireManager.resolve_tripwire_mode()
+        assert mode == WatcherMode.STABILIZATION, f"Expected STABILIZATION, got {mode}"
+        assert not TripwireManager.is_public_release_build()
+    finally:
+        _restore_frozen_state(old_frozen, old_meipass)
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Local dist/test build resolves to STABILIZATION mode")
+
+
+def test_public_release_marker_mode():
+    """A frozen build with a valid public release marker resolves to RELEASE."""
+    tmp = make_temp_workspace()
+    old_frozen, old_meipass = _patch_frozen_state(True, str(tmp))
+    try:
+        (tmp / "release_manifest.json").write_text(
+            json.dumps({"command_nexus_release_build": True, "release_channel": "public"}),
+            encoding="utf-8",
+        )
+        mode = TripwireManager.resolve_tripwire_mode()
+        assert mode == WatcherMode.RELEASE, f"Expected RELEASE, got {mode}"
+        assert TripwireManager.is_public_release_build()
+    finally:
+        _restore_frozen_state(old_frozen, old_meipass)
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Public release marker resolves to RELEASE mode")
+
+
+def test_local_dist_test_build_does_not_lockdown_on_startup():
+    """A local onefile EXE (STABILIZATION) must not lockdown on startup."""
+    tmp = make_temp_workspace()
+    old_frozen, old_meipass = _patch_frozen_state(True, str(tmp))
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        (tmp / "release_manifest.json").write_text(
+            json.dumps({"command_nexus_release_build": False, "release_channel": "development"}),
+            encoding="utf-8",
+        )
+        watcher = TripwireManager(audit_logger=AuditLogger(s))
+        assert watcher.get_mode() == WatcherMode.STABILIZATION
+        assert not watcher.is_locked_down(), "Local test build should not lockdown on startup"
+        assert watcher.get_mode() != WatcherMode.LOCKDOWN
+    finally:
+        _restore_frozen_state(old_frozen, old_meipass)
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Local dist/test build does not lockdown on startup")
+
+
+def test_public_release_marker_lockdown_if_tampered():
+    """A public release build (RELEASE) must still lockdown when protected files are tampered."""
+    tmp = make_temp_workspace()
+    old_frozen, old_meipass = _patch_frozen_state(True, str(tmp))
+    try:
+        s = SettingsManager()
+        s.initialize(config_path=str(tmp / "config.json"))
+        s.update(workspace_path=str(tmp))
+        (tmp / "release_manifest.json").write_text(
+            json.dumps({"command_nexus_release_build": True, "release_channel": "public"}),
+            encoding="utf-8",
+        )
+        watcher = TripwireManager(audit_logger=AuditLogger(s))
+        assert watcher.get_mode() == WatcherMode.RELEASE
+        assert watcher.is_trusted(), "Initial release state should be trusted"
+
+        protected = watcher._project_root / "src" / "core" / "nexus_ai_runtime.py"
+        if protected.exists():
+            original = protected.read_text(encoding="utf-8")
+            try:
+                protected.write_text(original + "\n# TAMPER_RELEASE", encoding="utf-8")
+                watcher._run_check()
+                assert watcher.is_locked_down(), "Public release build should lockdown after tamper"
+                assert watcher.get_mode() == WatcherMode.LOCKDOWN
+            finally:
+                protected.write_text(original, encoding="utf-8")
+    finally:
+        _restore_frozen_state(old_frozen, old_meipass)
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("[PASS] Public release marker build locks down when tampered")
+
+
 def main() -> int:
     tests = [
         test_dev_mode_does_not_punish_source_edit,
@@ -226,6 +358,11 @@ def main() -> int:
         test_audit_records_written,
         test_repair_from_baseline_verified,
         test_watcher_engine_startup_path,
+        test_source_dev_mode,
+        test_local_dist_test_build_mode,
+        test_public_release_marker_mode,
+        test_local_dist_test_build_does_not_lockdown_on_startup,
+        test_public_release_marker_lockdown_if_tampered,
     ]
     passed = []
     failed = []

@@ -105,11 +105,13 @@ class TripwireManager:
 
     def __init__(
         self,
-        mode: WatcherMode | str = WatcherMode.DEV,
+        mode: WatcherMode | str | None = None,
         license_manager: Any | None = None,
         audit_logger: Any | None = None,
         founder_mode: bool = False,
     ):
+        if mode is None:
+            mode = self.resolve_tripwire_mode()
         self._mode = mode if isinstance(mode, WatcherMode) else WatcherMode(str(mode).lower())
         self._lm = license_manager
         self._audit = audit_logger
@@ -236,6 +238,21 @@ class TripwireManager:
             return Path.home() / "CommandNexusWorkspace"
 
     def _load_or_build_manifest(self) -> None:
+        # For public release packages, trust the manifest that was generated at
+        # package time and bundled with the EXE.
+        if self._mode == WatcherMode.RELEASE:
+            marker = self._release_marker_path()
+            if marker.exists():
+                try:
+                    data = json.loads(marker.read_text(encoding="utf-8"))
+                    bundled = data.get("manifest")
+                    if isinstance(bundled, dict) and bundled:
+                        self._manifest = dict(bundled)
+                        self._audit_log("watcher_manifest_load", f"Loaded {len(self._manifest)} entries from release manifest")
+                        return
+                except Exception as e:
+                    self._audit_log("watcher_manifest_load_error", str(e))
+
         if self._manifest_path.exists():
             try:
                 self._manifest = json.loads(self._manifest_path.read_text(encoding="utf-8"))
@@ -285,7 +302,12 @@ class TripwireManager:
                 all_ok = False
                 self._record_event("protected_file_changed", pattern, "critical")
 
-        trust = WatcherTrust.TRUSTED if all_ok else WatcherTrust.BREACH
+        if all_ok:
+            trust = WatcherTrust.TRUSTED
+        elif self._mode == WatcherMode.STABILIZATION:
+            trust = WatcherTrust.DEGRADED
+        else:
+            trust = WatcherTrust.BREACH
         self._update_trust(trust)
 
     def _update_trust(self, trust: WatcherTrust) -> None:
@@ -293,6 +315,7 @@ class TripwireManager:
             trust = WatcherTrust.TRUSTED
         if trust == self._trust:
             return
+        old_trust = self._trust
         self._trust = trust
         self._state.trust = trust.value
         self._notify(trust)
@@ -301,8 +324,13 @@ class TripwireManager:
             self._audit_log("tripwire_fail", "Protected file integrity breach")
             if self._mode == WatcherMode.RELEASE:
                 self._enter_lockdown("protected file tampered in release mode")
+        elif trust == WatcherTrust.DEGRADED:
+            self._audit_log("tripwire_warn", "Protected file integrity degraded")
         elif trust == WatcherTrust.TRUSTED:
-            self._audit_log("tripwire_pass", "Protected files verified")
+            if old_trust in (WatcherTrust.BREACH, WatcherTrust.DEGRADED, WatcherTrust.UNKNOWN):
+                self._audit_log("tripwire_pass", "Protected files integrity restored")
+            else:
+                self._audit_log("tripwire_pass", "Protected files verified")
 
     def _notify(self, trust: WatcherTrust) -> None:
         for cb in self._callbacks:
@@ -383,7 +411,9 @@ class TripwireManager:
             return False
         if self._trust == WatcherTrust.DEGRADED:
             self._audit_log("tripwire_warn", action_name, f"trust=degraded: {target}")
-            return self._mode == WatcherMode.STABILIZATION
+            # In STABILIZATION, degraded trust pauses risky actions without
+            # entering full release lockdown.
+            return False
         self._audit_log("tripwire_pass", action_name, target)
         return True
 
@@ -407,12 +437,49 @@ class TripwireManager:
     # Build / release detection
     # ------------------------------------------------------------------
     @staticmethod
-    def is_release_build() -> bool:
-        return getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+    def _release_marker_path() -> Path:
+        """Return the path to the bundled release marker.
+
+        In a PyInstaller onefile build, the marker is extracted alongside the
+        bundled source tree in sys._MEIPASS. In source runs, the marker would
+        live in the project root, but public release mode is only meaningful for
+        frozen customer packages.
+        """
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            return Path(sys._MEIPASS) / "release_manifest.json"
+        return Path(__file__).resolve().parent.parent.parent / "release_manifest.json"
+
+    @classmethod
+    def is_public_release_build(cls) -> bool:
+        """Return True only for frozen customer packages with a valid release marker."""
+        if not (getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")):
+            return False
+        marker = cls._release_marker_path()
+        if not marker.exists():
+            return False
+        try:
+            data = json.loads(marker.read_text(encoding="utf-8"))
+            return bool(data.get("command_nexus_release_build") and data.get("release_channel") == "public")
+        except Exception:
+            return False
+
+    @classmethod
+    def resolve_tripwire_mode(cls) -> WatcherMode:
+        """Choose the appropriate mode for the current build environment.
+
+        Source / development run          -> DEV
+        Local rebuilt dist EXE (onefile)  -> STABILIZATION
+        Public release/customer package   -> RELEASE
+        """
+        if cls.is_public_release_build():
+            return WatcherMode.RELEASE
+        if getattr(sys, "frozen", False):
+            return WatcherMode.STABILIZATION
+        return WatcherMode.DEV
 
     @classmethod
     def recommended_mode(cls) -> WatcherMode:
-        return WatcherMode.RELEASE if cls.is_release_build() else WatcherMode.DEV
+        return cls.resolve_tripwire_mode()
 
     # ------------------------------------------------------------------
     # Legacy compatibility
