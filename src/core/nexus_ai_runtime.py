@@ -17,6 +17,7 @@ from .settings_manager import SettingsManager
 from .adaptive_memory import AdaptiveMemoryStore
 from .tool_executor import ToolExecutor, ToolResult
 from .model_registry import ModelRegistry
+from .capability_registry import canonical_intent, capability_status, is_paused, ImplementationStatus
 
 
 _BOOK_CIPHER_KEY = b"AVERY_LOGIC_WORKS_NEXUS_BOOK_2026"
@@ -37,56 +38,6 @@ class RuntimeResult:
     trajectory_lines: list[str] = field(default_factory=list)
     result_text: str = ""
     opened_url: str = ""
-
-
-CAPABILITY_ALIASES = {
-    "Chat Companion": "Chatbot",
-    "Chat": "Chatbot",
-    "Customer Support Agent": "Chatbot",
-    "Customer Support AI": "Chatbot",
-    "Email Sifter & Responder": "Chatbot",
-
-    "Research Assistant": "Research",
-    "Academic Researcher": "Research",
-    "Business Intelligence Analyst": "Research",
-
-    "Coding Assistant": "Coder",
-    "IT Operations Agent": "Coder",
-
-    "Creative Writer": "Creative Writing",
-    "Marketing Generator": "Creative Writing",
-
-    "Personal Organizer": "Notebook",
-    "Meeting Scribe": "Notebook",
-
-    "Task / Project Manager": "Planner",
-    "Strategic Planner": "Planner",
-    "Workflow Automator": "Planner",
-
-    "Document Processor": "Document Processor",
-
-    "Learning Tutor": "Tutor",
-    "Classroom Tutor": "Tutor",
-    "Assignment Grader": "Tutor",
-    "Lesson Planner": "Tutor",
-    "Language Coach": "Tutor",
-    "Accessibility Aide": "Tutor",
-
-    "Sales Assistant": "Business Workflow",
-    "Financial Analyst": "Business Workflow",
-    "HR Assistant": "Business Workflow",
-    "Compliance Auditor": "Business Workflow",
-    "Supply Chain Coordinator": "Business Workflow",
-    "Legal Document Reviewer": "Business Workflow",
-    "Multi-Department Orchestrator": "Business Workflow",
-    "Data Entry Agent": "Business Workflow",
-    "Content Moderator": "Business Workflow",
-
-    "Archive": "Archive",
-    "Memory": "Archive",
-    "Tool User": "Tool User",
-    "Agent": "Tool User",
-}
 
 
 class NexusAIRuntime:
@@ -405,19 +356,29 @@ class NexusAIRuntime:
             item = str(item).strip()
             if not item:
                 continue
-            out.add(item)
-            out.add(CAPABILITY_ALIASES.get(item, item))
+            out.add(canonical_intent(item))
         if not out:
             out.add("Chatbot")
         return out
 
     def _capability_allowed(self, intent: str, abilities: set[str]) -> bool:
+        # Chatbot is always allowed as the default fallback surface.
         if intent == "Chatbot":
             return True
+
+        # Honest pause for capabilities that are not wired in this build.
+        if is_paused(intent):
+            return False
+
+        # The AI must explicitly have the capability (or an alias that maps to it).
         if intent in abilities:
             return True
-        if intent == "Tool User" and any(x in abilities for x in {"Coder", "Research", "Planner", "Business Workflow"}):
+
+        # Tool User is a privileged capability: only AIs explicitly given Tool User
+        # (or Agent) may invoke the governed tool loop, not every nearby capability.
+        if intent == "Tool User" and "Tool User" in abilities:
             return True
+
         return False
 
     def _classify(self, task: str) -> str:

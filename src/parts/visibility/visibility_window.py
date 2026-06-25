@@ -678,11 +678,13 @@ class VisibilityWindow(QMainWindow):
         # Task assignment row
         task_row = QHBoxLayout()
         self._task_input = QLineEdit()
+        self._task_input.setObjectName("mission_input")
         self._task_input.setPlaceholderText("Enter mission / task description...")
         self._task_input.setStyleSheet("background-color: #0f172a; color: #e2e8f0; border: 1px solid #334155; padding: 6px; border-radius: 4px;")
         task_row.addWidget(self._task_input, stretch=1)
 
         self._btn_start = QPushButton("START")
+        self._btn_start.setObjectName("mission_start_button")
         self._btn_start.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold; min-width: 70px;")
         self._btn_start.clicked.connect(self._on_start_mission)
         task_row.addWidget(self._btn_start)

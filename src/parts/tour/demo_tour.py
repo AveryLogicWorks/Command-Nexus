@@ -13,7 +13,8 @@ from typing import Callable, Optional
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QEvent, QPoint, QRect
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QFrame, QGraphicsDropShadowEffect, QTextEdit
+    QLabel, QPushButton, QFrame, QGraphicsDropShadowEffect, QTextEdit,
+    QListWidget,
 )
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QPolygon, QScreen
 
@@ -385,69 +386,105 @@ class DemoTourController(QWidget):
         self._pending_click_target = None
         self._setup_steps()
     
+    def _find_forge_window(self) -> Optional[QMainWindow]:
+        """Find the open AI Forge window, if it exists."""
+        for w in QApplication.topLevelWidgets():
+            if isinstance(w, QMainWindow) and "Forge" in w.windowTitle():
+                return w
+        return None
+
+    def _find_forge_ai_list(self) -> Optional[QWidget]:
+        forge = self._find_forge_window()
+        if forge is None:
+            return None
+        return forge.findChild(QListWidget, "forge_ai_list")
+
+    def _find_forge_deploy_button(self) -> Optional[QWidget]:
+        forge = self._find_forge_window()
+        if forge is None:
+            return None
+        return forge.findChild(QPushButton, "forge_deploy_button")
+
     def _setup_steps(self):
-        """Define the demo tour steps."""
+        """Define the interactive demo tour steps using real, clickable widgets."""
         self._steps = [
             DemoTourStep(
                 title="👋 Welcome to Command Nexus",
-                instruction="This demo will show you how to create and use AI assistants.",
-                detail_html="""<p>By the end of this demo, you'll know how to:</p>
+                instruction="This tour will show you how to build and deploy an AI assistant.",
+                detail_html="""<p>By the end of this tour, you'll know how to:</p>
                 <ul>
-                    <li>🧠 <b>Create</b> AI assistants in the Forge</li>
-                    <li>⚡ <b>Customize</b> their capabilities</li>
-                    <li>💬 <b>Chat</b> with your AIs</li>
-                    <li>📚 <b>Manage</b> AI memory</li>
+                    <li>🧠 <b>Open</b> the AI Forge</li>
+                    <li>⚡ <b>Select</b> an AI and deploy it</li>
+                    <li>🎯 <b>Give</b> your AI a mission</li>
                 </ul>
-                <p><b>This is a demo - nothing you do will be saved!</b></p>""",
+                <p><b>Clickable targets are highlighted.</b> The tour waits for you to click them.</p>
+                <p><i>If a window isn't available, the tour will skip that step.</i></p>""",
                 action_prompt="Click 'Next' to start",
                 wait_for_click=False,
             ),
-            
+
             DemoTourStep(
                 title="🧠 Step 1: Open the AI Forge",
-                instruction="The AI Forge is where you build AI assistants. Click the AI Forge button to open it!",
-                detail_html="""<p>The <b>AI Forge</b> is your workshop. Here you'll:</p>
-                <ul>
-                    <li>Choose a <b>Use Case</b> (Individual, Business, etc.)</li>
-                    <li>Select <b>Capabilities</b> (what your AI can do)</li>
-                    <li>Set <b>Personality</b> traits</li>
-                </ul>""",
+                instruction="The AI Forge is where you build AI assistants. Click the AI Forge button to open it.",
+                detail_html="""<p>The <b>AI Forge</b> is your workshop. Here you'll create and customize AI assistants.</p>
+                <p>Click the <b>AI Forge</b> button in the navigation bar.</p>""",
                 target_widget_name="nav_forge",
-                action_prompt="👉 CLICK the 'AI Forge' button",
+                action_prompt="👉 CLICK 'AI Forge'",
                 wait_for_click=True,
             ),
-            
+
             DemoTourStep(
-                title="🎯 Step 2: Choose Use Case",
-                instruction="Now that the Forge is open, select a Use Case to see what capabilities are available.",
-                detail_html="""<p><b>Use Cases</b> filter capabilities:</p>
+                title="📋 Step 2: Select an AI",
+                instruction="In the AI Forge, select an AI from the library list.",
+                detail_html="""<p>The AI library shows the AIs you have created. Click one to select it.</p>
+                <p><i>If the Forge window did not open, click Next to skip.</i></p>""",
+                target_getter=self._find_forge_ai_list,
+                action_prompt="👉 CLICK an AI in the list",
+                wait_for_click=True,
+            ),
+
+            DemoTourStep(
+                title="🚀 Step 3: Deploy to Command Center",
+                instruction="Click 'Deploy to Command Center' to activate the selected AI.",
+                detail_html="""<p>Deploying makes the AI appear in the Active AI selector in the main window.</p>
+                <p><i>If the Forge window is not visible, click Next to skip.</i></p>""",
+                target_getter=self._find_forge_deploy_button,
+                action_prompt="👉 CLICK 'Deploy to Command Center'",
+                wait_for_click=True,
+            ),
+
+            DemoTourStep(
+                title="🎯 Step 4: Give Your AI a Mission",
+                instruction="Type a mission in the Mission Control box, then click START.",
+                detail_html="""<p>The Active AI is shown in the selector. Type a task like:</p>
                 <ul>
-                    <li><b>Individual</b> — Personal productivity</li>
-                    <li><b>Business</b> — Professional tools</li>
-                    <li><b>Educational</b> — Teaching & tutoring</li>
-                    <li><b>Enterprise</b> — Compliance & security</li>
+                    <li>"Write file notes.txt content: hello"</li>
+                    <li>"Plan my day"</li>
+                    <li>"Summarize this document: [paste text]"</li>
                 </ul>
-                <p><i>Try clicking different use cases!</i></p>""",
-                action_prompt="👉 CLICK on a Use Case",
+                <p>Click the START button when ready.</p>""",
+                target_widget_name="mission_start_button",
+                action_prompt="👉 TYPE a mission, then click START",
                 wait_for_click=True,
             ),
-            
+
             DemoTourStep(
-                title="✅ Demo Complete!",
-                instruction="You've completed the demo tour!",
+                title="✅ Tour Complete!",
+                instruction="You've completed the interactive tour.",
                 detail_html="""<h3>🎉 You now know how to:</h3>
                 <ul>
-                    <li>✅ Navigate to the AI Forge</li>
-                    <li>✅ Select use cases and capabilities</li>
-                    <li>✅ Create AI assistants</li>
+                    <li>✅ Open the AI Forge</li>
+                    <li>✅ Select and deploy an AI</li>
+                    <li>✅ Give the AI a mission</li>
                 </ul>
-                <p><b>Remember: This was a demo - no AIs were actually created!</b></p>
-                <p>Click 'Finish' to close the tutorial and start using Command Nexus for real.</p>""",
+                <p><b>Some capabilities are real, some are partial, and some are paused.</b>
+                Command Nexus will always tell you honestly instead of faking work.</p>
+                <p>Click 'Finish' to close the tutorial.</p>""",
                 action_prompt="Click 'Finish' to close",
                 wait_for_click=False,
             ),
         ]
-    
+
     def start_tour(self):
         """Start the demo tour."""
         self._current_step = 0
@@ -496,24 +533,31 @@ class DemoTourController(QWidget):
         
         # Find target widget
         target = self._find_target(step)
-        
+        target_missing = step.wait_for_click and target is None
+
         if target:
             # Highlight it
             self._overlay.highlight_widget(target)
-            
+
             # If waiting for click, install event filter
             if step.wait_for_click:
                 self._pending_click_target = target
                 self._install_event_filter()
-        
-        # Update tooltip
+
+        # Update tooltip; if target is missing, explain that the step is skipped.
+        action_prompt = step.action_prompt
+        detail_html = step.detail_html
+        if target_missing:
+            action_prompt = "⚠️ Target not available — click Next to skip"
+            detail_html += "<p><i>This step is skipped because the target window or widget is not available.</i></p>"
+
         self._tooltip.update_content(
             step_num=self._current_step + 1,
             total_steps=len(self._steps),
             title=step.title,
             instruction=step.instruction,
-            action_prompt=step.action_prompt,
-            detail_html=step.detail_html,
+            action_prompt=action_prompt,
+            detail_html=detail_html,
             wait_for_click=step.wait_for_click and target is not None
         )
         

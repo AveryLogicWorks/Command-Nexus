@@ -122,11 +122,62 @@ def _canonical_ability(name: str) -> str:
     }
     return mapping.get(name.strip(), name.strip())
 
+def _surface_description(ability: str) -> str:
+    """Return an honest surface description for a capability, including implementation status."""
+    intent = canonical_intent(ability)
+    if is_real(intent):
+        return f"{ability} — real engine wired in this build"
+    if is_partial(intent):
+        return f"{ability} — local scaffold works; full output needs a model or optional API"
+    if is_paused(intent):
+        return f"{ability} — not connected in this build; requests will be paused instead of faked"
+    return f"{ability} — capability status not yet mapped"
+
+
+def _format_capability_status_summary(abilities: list[str]) -> str:
+    """Return a concise real/partial/paused summary for an AI activation dialog."""
+    real: list[str] = []
+    partial: list[str] = []
+    paused: list[str] = []
+    unmapped: list[str] = []
+    for ab in abilities:
+        intent = canonical_intent(ab)
+        if is_real(intent):
+            real.append(ab)
+        elif is_partial(intent):
+            partial.append(ab)
+        elif is_paused(intent):
+            paused.append(ab)
+        else:
+            unmapped.append(ab)
+    lines = ["Capability status in this build:"]
+    if real:
+        lines.append(f"  Real: {', '.join(real)}")
+    if partial:
+        lines.append(f"  Partial: {', '.join(partial)}")
+    if paused:
+        lines.append(f"  Paused: {', '.join(paused)}")
+    if unmapped:
+        lines.append(f"  Unmapped: {', '.join(unmapped)}")
+    return "\n".join(lines)
+
+
 def _generate_surfaces(abilities: list[str]) -> dict[str, str]:
     surfaces = {}
     for ab in abilities:
         key = _canonical_ability(ab)
-        desc = ABILITY_SURFACES.get(key, "Placeholder ability surface (backend not connected yet)")
+        desc = ABILITY_SURFACES.get(key)
+        if desc:
+            # Keep the original technical description but append the honesty status.
+            status = capability_status(canonical_intent(ab))
+            if status == ImplementationStatus.PAUSED:
+                desc = f"{desc} (NOT CONNECTED in this build)"
+            elif status == ImplementationStatus.PARTIAL:
+                desc = f"{desc} (PARTIAL — local scaffold works, model/API optional)"
+            elif status == ImplementationStatus.REAL:
+                desc = f"{desc} (REAL)"
+        else:
+            desc = _surface_description(ab)
         surfaces[key] = desc
         surfaces[ab] = desc  # keep original name mapping for Knowledge / Intelligence rendering
     return surfaces
@@ -980,6 +1031,7 @@ from ...core.translator import NexusIntentTranslator
 from ...core.settings_manager import SettingsManager
 from ...core.stasis_gate import StasisGate, StasisState
 from ...core.recursive_scanner import RecursiveScanner, ScanResult, ThreatLevel
+from ...core.capability_registry import canonical_intent, capability_status, is_real, is_partial, is_paused, ImplementationStatus
 from .forge_models import AIUnit, AISource
 from .capability_book_engine import generate_full_book_for_ai
 from .capability_actions import (
@@ -2601,16 +2653,19 @@ class AIForgeWindow(QMainWindow):
 
         left_layout.addWidget(QLabel("AI Library"))
         self._list = QListWidget()
+        self._list.setObjectName("forge_ai_list")
         self._list.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
         self._list.itemClicked.connect(self._on_ai_selected)
         left_layout.addWidget(self._list, stretch=1)
 
         btn_drop = QPushButton("Drop-In AI...")
+        btn_drop.setObjectName("forge_dropin_button")
         btn_drop.setStyleSheet("background-color: #5e35b1; color: white; font-weight: bold;")
         btn_drop.clicked.connect(self._drop_in_ai)
         left_layout.addWidget(btn_drop)
 
         btn_activate = QPushButton("Deploy to Command Center")
+        btn_activate.setObjectName("forge_deploy_button")
         btn_activate.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
         btn_activate.clicked.connect(self._activate_selected)
         left_layout.addWidget(btn_activate)
@@ -3115,13 +3170,14 @@ class AIForgeWindow(QMainWindow):
                         libraries=u.libraries,
                     )
                 surfaces = "\n".join([f"- {k}: {v}" for k, v in u.ability_surfaces.items()]) or "(none)"
+                status_summary = _format_capability_status_summary(u.abilities)
                 QMessageBox.information(
                     self,
                     "AI Activated",
                     f"'{u.name}' is now active in the Visibility Window.\n\n"
                     f"Ability surfaces:\n{surfaces}\n\n"
-                    f"Archive: {u.archive_path or 'N/A'}\nIntelligence: {u.ability_book_path or 'N/A'}\n\n"
-                    f"Note: Some abilities are in placeholder mode; backend not connected yet."
+                    f"{status_summary}\n\n"
+                    f"Archive: {u.archive_path or 'N/A'}\nIntelligence: {u.ability_book_path or 'N/A'}"
                 )
                 self._on_ai_selected(item)
                 return
