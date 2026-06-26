@@ -60,18 +60,19 @@ class DemoTourOverlay(QWidget):
             self.update()
     
     def _update_highlight_rect(self):
-        """Recompute highlight rect from target widget's current global geometry."""
+        """Recompute highlight rect from target widget's current global position."""
         if not self._target_widget or not self._target_widget.isVisible():
             return
-        geo = self._target_widget.geometry()
-        top_left = self._target_widget.mapToGlobal(geo.topLeft())
-        bottom_right = self._target_widget.mapToGlobal(geo.bottomRight())
+        # mapToGlobal(QPoint(0,0)) gives the global screen position of the widget's top-left corner.
+        # Do NOT use geometry().topLeft() — that's the position within the parent, which would
+        # double-count the offset when passed to mapToGlobal.
+        top_left = self._target_widget.mapToGlobal(QPoint(0, 0))
+        w = self._target_widget.width()
+        h = self._target_widget.height()
         # Map from global screen coords to overlay's local coords
         origin = self.geometry().topLeft()
         x = top_left.x() - origin.x()
         y = top_left.y() - origin.y()
-        w = bottom_right.x() - top_left.x()
-        h = bottom_right.y() - top_left.y()
         self._highlight_rect = QRect(
             x - self._padding,
             y - self._padding,
@@ -515,6 +516,10 @@ class DemoTourController(QWidget):
         if forge is None:
             return None
         return forge.findChild(QPushButton, "forge_deploy_button")
+    
+    def _close_forge_after_deploy(self):
+        """Close the Forge window after deploying, so user sees the Command Center."""
+        QTimer.singleShot(800, self._close_sub_windows)
 
     def _setup_steps(self):
         """Define the interactive demo tour steps using real, clickable widgets."""
@@ -581,10 +586,11 @@ class DemoTourController(QWidget):
                     <li><b>Chat</b> with the AI about anything</li>
                     <li>Let the AI <b>use tools</b> (read/write files, etc.)</li>
                 </ul>
-                <p><i>If the Forge window is not visible, click Next to skip.</i></p>""",
+                <p>After deploying, the Forge will close and you'll return to the Command Center.</p>""",
                 target_getter=self._find_forge_deploy_button,
                 action_prompt="👉 CLICK 'Deploy to Command Center'",
                 wait_for_click=True,
+                on_target_clicked=self._close_forge_after_deploy,
             ),
 
             DemoTourStep(
@@ -745,6 +751,16 @@ class DemoTourController(QWidget):
             if self._tts:
                 self._tts.stop()
     
+    def _close_sub_windows(self):
+        """Close all sub-windows (Forge, Book, Customer AI, etc.) to return to main window."""
+        for w in QApplication.topLevelWidgets():
+            if w is self._main_window:
+                continue
+            if w is self._overlay or w is self._tooltip:
+                continue
+            if isinstance(w, QMainWindow) and w.isVisible():
+                w.close()
+    
     def _show_current_step(self):
         """Display current step with highlight and instructions."""
         if self._current_step >= len(self._steps):
@@ -758,6 +774,16 @@ class DemoTourController(QWidget):
         self._overlay.clear_highlight()
         self._remove_event_filter()
         
+        # Close sub-windows when moving to a step that targets the main window.
+        # Steps that use target_getter for Forge widgets need the Forge window open.
+        step_needs_forge = (
+            step.target_getter is not None
+            and 'forge' in step.target_getter.__name__
+        )
+        if not step_needs_forge and self._current_step > 3:
+            # After the Forge steps (2-3), close sub-windows when returning to main window
+            self._close_sub_windows()
+        
         # Find target widget
         target = self._find_target(step)
         target_missing = step.wait_for_click and target is None
@@ -765,6 +791,8 @@ class DemoTourController(QWidget):
         if target:
             # Highlight it
             self._overlay.highlight_widget(target)
+            self._overlay.raise_()
+            self._tooltip.raise_()
 
             # If waiting for click, install event filter
             if step.wait_for_click:
@@ -862,6 +890,9 @@ class DemoTourController(QWidget):
             )
             # Reposition tooltip near the new highlight
             self._tooltip.position_near_highlight(self._overlay._highlight_rect)
+            # Raise overlay above the sub-window that just opened
+            self._overlay.raise_()
+            self._tooltip.raise_()
     
     def _install_event_filter(self):
         """Install event filter on the application to watch for clicks anywhere."""
