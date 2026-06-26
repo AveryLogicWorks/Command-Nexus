@@ -25,12 +25,11 @@ class DemoTourOverlay(QWidget):
     """
     Screen-wide top-level overlay that draws animated highlight AROUND any widget.
     Works across multiple windows (main window, Forge, Intelligence, etc.).
-    Tooltip is positioned separately (bottom-right) so both are visible.
+    Tooltip is positioned separately so both are visible.
     """
     
     def __init__(self, parent: QWidget = None):
         super().__init__(None)
-        # Make it a frameless, transparent, always-on-top, non-activating top-level window
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
@@ -44,7 +43,10 @@ class DemoTourOverlay(QWidget):
         self.setStyleSheet("background: transparent;")
         
         self._highlight_rect: QRect = None
+        self._target_widget: QWidget = None
+        self._padding: int = 30
         self._pulse_animation = 0
+        self._click_flash = 0
         
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._animate)
@@ -53,31 +55,51 @@ class DemoTourOverlay(QWidget):
     def highlight_widget(self, widget: QWidget, padding: int = 30):
         """Highlight a widget with animated border AROUND it."""
         if widget and widget.isVisible():
-            geo = widget.geometry()
-            top_left = widget.mapToGlobal(geo.topLeft())
-            bottom_right = widget.mapToGlobal(geo.bottomRight())
-            
-            # Since we're a top-level window covering the screen, use global coords directly
-            width = bottom_right.x() - top_left.x()
-            height = bottom_right.y() - top_left.y()
-            
-            # Create highlight rect AROUND the widget (not on it)
-            self._highlight_rect = QRect(
-                top_left.x() - padding,
-                top_left.y() - padding,
-                width + padding * 2,
-                height + padding * 2
-            )
+            self._target_widget = widget
+            self._padding = padding
+            self._update_highlight_rect()
             self.update()
+    
+    def _update_highlight_rect(self):
+        """Recompute highlight rect from target widget's current global geometry."""
+        if not self._target_widget or not self._target_widget.isVisible():
+            return
+        geo = self._target_widget.geometry()
+        top_left = self._target_widget.mapToGlobal(geo.topLeft())
+        bottom_right = self._target_widget.mapToGlobal(geo.bottomRight())
+        # Map from global screen coords to overlay's local coords
+        origin = self.geometry().topLeft()
+        x = top_left.x() - origin.x()
+        y = top_left.y() - origin.y()
+        w = bottom_right.x() - top_left.x()
+        h = bottom_right.y() - top_left.y()
+        self._highlight_rect = QRect(
+            x - self._padding,
+            y - self._padding,
+            w + self._padding * 2,
+            h + self._padding * 2,
+        )
+    
+    def flash_click(self):
+        """Flash green to indicate a click was detected."""
+        self._click_flash = 10
+        self.update()
     
     def clear_highlight(self):
         """Clear the highlight."""
         self._highlight_rect = None
+        self._target_widget = None
+        self._click_flash = 0
         self.update()
     
     def _animate(self):
-        """Animate the pulsing effect."""
+        """Animate the pulsing effect and recompute highlight position."""
         self._pulse_animation = (self._pulse_animation + 1) % 20
+        if self._click_flash > 0:
+            self._click_flash -= 1
+        # Recompute highlight rect every frame so it follows window moves/resizes
+        if self._target_widget:
+            self._update_highlight_rect()
         self.update()
     
     def paintEvent(self, event):
@@ -88,13 +110,23 @@ class DemoTourOverlay(QWidget):
         if self._highlight_rect:
             pulse = abs(self._pulse_animation - 10) + 5
             
-            # Multiple animated glow layers
-            layers = [
-                (pulse * 2, QColor(88, 166, 255, 60), 6),
-                (pulse, QColor(88, 166, 255, 120), 4),
-                (0, QColor(88, 166, 255), 3),
-                (-3, QColor(255, 255, 255, 200), 2),
-            ]
+            if self._click_flash > 0:
+                # Green flash on click detection
+                base_color = QColor(63, 185, 80)
+                flash_alpha = int(255 * self._click_flash / 10)
+                layers = [
+                    (pulse * 2, QColor(63, 185, 80, flash_alpha // 2), 8),
+                    (pulse, QColor(63, 185, 80, flash_alpha), 5),
+                    (0, QColor(63, 185, 80, 255), 3),
+                ]
+            else:
+                # Normal blue pulsing glow
+                layers = [
+                    (pulse * 2, QColor(88, 166, 255, 60), 6),
+                    (pulse, QColor(88, 166, 255, 120), 4),
+                    (0, QColor(88, 166, 255), 3),
+                    (-3, QColor(255, 255, 255, 200), 2),
+                ]
             
             for offset, color, width in layers:
                 rect = self._highlight_rect.adjusted(-offset, -offset, offset, offset)
@@ -140,8 +172,8 @@ class DemoTourOverlay(QWidget):
 
 class DemoTourTooltip(QFrame):
     """
-    Tour instruction panel positioned in bottom-right corner.
-    NEVER covers the highlighted widget.
+    Tour instruction panel — a frameless, always-on-top window.
+    Positions itself near the highlighted widget but never overlaps it.
     """
     
     def __init__(self, parent=None):
@@ -152,6 +184,7 @@ class DemoTourTooltip(QFrame):
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setFixedWidth(400)
         self._setup_ui()
         self._apply_styling()
     
@@ -278,12 +311,12 @@ class DemoTourTooltip(QFrame):
 
         layout.addLayout(button_layout)
 
-        # Demo mode notice
-        demo_notice = QLabel("🎮 DEMO MODE - Nothing you do will be saved")
-        demo_notice.setFont(QFont("Segoe UI", 10))
-        demo_notice.setStyleSheet("color: #ffee58; padding-top: 10px;")
-        demo_notice.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(demo_notice)
+        # Tour info notice
+        info_notice = QLabel("💡 Click highlighted items to advance • Skip anytime")
+        info_notice.setFont(QFont("Segoe UI", 10))
+        info_notice.setStyleSheet("color: #8b949e; padding-top: 10px;")
+        info_notice.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(info_notice)
     
     def _apply_styling(self):
         """Apply dark theme styling."""
@@ -317,17 +350,15 @@ class DemoTourTooltip(QFrame):
             self._next_btn.setStyleSheet(
                 "background-color: #484f58; color: #8b949e; padding: 8px 20px; border-radius: 6px;"
             )
-            # Skip button must always be enabled — tour is never forced
-            self._skip_btn.setEnabled(True)
-            self._skip_btn.setText("Skip Tour ✕")
         else:
-            self._next_btn.setText("Next →")
+            self._next_btn.setText("Finish ✓" if step_num >= total_steps else "Next →")
             self._next_btn.setEnabled(True)
             self._next_btn.setStyleSheet(
                 "background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px;"
             )
-            self._skip_btn.setEnabled(True)
-            self._skip_btn.setText("Skip Tour ✕")
+        # Skip button is always enabled — tour is never forced
+        self._skip_btn.setEnabled(True)
+        self._skip_btn.setText("Skip Tour ✕")
     
     def set_buttons(self, on_back=None, on_next=None, on_skip=None):
         """Connect button signals."""
@@ -343,14 +374,39 @@ class DemoTourTooltip(QFrame):
         if on_skip:
             self._skip_btn.clicked.connect(on_skip)
     
-    def position_bottom_right(self):
-        """Position in bottom-right corner of screen."""
+    def position_near_highlight(self, highlight_rect: QRect = None):
+        """Position tooltip near the highlight rect, but never overlapping it.
+        Falls back to bottom-right if no highlight rect."""
         self.adjustSize()
         size = self.size()
         screen = QApplication.primaryScreen().geometry()
+        margin = 20
         
-        x = screen.width() - size.width() - 20
-        y = screen.height() - size.height() - 80
+        if highlight_rect:
+            # Try right side of highlight
+            x = highlight_rect.right() + margin
+            y = highlight_rect.center().y() - size.height() // 2
+            
+            # If doesn't fit on right, try left side
+            if x + size.width() > screen.right() - margin:
+                x = highlight_rect.left() - size.width() - margin
+            
+            # If doesn't fit on left either, try below
+            if x < margin:
+                x = highlight_rect.center().x() - size.width() // 2
+                y = highlight_rect.bottom() + margin
+            
+            # If below doesn't fit, try above
+            if y + size.height() > screen.bottom() - margin:
+                y = highlight_rect.top() - size.height() - margin
+            
+            # Clamp to screen bounds
+            x = max(margin, min(x, screen.right() - size.width() - margin))
+            y = max(margin, min(y, screen.bottom() - size.height() - margin))
+        else:
+            # No highlight — bottom-right corner
+            x = screen.width() - size.width() - margin
+            y = screen.height() - size.height() - margin - 20
         
         self.move(x, y)
 
@@ -719,8 +775,12 @@ class DemoTourController(QWidget):
         else:
             self._tooltip._back_btn.setVisible(False)
         
-        # Position tooltip in bottom-right
-        self._tooltip.position_bottom_right()
+        # Position tooltip near the highlight, or bottom-right if no highlight
+        if target and target.isVisible():
+            highlight_rect = self._overlay._highlight_rect
+        else:
+            highlight_rect = None
+        self._tooltip.position_near_highlight(highlight_rect)
         
         # Voice narration
         if self._voice_enabled and self._tts.available:
@@ -771,6 +831,8 @@ class DemoTourController(QWidget):
                 detail_html=step.detail_html,
                 wait_for_click=True,
             )
+            # Reposition tooltip near the new highlight
+            self._tooltip.position_near_highlight(self._overlay._highlight_rect)
     
     def _install_event_filter(self):
         """Install event filter on the application to watch for clicks anywhere."""
@@ -801,11 +863,28 @@ class DemoTourController(QWidget):
                     if step.on_target_clicked:
                         step.on_target_clicked()
                     
+                    # Visual feedback: flash green
+                    if self._overlay:
+                        self._overlay.flash_click()
+                    
+                    # Update tooltip to show "✓ Click detected! Advancing..."
+                    self._tooltip.update_content(
+                        step_num=self._current_step + 1,
+                        total_steps=len(self._steps),
+                        title=step.title,
+                        instruction=step.instruction,
+                        action_prompt="✓ Click detected! Advancing...",
+                        detail_html=step.detail_html,
+                        wait_for_click=False,
+                    )
+                    self._tooltip._next_btn.setText("✓ Advancing...")
+                    self._tooltip._next_btn.setEnabled(False)
+                    
                     # Remove event filter immediately
                     self._remove_event_filter()
                     
                     # Auto-advance after delay — longer if this step opens a new window
-                    delay = 1500 if step.target_widget_name and step.target_widget_name.startswith("nav_") else 500
+                    delay = 1500 if step.target_widget_name and step.target_widget_name.startswith("nav_") else 600
                     QTimer.singleShot(delay, self._on_next)
                     
                     if self._audit:
