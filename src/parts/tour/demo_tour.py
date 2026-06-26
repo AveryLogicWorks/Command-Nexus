@@ -32,7 +32,6 @@ class DemoTourOverlay(QWidget):
         super().__init__(None)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.Tool |
             Qt.WindowType.WindowTransparentForInput
         )
@@ -180,13 +179,15 @@ class DemoTourTooltip(QFrame):
         super().__init__(parent)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self.setFixedWidth(400)
         self._setup_ui()
         self._apply_styling()
+        
+        # Close on Escape key
+        self._close_callback = None
     
     def _setup_ui(self):
         """Build the instruction panel UI."""
@@ -194,11 +195,24 @@ class DemoTourTooltip(QFrame):
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Step indicator
+        # Top row: step indicator + close button
+        top_row = QHBoxLayout()
+        
         self._step_label = QLabel("Step 1 of 10")
         self._step_label.setFont(QFont("Segoe UI", 10))
         self._step_label.setStyleSheet("color: #8b949e;")
-        layout.addWidget(self._step_label)
+        top_row.addWidget(self._step_label)
+        top_row.addStretch()
+        
+        self._close_btn = QPushButton("✕")
+        self._close_btn.setFixedSize(28, 28)
+        self._close_btn.setStyleSheet(
+            "QPushButton { background-color: #21262d; color: #8b949e; border-radius: 4px; font-size: 14px; }"
+            "QPushButton:hover { background-color: #da3633; color: white; }"
+        )
+        self._close_btn.setToolTip("Close tour")
+        top_row.addWidget(self._close_btn)
+        layout.addLayout(top_row)
         
         # Title
         self._title_label = QLabel("Tour Title")
@@ -373,6 +387,19 @@ class DemoTourTooltip(QFrame):
         
         if on_skip:
             self._skip_btn.clicked.connect(on_skip)
+    
+    def set_close_callback(self, callback):
+        """Set callback for the X close button."""
+        self._close_callback = callback
+        self._close_btn.clicked.connect(callback)
+    
+    def keyPressEvent(self, event):
+        """Close tour on Escape key."""
+        if event.key() == Qt.Key.Key_Escape:
+            if self._close_callback:
+                self._close_callback()
+        else:
+            super().keyPressEvent(event)
     
     def position_near_highlight(self, highlight_rect: QRect = None):
         """Position tooltip near the highlight rect, but never overlapping it.
@@ -697,6 +724,8 @@ class DemoTourController(QWidget):
         )
         # Wire voice toggle
         self._tooltip._voice_btn.clicked.connect(self._on_voice_toggle)
+        # Wire close X button and Escape key to skip
+        self._tooltip.set_close_callback(self._on_skip)
         self._tooltip.show()
         self._tooltip.raise_()
     

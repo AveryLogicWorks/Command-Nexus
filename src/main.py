@@ -189,30 +189,35 @@ class CommandNexusApp:
 
     def _maybe_show_tour(self):
         """Show interactive hands-on tour on first run or if test mode is enabled."""
-        # Check if this is first run (no settings file exists)
         first_run_marker = Path.home() / ".command_nexus" / "first_run_complete"
         test_mode = getattr(self._settings, 'test_mode', False)
         
-        show_tour = False
+        should_show = False
         
         if test_mode:
-            # Test mode always shows tour
-            show_tour = True
+            should_show = True
         elif not first_run_marker.exists():
-            # First run - show tour
-            show_tour = True
+            # First run — ask the user if they want a tour
+            from PyQt6.QtWidgets import QMessageBox
+            reply = QMessageBox.question(
+                self._visibility,
+                "Welcome to Command Nexus",
+                "<h2>Welcome to Command Nexus!</h2>"
+                "<p>Would you like to take a quick interactive tour?</p>"
+                "<p>It takes about 2 minutes and shows you how to build, deploy, "
+                "and use AI assistants — no coding required.</p>"
+                "<p><i>You can skip the tour at any time.</i></p>",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            should_show = (reply == QMessageBox.StandardButton.Yes)
+            # Mark first run complete regardless — don't force the tour on next launch
+            first_run_marker.touch()
         
-        if show_tour:
-            # In test mode, show test keys dialog first
+        if should_show:
             if test_mode:
                 self._show_test_keys_dialog()
-            
-            # Start the interactive demo tour
             self._start_demo_tour()
-            
-            # Mark first run as complete when tour finishes
-            if not test_mode:
-                first_run_marker.touch()
     
     def _start_demo_tour(self):
         """Start the interactive demo tutorial (nothing persists)."""
