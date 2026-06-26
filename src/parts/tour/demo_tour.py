@@ -10,13 +10,13 @@ Interactive hands-on tutorial that:
 import math
 from typing import Callable, Optional
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QEvent, QPoint, QRect
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QEvent, QPoint, QRect, QPropertyAnimation, QEasingCurve
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QGraphicsDropShadowEffect, QTextEdit,
-    QListWidget, QCheckBox,
+    QListWidget, QCheckBox, QProgressBar, QSizePolicy,
 )
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QPolygon, QScreen
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QPolygon, QScreen, QPainterPath
 
 from ...core.tts_engine import get_tts
 
@@ -24,8 +24,8 @@ from ...core.tts_engine import get_tts
 class DemoTourOverlay(QWidget):
     """
     Screen-wide top-level overlay that draws animated highlight AROUND any widget.
+    Dims the rest of the screen to focus attention on the highlighted element.
     Works across multiple windows (main window, Forge, Intelligence, etc.).
-    Tooltip is positioned separately so both are visible.
     """
     
     def __init__(self, parent: QWidget = None):
@@ -43,13 +43,14 @@ class DemoTourOverlay(QWidget):
         
         self._highlight_rect: QRect = None
         self._target_widget: QWidget = None
-        self._padding: int = 30
-        self._pulse_animation = 0
+        self._padding: int = 20
+        self._pulse_animation = 0.0
         self._click_flash = 0
+        self._dim_opacity = 0.45
         
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._animate)
-        self._timer.start(50)
+        self._timer.start(16)  # ~60fps for smooth animation
     
     def highlight_widget(self, widget: QWidget, padding: int = 30):
         """Highlight a widget with animated border AROUND it."""
@@ -94,38 +95,50 @@ class DemoTourOverlay(QWidget):
     
     def _animate(self):
         """Animate the pulsing effect and recompute highlight position."""
-        self._pulse_animation = (self._pulse_animation + 1) % 20
+        self._pulse_animation += 0.08
         if self._click_flash > 0:
             self._click_flash -= 1
-        # Recompute highlight rect every frame so it follows window moves/resizes
         if self._target_widget:
             self._update_highlight_rect()
         self.update()
     
     def paintEvent(self, event):
-        """Paint animated border around highlight area."""
+        """Paint dimmed overlay with animated highlight border."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if self._highlight_rect:
-            pulse = abs(self._pulse_animation - 10) + 5
+            # Dim the entire screen except the highlight area
+            dim_color = QColor(0, 0, 0, int(255 * self._dim_opacity))
+            
+            # Create a path: full screen rect minus the highlight rect (with rounded corners)
+            path = QPainterPath()
+            path.addRoundedRect(self._highlight_rect, 12, 12)
+            # Fill everything outside the highlight with dim color
+            outer_rect = QRect(0, 0, self.width(), self.height())
+            outer_path = QPainterPath()
+            outer_path.addRect(outer_rect)
+            dim_path = outer_path.subtracted(path)
+            painter.fillPath(dim_path, dim_color)
+            
+            # Smooth sine wave pulse
+            pulse = (math.sin(self._pulse_animation) + 1) / 2  # 0.0 to 1.0
+            glow_alpha = int(80 + pulse * 100)
             
             if self._click_flash > 0:
                 # Green flash on click detection
-                base_color = QColor(63, 185, 80)
                 flash_alpha = int(255 * self._click_flash / 10)
                 layers = [
-                    (pulse * 2, QColor(63, 185, 80, flash_alpha // 2), 8),
-                    (pulse, QColor(63, 185, 80, flash_alpha), 5),
+                    (8, QColor(63, 185, 80, flash_alpha // 3), 8),
+                    (4, QColor(63, 185, 80, flash_alpha // 2), 5),
                     (0, QColor(63, 185, 80, 255), 3),
                 ]
             else:
-                # Normal blue pulsing glow
+                # Blue pulsing glow with smooth animation
                 layers = [
-                    (pulse * 2, QColor(88, 166, 255, 60), 6),
-                    (pulse, QColor(88, 166, 255, 120), 4),
-                    (0, QColor(88, 166, 255), 3),
-                    (-3, QColor(255, 255, 255, 200), 2),
+                    (10, QColor(88, 166, 255, int(glow_alpha * 0.3)), 6),
+                    (5, QColor(88, 166, 255, int(glow_alpha * 0.6)), 4),
+                    (0, QColor(88, 166, 255, 255), 3),
                 ]
             
             for offset, color, width in layers:
@@ -135,8 +148,8 @@ class DemoTourOverlay(QWidget):
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.drawRoundedRect(rect, 12, 12)
             
-            # Corner accents
-            self._draw_corners(painter, self._highlight_rect, QColor(255, 193, 7))
+            # Corner accents (gold)
+            self._draw_corners(painter, self._highlight_rect, QColor(255, 193, 7, 220))
     
     def _draw_corners(self, painter: QPainter, rect: QRect, color: QColor):
         """Draw yellow corner accents."""
@@ -163,8 +176,15 @@ class DemoTourOverlay(QWidget):
             painter.drawLine(x1, y1, x2, y2)
             painter.drawLine(x3, y3, x4, y4)
     
-    def resize_to_screen(self):
-        """Resize to cover the entire screen so we can highlight widgets in any window."""
+    def resize_to_screen(self, reference_widget: QWidget = None):
+        """Resize to cover the screen containing the reference widget (or primary screen)."""
+        if reference_widget and reference_widget.isVisible():
+            screen = QApplication.screenAt(reference_widget.mapToGlobal(QPoint(0, 0)))
+            if screen:
+                self.setGeometry(screen.geometry())
+                self.raise_()
+                return
+        # Fallback to primary screen
         screen = QApplication.primaryScreen().geometry()
         self.setGeometry(screen)
         self.raise_()
@@ -183,25 +203,28 @@ class DemoTourTooltip(QFrame):
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        self.setFixedWidth(400)
+        self.setFixedWidth(420)
         self._setup_ui()
         self._apply_styling()
         
-        # Close on Escape key
         self._close_callback = None
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+        # Fade-in animation
+        self._fade_anim = None
     
     def _setup_ui(self):
         """Build the instruction panel UI."""
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+        layout.setContentsMargins(22, 22, 22, 22)
         
         # Top row: step indicator + close button
         top_row = QHBoxLayout()
         
         self._step_label = QLabel("Step 1 of 10")
         self._step_label.setFont(QFont("Segoe UI", 10))
-        self._step_label.setStyleSheet("color: #8b949e;")
+        self._step_label.setStyleSheet("color: #8b949e; font-weight: bold;")
         top_row.addWidget(self._step_label)
         top_row.addStretch()
         
@@ -215,27 +238,44 @@ class DemoTourTooltip(QFrame):
         top_row.addWidget(self._close_btn)
         layout.addLayout(top_row)
         
+        # Progress bar
+        self._progress = QProgressBar()
+        self._progress.setFixedHeight(6)
+        self._progress.setTextVisible(False)
+        self._progress.setStyleSheet("""
+            QProgressBar {
+                background-color: #21262d;
+                border: none;
+                border-radius: 3px;
+            }
+            QProgressBar::chunk {
+                background-color: #58a6ff;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self._progress)
+        
         # Title
         self._title_label = QLabel("Tour Title")
         self._title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         self._title_label.setWordWrap(True)
-        self._title_label.setStyleSheet("color: #58a6ff;")
+        self._title_label.setStyleSheet("color: #58a6ff; padding-top: 4px;")
         layout.addWidget(self._title_label)
         
         # Main instruction
         self._instruction_label = QLabel("Instruction text...")
         self._instruction_label.setFont(QFont("Segoe UI", 12))
         self._instruction_label.setWordWrap(True)
-        self._instruction_label.setStyleSheet("color: #ffffff; padding: 5px 0;")
+        self._instruction_label.setStyleSheet("color: #e6edf3; padding: 2px 0;")
         layout.addWidget(self._instruction_label)
         
         # Action prompt (green box)
         self._action_frame = QFrame()
         self._action_frame.setStyleSheet(
-            "background-color: #23863633; border: 2px solid #238636; border-radius: 8px;"
+            "background-color: rgba(35, 134, 54, 0.15); border: 2px solid #238636; border-radius: 8px;"
         )
         action_layout = QHBoxLayout(self._action_frame)
-        action_layout.setContentsMargins(15, 12, 15, 12)
+        action_layout.setContentsMargins(15, 10, 15, 10)
         
         self._action_label = QLabel("👉 CLICK the button")
         self._action_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
@@ -243,60 +283,32 @@ class DemoTourTooltip(QFrame):
         action_layout.addWidget(self._action_label)
         layout.addWidget(self._action_frame)
         
-        # Detail text with mouse wheel scrolling
-        from PyQt6.QtWidgets import QScrollArea, QWidget
-        
-        self._detail_scroll = QScrollArea()
-        self._detail_scroll.setWidgetResizable(True)
-        self._detail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._detail_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._detail_scroll.setStyleSheet("""
-            QScrollArea {
-                background-color: #161b22;
-                border: 1px solid #30363d;
-                border-radius: 8px;
-            }
-            QScrollBar:vertical {
-                background-color: #21262d;
-                width: 12px;
-                border-radius: 6px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #30363d;
-                border-radius: 6px;
-                min-height: 30px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #484f58;
-            }
-        """)
-        
+        # Detail text (QTextEdit has built-in scrolling)
         self._detail_text = QTextEdit()
         self._detail_text.setReadOnly(True)
         self._detail_text.setFont(QFont("Segoe UI", 11))
         self._detail_text.setStyleSheet("""
             QTextEdit {
                 background-color: #161b22;
-                border: none;
+                border: 1px solid #30363d;
+                border-radius: 8px;
                 color: #c9d1d9;
-                padding: 10px;
+                padding: 8px;
             }
         """)
-        self._detail_text.setMinimumHeight(100)
-        self._detail_text.setMaximumHeight(180)
-        
-        # Enable mouse wheel scrolling
+        self._detail_text.setMinimumHeight(80)
+        self._detail_text.setMaximumHeight(160)
         self._detail_text.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._detail_text.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        
         layout.addWidget(self._detail_text)
         
         # Buttons
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
         
         self._back_btn = QPushButton("← Back")
         self._back_btn.setStyleSheet(
-            "background-color: #30363d; color: #c9d1d9; padding: 8px 16px; border-radius: 6px;"
+            "QPushButton { background-color: #30363d; color: #c9d1d9; padding: 8px 16px; border-radius: 6px; border: 1px solid #484f58; }"
+            "QPushButton:hover { background-color: #484f58; }"
         )
         button_layout.addWidget(self._back_btn)
         
@@ -306,20 +318,26 @@ class DemoTourTooltip(QFrame):
         self._voice_btn.setCheckable(True)
         self._voice_btn.setChecked(True)
         self._voice_btn.setStyleSheet(
-            "background-color: #1f6feb; color: white; padding: 8px 12px; border-radius: 6px; font-size: 11px;"
+            "QPushButton { background-color: #1f6feb; color: white; padding: 8px 12px; border-radius: 6px; font-size: 11px; border: none; }"
+            "QPushButton:hover { background-color: #388bfd; }"
+            "QPushButton:checked { background-color: #1f6feb; }"
+            "QPushButton:unchecked { background-color: #30363d; color: #8b949e; }"
         )
-        self._voice_btn.setFixedWidth(110)
+        self._voice_btn.setFixedWidth(115)
         button_layout.addWidget(self._voice_btn)
 
-        self._skip_btn = QPushButton("Skip Tour")
+        self._skip_btn = QPushButton("Skip Tour ✕")
         self._skip_btn.setStyleSheet(
-            "background-color: #30363d; color: #8b949e; padding: 8px 16px; border-radius: 6px;"
+            "QPushButton { background-color: #30363d; color: #8b949e; padding: 8px 16px; border-radius: 6px; border: 1px solid #484f58; }"
+            "QPushButton:hover { background-color: #da3633; color: white; border-color: #da3633; }"
         )
         button_layout.addWidget(self._skip_btn)
 
         self._next_btn = QPushButton("Next →")
         self._next_btn.setStyleSheet(
-            "background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px;"
+            "QPushButton { background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px; border: none; }"
+            "QPushButton:hover { background-color: #2ea043; }"
+            "QPushButton:disabled { background-color: #21262d; color: #484f58; }"
         )
         self._next_btn.setDefault(True)
         button_layout.addWidget(self._next_btn)
@@ -327,9 +345,9 @@ class DemoTourTooltip(QFrame):
         layout.addLayout(button_layout)
 
         # Tour info notice
-        info_notice = QLabel("💡 Click highlighted items to advance • Skip anytime")
-        info_notice.setFont(QFont("Segoe UI", 10))
-        info_notice.setStyleSheet("color: #8b949e; padding-top: 10px;")
+        info_notice = QLabel("💡 Click highlighted items to advance • Press Esc to exit")
+        info_notice.setFont(QFont("Segoe UI", 9))
+        info_notice.setStyleSheet("color: #6e7681; padding-top: 6px;")
         info_notice.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(info_notice)
     
@@ -354,6 +372,8 @@ class DemoTourTooltip(QFrame):
                       wait_for_click: bool = False):
         """Update tooltip content."""
         self._step_label.setText(f"Step {step_num} of {total_steps}")
+        self._progress.setMaximum(total_steps)
+        self._progress.setValue(step_num)
         self._title_label.setText(title)
         self._instruction_label.setText(instruction)
         self._action_label.setText(action_prompt)
@@ -362,18 +382,22 @@ class DemoTourTooltip(QFrame):
         if wait_for_click:
             self._next_btn.setText("Waiting for click...")
             self._next_btn.setEnabled(False)
-            self._next_btn.setStyleSheet(
-                "background-color: #484f58; color: #8b949e; padding: 8px 20px; border-radius: 6px;"
-            )
         else:
             self._next_btn.setText("Finish ✓" if step_num >= total_steps else "Next →")
             self._next_btn.setEnabled(True)
-            self._next_btn.setStyleSheet(
-                "background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px;"
-            )
         # Skip button is always enabled — tour is never forced
         self._skip_btn.setEnabled(True)
-        self._skip_btn.setText("Skip Tour ✕")
+    
+    def showEvent(self, event):
+        """Fade in on show."""
+        super().showEvent(event)
+        self.setWindowOpacity(0.0)
+        self._fade_anim = QPropertyAnimation(self, b"windowOpacity")
+        self._fade_anim.setDuration(200)
+        self._fade_anim.setStartValue(0.0)
+        self._fade_anim.setEndValue(1.0)
+        self._fade_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._fade_anim.start()
     
     def set_buttons(self, on_back=None, on_next=None, on_skip=None):
         """Connect button signals."""
@@ -404,6 +428,7 @@ class DemoTourTooltip(QFrame):
     
     def position_near_highlight(self, highlight_rect: QRect = None):
         """Position tooltip near the highlight rect, but never overlapping it.
+        Prefers below the highlight (natural for top nav bars), then right, left, above.
         Falls back to bottom-right if no highlight rect."""
         self.adjustSize()
         size = self.size()
@@ -411,32 +436,50 @@ class DemoTourTooltip(QFrame):
         margin = 20
         
         if highlight_rect:
-            # Try right side of highlight
-            x = highlight_rect.right() + margin
-            y = highlight_rect.center().y() - size.height() // 2
+            # Strategy: try below first (nav buttons are at top), then right, left, above
+            positions = []
             
-            # If doesn't fit on right, try left side
-            if x + size.width() > screen.right() - margin:
-                x = highlight_rect.left() - size.width() - margin
+            # Below — centered horizontally
+            below_x = highlight_rect.center().x() - size.width() // 2
+            below_y = highlight_rect.bottom() + margin
+            positions.append(("below", below_x, below_y))
             
-            # If doesn't fit on left either, try below
-            if x < margin:
-                x = highlight_rect.center().x() - size.width() // 2
-                y = highlight_rect.bottom() + margin
+            # Right — vertically centered
+            right_x = highlight_rect.right() + margin
+            right_y = highlight_rect.center().y() - size.height() // 2
+            positions.append(("right", right_x, right_y))
             
-            # If below doesn't fit, try above
-            if y + size.height() > screen.bottom() - margin:
-                y = highlight_rect.top() - size.height() - margin
+            # Left — vertically centered
+            left_x = highlight_rect.left() - size.width() - margin
+            left_y = highlight_rect.center().y() - size.height() // 2
+            positions.append(("left", left_x, left_y))
             
-            # Clamp to screen bounds
-            x = max(margin, min(x, screen.right() - size.width() - margin))
-            y = max(margin, min(y, screen.bottom() - size.height() - margin))
+            # Above — centered horizontally
+            above_x = highlight_rect.center().x() - size.width() // 2
+            above_y = highlight_rect.top() - size.height() - margin
+            positions.append(("above", above_x, above_y))
+            
+            # Pick the first position that fits on screen
+            best_x, best_y = None, None
+            for name, x, y in positions:
+                if (margin <= x and x + size.width() <= screen.right() - margin and
+                    margin <= y and y + size.height() <= screen.bottom() - margin):
+                    best_x, best_y = x, y
+                    break
+            
+            if best_x is None:
+                # None fit perfectly — pick the one that needs least clamping
+                best_x, best_y = positions[0][1], positions[0][2]
+                # Clamp to screen bounds
+                best_x = max(margin, min(best_x, screen.right() - size.width() - margin))
+                best_y = max(margin, min(best_y, screen.bottom() - size.height() - margin))
+            
+            self.move(best_x, best_y)
         else:
-            # No highlight — bottom-right corner
+            # No highlight — bottom-right corner with margin
             x = screen.width() - size.width() - margin
             y = screen.height() - size.height() - margin - 20
-        
-        self.move(x, y)
+            self.move(x, y)
 
 
 class DemoTourStep:
@@ -714,7 +757,7 @@ class DemoTourController(QWidget):
         if self._overlay:
             self._overlay.deleteLater()
         self._overlay = DemoTourOverlay()
-        self._overlay.resize_to_screen()
+        self._overlay.resize_to_screen(self._main_window)
         self._overlay.show()
         self._overlay.raise_()
     
@@ -740,14 +783,10 @@ class DemoTourController(QWidget):
         self._voice_enabled = self._tooltip._voice_btn.isChecked()
         if self._voice_enabled:
             self._tooltip._voice_btn.setText("🔊 Voice: ON")
-            self._tooltip._voice_btn.setStyleSheet(
-                "background-color: #1f6feb; color: white; padding: 8px 12px; border-radius: 6px; font-size: 11px;"
-            )
+            if self._tts:
+                self._tts.stop()
         else:
             self._tooltip._voice_btn.setText("🔇 Voice: OFF")
-            self._tooltip._voice_btn.setStyleSheet(
-                "background-color: #30363d; color: #8b949e; padding: 8px 12px; border-radius: 6px; font-size: 11px;"
-            )
             if self._tts:
                 self._tts.stop()
     
@@ -776,12 +815,13 @@ class DemoTourController(QWidget):
         
         # Close sub-windows when moving to a step that targets the main window.
         # Steps that use target_getter for Forge widgets need the Forge window open.
+        # Steps 2-3 (index 1-2) are Forge steps. Step 4 (index 3) is mission_start_button on main window.
+        # Steps 5-8 (index 4-7) are nav buttons on main window that open sub-windows.
         step_needs_forge = (
             step.target_getter is not None
             and 'forge' in step.target_getter.__name__
         )
-        if not step_needs_forge and self._current_step > 3:
-            # After the Forge steps (2-3), close sub-windows when returning to main window
+        if not step_needs_forge and self._current_step >= 3:
             self._close_sub_windows()
         
         # Find target widget
@@ -821,11 +861,17 @@ class DemoTourController(QWidget):
             wait_for_click=step.wait_for_click and target is not None
         )
         
-        # Reconnect buttons for current step
-        self._tooltip._next_btn.clicked.disconnect() if self._tooltip._next_btn.receivers(self._tooltip._next_btn.clicked) > 0 else None
+        # Reconnect buttons for current step — safe disconnect/reconnect
+        try:
+            self._tooltip._next_btn.clicked.disconnect()
+        except TypeError:
+            pass
         self._tooltip._next_btn.clicked.connect(self._on_next)
         
-        self._tooltip._back_btn.clicked.disconnect() if self._tooltip._back_btn.receivers(self._tooltip._back_btn.clicked) > 0 else None
+        try:
+            self._tooltip._back_btn.clicked.disconnect()
+        except TypeError:
+            pass
         if self._current_step > 0:
             self._tooltip._back_btn.setVisible(True)
             self._tooltip._back_btn.clicked.connect(self._on_back)
@@ -838,6 +884,11 @@ class DemoTourController(QWidget):
         else:
             highlight_rect = None
         self._tooltip.position_near_highlight(highlight_rect)
+        
+        # Ensure tooltip has focus for keyboard input (Escape to close)
+        self._tooltip.setFocus()
+        self._tooltip.raise_()
+        self._tooltip.activateWindow()
         
         # Voice narration
         if self._voice_enabled and self._tts.available:
