@@ -23,14 +23,24 @@ from ...core.tts_engine import get_tts
 
 class DemoTourOverlay(QWidget):
     """
-    Overlay that draws animated highlight AROUND target widget.
+    Screen-wide top-level overlay that draws animated highlight AROUND any widget.
+    Works across multiple windows (main window, Forge, Intelligence, etc.).
     Tooltip is positioned separately (bottom-right) so both are visible.
     """
     
     def __init__(self, parent: QWidget = None):
-        super().__init__(parent)
+        super().__init__(None)
+        # Make it a frameless, transparent, always-on-top, non-activating top-level window
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool |
+            Qt.WindowType.WindowTransparentForInput
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setStyleSheet("background: transparent;")
         
         self._highlight_rect: QRect = None
@@ -47,10 +57,7 @@ class DemoTourOverlay(QWidget):
             top_left = widget.mapToGlobal(geo.topLeft())
             bottom_right = widget.mapToGlobal(geo.bottomRight())
             
-            if self.parent():
-                top_left = self.parent().mapFromGlobal(top_left)
-                bottom_right = self.parent().mapFromGlobal(bottom_right)
-            
+            # Since we're a top-level window covering the screen, use global coords directly
             width = bottom_right.x() - top_left.x()
             height = bottom_right.y() - top_left.y()
             
@@ -124,11 +131,11 @@ class DemoTourOverlay(QWidget):
             painter.drawLine(x1, y1, x2, y2)
             painter.drawLine(x3, y3, x4, y4)
     
-    def resize_to_parent(self):
-        """Resize to cover parent window."""
-        if self.parent():
-            self.setGeometry(self.parent().rect())
-            self.raise_()
+    def resize_to_screen(self):
+        """Resize to cover the entire screen so we can highlight widgets in any window."""
+        screen = QApplication.primaryScreen().geometry()
+        self.setGeometry(screen)
+        self.raise_()
 
 
 class DemoTourTooltip(QFrame):
@@ -397,6 +404,9 @@ class DemoTourController(QWidget):
         self._pending_click_target = None
         self._tts = get_tts()
         self._voice_enabled = True
+        self._rehighlight_timer = QTimer(self)
+        self._rehighlight_timer.setInterval(300)
+        self._rehighlight_timer.timeout.connect(self._rehighlight)
         self._setup_steps()
     
     def _find_forge_window(self) -> Optional[QMainWindow]:
@@ -606,11 +616,11 @@ class DemoTourController(QWidget):
                           target="Interactive demo tour started", approved=True, status="info")
     
     def _create_overlay(self):
-        """Create the highlight overlay."""
+        """Create the highlight overlay (screen-wide top-level)."""
         if self._overlay:
             self._overlay.deleteLater()
-        self._overlay = DemoTourOverlay(self._main_window)
-        self._overlay.resize_to_parent()
+        self._overlay = DemoTourOverlay()
+        self._overlay.resize_to_screen()
         self._overlay.show()
         self._overlay.raise_()
     
@@ -670,6 +680,11 @@ class DemoTourController(QWidget):
             if step.wait_for_click:
                 self._pending_click_target = target
                 self._install_event_filter()
+            self._rehighlight_timer.stop()
+        else:
+            # Target not found yet — start polling in case a window is still opening
+            if step.wait_for_click or step.target_widget_name:
+                self._rehighlight_timer.start()
 
         # Update tooltip; if target is missing, explain that the step is skipped.
         action_prompt = step.action_prompt
@@ -708,12 +723,49 @@ class DemoTourController(QWidget):
             self._tts.speak(narration)
     
     def _find_target(self, step: DemoTourStep) -> Optional[QWidget]:
-        """Find the target widget for a step."""
+        """Find the target widget for a step. Searches all open windows."""
         if step.target_getter:
             return step.target_getter()
         if step.target_widget_name:
-            return self._main_window.findChild(QWidget, step.target_widget_name)
+            # First try the main window
+            target = self._main_window.findChild(QWidget, step.target_widget_name)
+            if target and target.isVisible():
+                return target
+            # Then search all top-level windows (Forge, Intelligence, etc.)
+            for w in QApplication.topLevelWidgets():
+                if w is self._main_window:
+                    continue
+                target = w.findChild(QWidget, step.target_widget_name)
+                if target and target.isVisible():
+                    return target
+            # Return even if not visible — the caller handles missing targets
+            if target:
+                return target
         return None
+    
+    def _rehighlight(self):
+        """Periodically re-check if the target widget has appeared (e.g. sub-window just opened)."""
+        if self._current_step >= len(self._steps):
+            self._rehighlight_timer.stop()
+            return
+        step = self._steps[self._current_step]
+        target = self._find_target(step)
+        if target and target.isVisible():
+            self._rehighlight_timer.stop()
+            self._overlay.highlight_widget(target)
+            if step.wait_for_click and not self._event_filter_installed:
+                self._pending_click_target = target
+                self._install_event_filter()
+            # Update tooltip to show the real action prompt now that target is found
+            self._tooltip.update_content(
+                step_num=self._current_step + 1,
+                total_steps=len(self._steps),
+                title=step.title,
+                instruction=step.instruction,
+                action_prompt=step.action_prompt,
+                detail_html=step.detail_html,
+                wait_for_click=True,
+            )
     
     def _install_event_filter(self):
         """Install event filter to watch for clicks on target."""
@@ -737,15 +789,19 @@ class DemoTourController(QWidget):
                 if step.on_target_clicked:
                     step.on_target_clicked()
                 
-                # Auto-advance after click
-                QTimer.singleShot(500, self._on_next)
+                # Remove event filter immediately so the click reaches the widget
+                self._remove_event_filter()
+                
+                # Auto-advance after delay — longer if this step opens a new window
+                delay = 1500 if step.target_widget_name and step.target_widget_name.startswith("nav_") else 500
+                QTimer.singleShot(delay, self._on_next)
                 
                 if self._audit:
                     self._audit.log(tool="DemoTour", action="STEP_ACTION_COMPLETED",
                                   target=f"Step {self._current_step + 1}: {step.title}",
                                   approved=True, status="info")
             
-            return True
+            return False  # Let the click reach the widget so it actually works
         
         return super().eventFilter(obj, event)
     
@@ -778,6 +834,7 @@ class DemoTourController(QWidget):
     
     def _cleanup(self):
         """Clean up resources."""
+        self._rehighlight_timer.stop()
         self._remove_event_filter()
         if self._tts:
             self._tts.stop()

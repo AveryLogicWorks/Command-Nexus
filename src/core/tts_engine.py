@@ -32,16 +32,9 @@ class TTSEngine:
         """Check if any TTS backend is available on this OS."""
         system = platform.system()
         if system == "Windows":
-            try:
-                import win32com.client  # type: ignore
-                return True
-            except Exception:
-                try:
-                    # pythoncom is enough to create the COM object
-                    import pythoncom  # type: ignore
-                    return True
-                except Exception:
-                    return False
+            # Windows always has SAPI or PowerShell System.Speech built-in.
+            # Don't require pywin32 — the PowerShell fallback works everywhere.
+            return True
         elif system == "Darwin":
             return shutil.which("say") is not None
         elif system == "Linux":
@@ -75,7 +68,7 @@ class TTSEngine:
             pass
 
     def _speak_windows(self, text: str) -> None:
-        """Use Windows SAPI SpVoice COM object."""
+        """Use Windows SAPI SpVoice COM object or PowerShell fallback."""
         if self._stop_flag.is_set():
             return
         try:
@@ -86,11 +79,13 @@ class TTSEngine:
                 voice = win32com.client.Dispatch("SAPI.SpVoice")
                 voice.Rate = 1
                 voice.Volume = 100
-                voice.Speak(text, 1 | 2)  # SVSFPurgeBeforeSpeak | SVSFlagsAsync
+                # Synchronous speak (flag 0) — we're in a background thread so blocking is fine.
+                # This ensures the COM object stays alive until speech completes.
+                voice.Speak(text, 0)
             finally:
                 pythoncom.CoUninitialize()
         except ImportError:
-            # win32com not available — try PowerShell as fallback
+            # win32com not available — use PowerShell System.Speech (built into Windows)
             try:
                 escaped = text.replace("'", "''")
                 ps_script = (
@@ -100,7 +95,7 @@ class TTSEngine:
                 )
                 subprocess.run(
                     ["powershell", "-NoProfile", "-Command", ps_script],
-                    timeout=30,
+                    timeout=60,
                     capture_output=True,
                 )
             except Exception:
