@@ -5,7 +5,7 @@ a = Analysis(
     ['B:\\Documents\\GitHub\\Command Nexus\\src\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('src', 'src'), ('assets', 'assets')],
+    datas=[('src', 'src'), ('assets', 'assets'), ('release_manifest.json', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

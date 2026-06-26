@@ -1,5 +1,5 @@
 {
   "command_nexus_release_build": false,
-  "release_channel": "development",
-  "manifest": {}
+  "manifest": {},
+  "release_channel": "development"
 }
