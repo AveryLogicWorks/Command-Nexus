@@ -529,6 +529,11 @@ class NexusAIRuntime:
         memory_text = self._memory_excerpt(ai_uuid, task)
         knowledge_excerpt = self._knowledge_excerpt(knowledge, limit=3000)
 
+        # Get recent memories for conversation continuity
+        recent_memories = self._memory.get_recent(ai_uuid, 5) if ai_uuid else []
+        preference_memories = [m for m in recent_memories if "preference" in m.tags] if recent_memories else []
+        mission_memories = [m for m in recent_memories if "mission" in m.tags] if recent_memories else []
+
         parts: list[str] = []
         parts.append(f"[Local Intelligence Mode — {ai_name} is running without a model backend]")
         parts.append("")
@@ -538,6 +543,7 @@ class NexusAIRuntime:
         has_knowledge = bool(knowledge_excerpt.strip())
         has_memory = bool(memory_text.strip())
 
+        # Show knowledge context
         if has_knowledge:
             parts.append("From my Knowledge/Intelligence profile:")
             for line in knowledge_excerpt.splitlines()[:15]:
@@ -545,14 +551,23 @@ class NexusAIRuntime:
                     parts.append(f"  {line.strip()}")
             parts.append("")
 
-        if has_memory:
-            parts.append("From what I've learned with you:")
-            for line in memory_text.splitlines()[:8]:
-                if line.strip() and not line.startswith("Learned context"):
-                    parts.append(f"  {line.strip()}")
+        # Show learned preferences for continuity
+        if preference_memories:
+            parts.append("What I've learned about you:")
+            for m in preference_memories[:3]:
+                parts.append(f"  - {m.content[:120]}")
+            parts.append("")
+
+        # Show recent mission context for continuity
+        if mission_memories:
+            parts.append("Recent things we've worked on:")
+            for m in mission_memories[:3]:
+                parts.append(f"  - {m.content[:120]}")
             parts.append("")
 
         task_lower = task.lower()
+
+        # Intent: capabilities question
         if any(k in task_lower for k in ["what can you do", "help me", "what are you", "capabilities", "what do you do"]):
             parts.append(f"I'm {ai_name}, a Command Nexus AI for {use_case or 'general assistance'}.")
             parts.append(f"My capabilities: {', '.join(abilities) if abilities else 'basic chat'}")
@@ -566,24 +581,70 @@ class NexusAIRuntime:
             parts.append("  - Learn your preferences over time")
             parts.append("")
             parts.append("Connect a model backend (Ollama/OpenAI) for full AI reasoning power.")
+
+        # Intent: preference statement
         elif any(k in task_lower for k in ["prefer", "like", "always", "never", "remember", "dislike", "hate", "want", "need"]):
             parts.append("Got it — I've saved that to my local memory and will remember it for future tasks.")
             parts.append("You don't need to repeat yourself; I learn from every interaction.")
+            if preference_memories:
+                parts.append("")
+                parts.append("Here's what I already know about you:")
+                for m in preference_memories[:3]:
+                    parts.append(f"  - {m.content[:100]}")
+
+        # Intent: greeting
         elif any(k in task_lower for k in ["hello", "hi ", "hey", "greetings", "good morning", "good afternoon", "good evening"]):
             parts.append(f"Hello! I'm {ai_name}, your Command Nexus AI.")
             if abilities:
                 parts.append(f"I'm equipped with: {', '.join(abilities)}.")
-            parts.append("Ask me anything, give me a task, or tell me what you'd like to accomplish.")
+            if mission_memories:
+                parts.append(f"Last time we worked on: {mission_memories[0].content[:100]}")
+                parts.append("Want to continue that, or start something new?")
+            else:
+                parts.append("Ask me anything, give me a task, or tell me what you'd like to accomplish.")
             if not has_knowledge and not has_memory:
                 parts.append("I'm fresh and ready to learn — the more we work together, the better I'll understand your needs.")
+
+        # Intent: how to use a specific capability
+        elif any(k in task_lower for k in ["how do i", "how to", "where is", "where do", "show me how", "teach me how"]):
+            parts.append("Here's how to use Command Nexus:")
+            parts.append("")
+            parts.append("  🧠 AI Forge — Create and customize AI assistants")
+            parts.append("  📚 Intelligence — Add memory and knowledge to your AI")
+            parts.append("  ⬆️ Upgrades — Browse and unlock more capabilities")
+            parts.append("  🛡️ Governance — Safety controls, audit logs, parental controls")
+            parts.append("  🤖 Support — Get help from the Customer Support AI")
+            parts.append("  🎯 Mission Control — Type a task and click START")
+            parts.append("")
+            parts.append("Just type what you want in plain language. No coding required!")
+
+        # Intent: question
         elif "?" in task:
             parts.append("I don't have a model backend connected to reason through this question fully.")
             if has_knowledge:
                 parts.append("However, my knowledge profile may contain relevant information — see above.")
+            if preference_memories:
+                parts.append("I also remember your preferences and past interactions.")
             parts.append("")
             parts.append("For full AI-powered answers, connect Ollama or set an OpenAI API key in Backend settings.")
+
+        # Intent: continue previous work
+        elif any(k in task_lower for k in ["continue", "last time", "previous", "again", "pick up", "resume"]):
+            if mission_memories:
+                parts.append("Here's what we've been working on:")
+                for m in mission_memories[:5]:
+                    parts.append(f"  - {m.content[:120]}")
+                parts.append("")
+                parts.append("Tell me which one to continue, or describe a new task.")
+            else:
+                parts.append("I don't have any previous missions to continue yet.")
+                parts.append("Start a new task by typing what you'd like to accomplish.")
+
+        # Intent: general statement
         else:
             parts.append("I've received your message and stored it in my local memory.")
+            if mission_memories:
+                parts.append(f"We've worked on {len(mission_memories)} recent task(s) together.")
             parts.append("To act on this fully, I'd need a model backend (Ollama/OpenAI).")
             parts.append("")
             parts.append("In the meantime, I can:")
@@ -591,6 +652,7 @@ class NexusAIRuntime:
             parts.append("  - Break it into steps (just ask me to plan)")
             parts.append("  - Read or write files (use Tool User capability)")
             parts.append("  - Remember your preferences for next time")
+            parts.append("  - Process documents (paste text or use Document Processor)")
 
         parts.append("")
         parts.append("[Local Intelligence Mode — connect a model backend for full AI reasoning]")
@@ -602,7 +664,7 @@ class NexusAIRuntime:
             thought + [
                 f"[{ai_name}] No model backend connected; using local intelligence.",
                 f"[{ai_name}] Knowledge: {'connected' if has_knowledge else 'not found'}, Memory: {'connected' if has_memory else 'empty'}.",
-                f"[{ai_name}] Produced a context-aware local response.",
+                f"[{ai_name}] Produced a context-aware local response with continuity.",
             ],
             [f"[{ai_name}] Returned local intelligence response (clearly labeled, not faking backend)."],
             ["Next: connect Ollama/OpenAI for full AI reasoning, or continue with local capabilities."],

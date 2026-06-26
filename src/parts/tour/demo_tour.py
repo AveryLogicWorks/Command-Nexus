@@ -14,9 +14,11 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QEvent, QPoint, QRect
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QGraphicsDropShadowEffect, QTextEdit,
-    QListWidget,
+    QListWidget, QCheckBox,
 )
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QPolygon, QScreen
+
+from ...core.tts_engine import get_tts
 
 
 class DemoTourOverlay(QWidget):
@@ -244,22 +246,31 @@ class DemoTourTooltip(QFrame):
         button_layout.addWidget(self._back_btn)
         
         button_layout.addStretch()
-        
+
+        self._voice_btn = QPushButton("🔊 Voice: ON")
+        self._voice_btn.setCheckable(True)
+        self._voice_btn.setChecked(True)
+        self._voice_btn.setStyleSheet(
+            "background-color: #1f6feb; color: white; padding: 8px 12px; border-radius: 6px; font-size: 11px;"
+        )
+        self._voice_btn.setFixedWidth(110)
+        button_layout.addWidget(self._voice_btn)
+
         self._skip_btn = QPushButton("Skip Tour")
         self._skip_btn.setStyleSheet(
             "background-color: #30363d; color: #8b949e; padding: 8px 16px; border-radius: 6px;"
         )
         button_layout.addWidget(self._skip_btn)
-        
+
         self._next_btn = QPushButton("Next →")
         self._next_btn.setStyleSheet(
             "background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px;"
         )
         self._next_btn.setDefault(True)
         button_layout.addWidget(self._next_btn)
-        
+
         layout.addLayout(button_layout)
-        
+
         # Demo mode notice
         demo_notice = QLabel("🎮 DEMO MODE - Nothing you do will be saved")
         demo_notice.setFont(QFont("Segoe UI", 10))
@@ -384,6 +395,8 @@ class DemoTourController(QWidget):
         self._tooltip: DemoTourTooltip = None
         self._event_filter_installed = False
         self._pending_click_target = None
+        self._tts = get_tts()
+        self._voice_enabled = True
         self._setup_steps()
     
     def _find_forge_window(self) -> Optional[QMainWindow]:
@@ -410,15 +423,19 @@ class DemoTourController(QWidget):
         self._steps = [
             DemoTourStep(
                 title="👋 Welcome to Command Nexus",
-                instruction="This tour will show you how to build and deploy an AI assistant.",
+                instruction="This tour will show you how to build, deploy, and use AI assistants — no coding required.",
                 detail_html="""<p>By the end of this tour, you'll know how to:</p>
                 <ul>
-                    <li>🧠 <b>Open</b> the AI Forge</li>
-                    <li>⚡ <b>Select</b> an AI and deploy it</li>
+                    <li>🧠 <b>Open</b> the AI Forge and create an AI</li>
+                    <li>⚡ <b>Deploy</b> an AI to the Command Center</li>
                     <li>🎯 <b>Give</b> your AI a mission</li>
+                    <li>📚 <b>Add Intelligence</b> — memory and knowledge</li>
+                    <li>⬆️ <b>Explore Upgrades</b> for more capabilities</li>
+                    <li>🤖 <b>Use Customer Support</b> for help</li>
                 </ul>
                 <p><b>Clickable targets are highlighted.</b> The tour waits for you to click them.</p>
-                <p><i>If a window isn't available, the tour will skip that step.</i></p>""",
+                <p><i>If a window isn't available, the tour will skip that step.</i></p>
+                <p><b>🔊 Voice narration is on.</b> Your OS built-in voice will read each step.</p>""",
                 action_prompt="Click 'Next' to start",
                 wait_for_click=False,
             ),
@@ -427,6 +444,13 @@ class DemoTourController(QWidget):
                 title="🧠 Step 1: Open the AI Forge",
                 instruction="The AI Forge is where you build AI assistants. Click the AI Forge button to open it.",
                 detail_html="""<p>The <b>AI Forge</b> is your workshop. Here you'll create and customize AI assistants.</p>
+                <p>In the Forge you can:</p>
+                <ul>
+                    <li>Choose a <b>Use Case</b> (Individual, Business, Educational, Enterprise)</li>
+                    <li>Select <b>Capabilities</b> — what your AI can do</li>
+                    <li>Adjust <b>Personality</b> — creativity, caution, verbosity</li>
+                    <li>Add <b>Guardrails</b> — safety boundaries</li>
+                </ul>
                 <p>Click the <b>AI Forge</b> button in the navigation bar.</p>""",
                 target_widget_name="nav_forge",
                 action_prompt="👉 CLICK 'AI Forge'",
@@ -437,6 +461,12 @@ class DemoTourController(QWidget):
                 title="📋 Step 2: Select an AI",
                 instruction="In the AI Forge, select an AI from the library list.",
                 detail_html="""<p>The AI library shows the AIs you have created. Click one to select it.</p>
+                <p>Each AI has its own:</p>
+                <ul>
+                    <li><b>Capabilities</b> — what it can do</li>
+                    <li><b>Knowledge</b> — what it knows</li>
+                    <li><b>Memory</b> — what it learns with you</li>
+                </ul>
                 <p><i>If the Forge window did not open, click Next to skip.</i></p>""",
                 target_getter=self._find_forge_ai_list,
                 action_prompt="👉 CLICK an AI in the list",
@@ -447,6 +477,12 @@ class DemoTourController(QWidget):
                 title="🚀 Step 3: Deploy to Command Center",
                 instruction="Click 'Deploy to Command Center' to activate the selected AI.",
                 detail_html="""<p>Deploying makes the AI appear in the Active AI selector in the main window.</p>
+                <p>Once deployed, you can:</p>
+                <ul>
+                    <li>Give the AI <b>missions</b> (tasks to complete)</li>
+                    <li><b>Chat</b> with the AI about anything</li>
+                    <li>Let the AI <b>use tools</b> (read/write files, etc.)</li>
+                </ul>
                 <p><i>If the Forge window is not visible, click Next to skip.</i></p>""",
                 target_getter=self._find_forge_deploy_button,
                 action_prompt="👉 CLICK 'Deploy to Command Center'",
@@ -458,10 +494,13 @@ class DemoTourController(QWidget):
                 instruction="Type a mission in the Mission Control box, then click START.",
                 detail_html="""<p>The Active AI is shown in the selector. Type a task like:</p>
                 <ul>
-                    <li>"Write file notes.txt content: hello"</li>
                     <li>"Plan my day"</li>
+                    <li>"Write a poem about space"</li>
+                    <li>"Explain how photosynthesis works"</li>
                     <li>"Summarize this document: [paste text]"</li>
                 </ul>
+                <p>Your AI will use its capabilities to complete the mission.</p>
+                <p><b>No coding required!</b> Just type what you want in plain language.</p>
                 <p>Click the START button when ready.</p>""",
                 target_widget_name="mission_start_button",
                 action_prompt="👉 TYPE a mission, then click START",
@@ -469,17 +508,87 @@ class DemoTourController(QWidget):
             ),
 
             DemoTourStep(
+                title="📚 Step 5: Add Intelligence",
+                instruction="The Intelligence button lets you give your AI memory and knowledge.",
+                detail_html="""<p>Click the <b>Intelligence</b> button to open the Knowledge panel.</p>
+                <p>There you can:</p>
+                <ul>
+                    <li><b>Add Quick Memory</b> — notes your AI remembers</li>
+                    <li><b>Set Running Memory</b> — how the AI summarizes what it knows</li>
+                    <li><b>Configure Defaults</b> — how the AI starts conversations</li>
+                </ul>
+                <p><b>Your AI learns with you.</b> Every interaction builds its memory.</p>
+                <p><i>Memory is private and stored locally — never sent to external services.</i></p>""",
+                target_widget_name="nav_book",
+                action_prompt="👉 CLICK 'Intelligence' to explore",
+                wait_for_click=True,
+            ),
+
+            DemoTourStep(
+                title="⬆️ Step 6: Explore Upgrades",
+                instruction="The Upgrades button opens the store where you can unlock more capabilities.",
+                detail_html="""<p>Click the <b>Upgrades</b> button to browse available upgrades.</p>
+                <p>Upgrades include:</p>
+                <ul>
+                    <li><b>Premium Capabilities</b> — Data Analyst Pro, Security Auditor, Code Reviewer</li>
+                    <li><b>Team Tools</b> — Meeting Facilitator, Business Workflow</li>
+                    <li><b>Advanced AI</b> — Hephaestus Relay, Customer Support AI</li>
+                    <li><b>License Tiers</b> — More AIs, longer audit logs, priority support</li>
+                </ul>
+                <p>Some capabilities work with <b>local intelligence</b> right away.</p>
+                <p>Others need a <b>model backend</b> (Ollama or OpenAI) for full AI power.</p>""",
+                target_widget_name="nav_constraints",
+                action_prompt="👉 CLICK 'Upgrades' to browse",
+                wait_for_click=True,
+            ),
+
+            DemoTourStep(
+                title="🤖 Step 7: Customer Support",
+                instruction="The Support button connects you to the Customer Support AI for help anytime.",
+                detail_html="""<p>Click the <b>Support</b> button if you need help with:</p>
+                <ul>
+                    <li>How to use Command Nexus</li>
+                    <li>License activation and pricing</li>
+                    <li>Connecting a model backend (Ollama/OpenAI)</li>
+                    <li>Troubleshooting issues</li>
+                </ul>
+                <p>The Support AI is always available to guide you.</p>""",
+                target_widget_name="nav_customer_ai",
+                action_prompt="👉 CLICK 'Support' to see help options",
+                wait_for_click=True,
+            ),
+
+            DemoTourStep(
+                title="🛡️ Step 8: Governance & Safety",
+                instruction="The Governance button shows safety controls, audit logs, and parental controls.",
+                detail_html="""<p>Click <b>Governance</b> to access:</p>
+                <ul>
+                    <li><b>Approval Gates</b> — AI asks before file changes or risky actions</li>
+                    <li><b>Audit Logging</b> — Every action is recorded for accountability</li>
+                    <li><b>Parental Controls</b> — Kid-safe content filtering</li>
+                    <li><b>Anti-Tamper</b> — Protection against unauthorized changes</li>
+                </ul>
+                <p><b>Trust is key.</b> Command Nexus always tells you honestly what it can and can't do.</p>""",
+                target_widget_name="nav_governance",
+                action_prompt="👉 CLICK 'Governance' to see safety controls",
+                wait_for_click=True,
+            ),
+
+            DemoTourStep(
                 title="✅ Tour Complete!",
-                instruction="You've completed the interactive tour.",
+                instruction="You've completed the interactive tour. You're ready to start using Command Nexus!",
                 detail_html="""<h3>🎉 You now know how to:</h3>
                 <ul>
-                    <li>✅ Open the AI Forge</li>
-                    <li>✅ Select and deploy an AI</li>
-                    <li>✅ Give the AI a mission</li>
+                    <li>✅ Open the AI Forge and create AIs</li>
+                    <li>✅ Deploy and give missions</li>
+                    <li>✅ Add Intelligence (memory + knowledge)</li>
+                    <li>✅ Explore Upgrades for more power</li>
+                    <li>✅ Get help from Customer Support</li>
+                    <li>✅ Stay safe with Governance</li>
                 </ul>
-                <p><b>Some capabilities are real, some are partial, and some are paused.</b>
-                Command Nexus will always tell you honestly instead of faking work.</p>
-                <p>Click 'Finish' to close the tutorial.</p>""",
+                <p><b>AI used to be powerful if you knew how to code. Now it's powerful even if you don't.</b></p>
+                <p>Command Nexus brings AI into homes, schools, and businesses — all with trust and no coding required.</p>
+                <p>Click 'Finish' to close the tutorial and start exploring!</p>""",
                 action_prompt="Click 'Finish' to close",
                 wait_for_click=False,
             ),
@@ -515,8 +624,26 @@ class DemoTourController(QWidget):
             on_next=self._on_next,
             on_skip=self._on_skip
         )
+        # Wire voice toggle
+        self._tooltip._voice_btn.clicked.connect(self._on_voice_toggle)
         self._tooltip.show()
         self._tooltip.raise_()
+    
+    def _on_voice_toggle(self):
+        """Toggle voice narration on/off."""
+        self._voice_enabled = self._tooltip._voice_btn.isChecked()
+        if self._voice_enabled:
+            self._tooltip._voice_btn.setText("🔊 Voice: ON")
+            self._tooltip._voice_btn.setStyleSheet(
+                "background-color: #1f6feb; color: white; padding: 8px 12px; border-radius: 6px; font-size: 11px;"
+            )
+        else:
+            self._tooltip._voice_btn.setText("🔇 Voice: OFF")
+            self._tooltip._voice_btn.setStyleSheet(
+                "background-color: #30363d; color: #8b949e; padding: 8px 12px; border-radius: 6px; font-size: 11px;"
+            )
+            if self._tts:
+                self._tts.stop()
     
     def _show_current_step(self):
         """Display current step with highlight and instructions."""
@@ -574,6 +701,11 @@ class DemoTourController(QWidget):
         
         # Position tooltip in bottom-right
         self._tooltip.position_bottom_right()
+        
+        # Voice narration
+        if self._voice_enabled and self._tts.available:
+            narration = f"{step.title}. {step.instruction}"
+            self._tts.speak(narration)
     
     def _find_target(self, step: DemoTourStep) -> Optional[QWidget]:
         """Find the target widget for a step."""
@@ -647,6 +779,8 @@ class DemoTourController(QWidget):
     def _cleanup(self):
         """Clean up resources."""
         self._remove_event_filter()
+        if self._tts:
+            self._tts.stop()
         if self._overlay:
             self._overlay.deleteLater()
             self._overlay = None
