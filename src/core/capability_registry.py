@@ -34,6 +34,10 @@ RUNTIME_INTENTS = {
     "Tool User",
     "Hephaestus Relay",
     "Customer Support AI",
+    "Data Analyst Pro",
+    "Code Reviewer",
+    "Meeting Facilitator",
+    "Security Auditor",
 }
 
 
@@ -131,6 +135,12 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "Visual Canvas": "Vision",
     "Voice Interface": "Voice",
 
+    # Premium upgrade capabilities — mapped to canonical intents
+    "Data Analyst Pro": "Data Analyst Pro",
+    "Code Reviewer": "Code Reviewer",
+    "Meeting Facilitator": "Meeting Facilitator",
+    "Security Auditor": "Security Auditor",
+
     # Browser/Network/External (not wired)
     "Browser Automation": "Browser",
     "Email Automation": "Email",
@@ -162,6 +172,10 @@ CAPABILITY_STATUS: dict[str, ImplementationStatus] = {
     "Hephaestus Relay": ImplementationStatus.PARTIAL,
     "Vision": ImplementationStatus.PARTIAL,
     "Voice": ImplementationStatus.PARTIAL,
+    "Data Analyst Pro": ImplementationStatus.PARTIAL,
+    "Code Reviewer": ImplementationStatus.PARTIAL,
+    "Meeting Facilitator": ImplementationStatus.PARTIAL,
+    "Security Auditor": ImplementationStatus.PARTIAL,
 
     # Paused: not wired in this build
     "Browser": ImplementationStatus.PAUSED,

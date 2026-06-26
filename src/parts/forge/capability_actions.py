@@ -9,6 +9,9 @@ from PyQt6.QtWidgets import (
     QSplitter, QMessageBox, QFileDialog,
 )
 
+from ...core.settings_manager import SettingsManager
+from ...core.backend_manager import BackendManager, BackendResponse
+
 
 @dataclass(frozen=True)
 class CapabilityAction:
@@ -1079,38 +1082,56 @@ class ChatCapabilityDialog(BaseCapabilityDialog):
             return
         self._append_user(msg)
         self._approval_banner.setVisible(False)
-        reply_parts: list[str] = []
         msg_l = msg.lower()
         canonicals = {_canonical_ability(c) for c in self._abilities}
-        if "Research" in canonicals and any(k in msg_l for k in ["research", "find", "search", "compare", "source", "cite"]):
-            reply_parts.append("[Research result] Live web research is not connected. I can prepare a local research brief, source checklist, risk list, and open the Research workflow for approved external search later.")
-            self._approval_banner.setText("Approval required before external/network research.")
-            self._approval_banner.setVisible(True)
-        if "Coder" in canonicals and any(k in msg_l for k in ["code", "function", "bug", "fix", "test", "diff", "patch"]):
-            reply_parts.append("[Coding result] I can operate in show-code-only mode now: explain, draft a diff, or outline tests. File edits and commands stay disabled until approval.")
-            self._approval_banner.setText("Approval required before file changes or command/test execution.")
-            self._approval_banner.setVisible(True)
-        if "Creative Writing" in canonicals and any(k in msg_l for k in ["write", "draft", "story", "scene", "outline", "tone", "polish"]):
-            reply_parts.append("[Writing result] I can outline, draft, revise, tone-shift, or polish in this workspace. Saving/exporting is approval-gated.")
-            if "Research" in canonicals:
-                reply_parts.append("[Research + Writing] If you provide findings or use the Research action first, I can turn them into a source-aware draft.")
-        if "Planner" in canonicals and any(k in msg_l for k in ["plan", "project", "task", "milestone", "timeline", "goal", "organize"]):
-            reply_parts.append("[Planner result] I can break this into goals, tasks, risks, dependencies, and proposed file/folder moves. Actual moves require approval.")
-            self._approval_banner.setText("Approval required before executing organization or external commitments.")
-            self._approval_banner.setVisible(True)
-        if "Notebook" in canonicals and any(k in msg_l for k in ["note", "notes", "remember", "recall", "tag"]):
-            reply_parts.append("[Notes result] I can capture a local note, tag it, and prepare it for archive or task conversion.")
-        if "Document Processor" in canonicals and any(k in msg_l for k in ["document", "doc", "summary", "summarize", "extract", "classify"]):
-            reply_parts.append("[Document result] I can intake selected text/files, summarize, extract actions, classify, and prepare exports after approval.")
-        if "Tutor" in canonicals and any(k in msg_l for k in ["teach", "tutor", "lesson", "quiz", "study", "explain"]):
-            reply_parts.append("[Tutor result] I can explain step by step, quiz you, create a study sheet, or adapt the explanation level.")
-        if "Business Workflow" in canonicals and any(k in msg_l for k in ["sop", "workflow", "business", "support", "checklist", "handoff"]):
-            reply_parts.append("[Business workflow result] I can draft SOPs, checklists, support replies, and handoff packets. Sending or automation requires approval.")
-        if ("Hephaestus Relay" in canonicals or "Hephaestus Briefing Library" in self._libraries) and any(k in msg_l for k in ["hephaestus", "design", "prototype", "material", "handoff", "brief"]):
-            reply_parts.append("[Hephaestus Relay result] I can structure purpose, constraints, scale, materials, unknowns, and a Hephaestus-ready brief without touching ProtoBrain internals.")
-        if not reply_parts:
-            reply_parts.append("I can help from this workspace. Use one of the Available Actions, or ask me to chat, research, code, write, plan, process documents, tutor, or prepare a handoff based on this AI's selected capabilities.")
-        self._append_ai(" ".join(reply_parts))
+
+        # Build a context-aware prompt and call the model backend.
+        book_ctx = (
+            f"You are {self._ai_name}, a Command Nexus governed AI.\n"
+            f"Use case: {self._use_case}\n"
+            f"Abilities: {', '.join(self._abilities) or 'general assistance'}\n"
+            f"Libraries: {', '.join(self._libraries) if self._libraries else 'None'}\n"
+            f"Guardrails: {', '.join(self._guardrails) if self._guardrails else 'None'}\n\n"
+            f"Quickstart: {self._book_context.get('quickstart', 'Ask me anything.')}\n\n"
+            f"User message: {msg}\n\n"
+            "Respond helpfully based on your capabilities. "
+            "Do not claim external actions were performed unless a tool actually performed them. "
+            "If a capability is not active, you can mention you know about it but cannot use it."
+        )
+
+        try:
+            settings = SettingsManager()
+            settings.initialize()
+            backend = BackendManager(settings)
+            response = backend.call_model(book_ctx)
+        except Exception as e:
+            response = BackendResponse(error=f"Backend unavailable: {e}")
+
+        if response.error:
+            self._append_ai(
+                f"I'm here, but my model backend is offline or unavailable.\n\n"
+                f"Provider: {response.display_name or response.provider_id or 'selected backend'}\n"
+                f"Error: {response.error}\n\n"
+                "Start the selected backend, choose a different backend, or configure Backend settings."
+            )
+            # Still provide capability routing hints so the user knows what's available.
+            reply_parts: list[str] = []
+            if "Research" in canonicals and any(k in msg_l for k in ["research", "find", "search", "compare", "source", "cite"]):
+                reply_parts.append("[Research capability is attached but backend is offline. Use the Research workflow for local briefs.]")
+            if "Coder" in canonicals and any(k in msg_l for k in ["code", "function", "bug", "fix", "test", "diff", "patch"]):
+                reply_parts.append("[Coding capability is attached but backend is offline. Use the Coding workflow for local scaffolding.]")
+            if "Creative Writing" in canonicals and any(k in msg_l for k in ["write", "draft", "story", "scene", "outline", "tone", "polish"]):
+                reply_parts.append("[Writing capability is attached but backend is offline. Use the Writing workflow for local drafts.]")
+            if reply_parts:
+                self._append_ai(" ".join(reply_parts))
+            self._input.clear()
+            return
+
+        if response.text:
+            self._append_ai(response.text)
+        else:
+            self._append_ai("I received your message but the model returned an empty response. Please try rephrasing.")
+
         self._input.clear()
 
     def _append_user(self, text: str):

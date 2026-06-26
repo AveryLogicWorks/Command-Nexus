@@ -325,6 +325,18 @@ class NexusAIRuntime:
             result = self._run_business(task, ai_name, meta, knowledge, thought)
         elif intent == "Tool User":
             result = self._run_tool_user(task, ai_name, meta, knowledge, thought)
+        elif intent == "Customer Support AI":
+            result = self._run_customer_support(task, ai_name, meta, knowledge, thought)
+        elif intent == "Hephaestus Relay":
+            result = self._run_hephaestus(task, ai_name, meta, knowledge, thought)
+        elif intent == "Data Analyst Pro":
+            result = self._run_data_analyst(task, ai_name, meta, knowledge, thought)
+        elif intent == "Code Reviewer":
+            result = self._run_code_reviewer(task, ai_name, meta, knowledge, thought)
+        elif intent == "Meeting Facilitator":
+            result = self._run_meeting_facilitator(task, ai_name, meta, knowledge, thought)
+        elif intent == "Security Auditor":
+            result = self._run_security_auditor(task, ai_name, meta, knowledge, thought)
         else:
             result = self._run_chat(task, ai_name, meta, knowledge, thought)
 
@@ -408,6 +420,24 @@ class NexusAIRuntime:
 
         if any(x in t for x in ["customer", "sales", "marketing", "hr", "sop", "business", "support reply"]):
             return "Business Workflow"
+
+        if any(x in t for x in ["hephaestus", "design brief", "prototype", "material spec", "handoff brief"]):
+            return "Hephaestus Relay"
+
+        if any(x in t for x in ["customer support", "support ticket", "help desk", "escalat", "customer service"]):
+            return "Customer Support AI"
+
+        if any(x in t for x in ["analyze data", "data analyst", "dataset", "statistics", "chart", "pivot", "data trend", "data visualization"]):
+            return "Data Analyst Pro"
+
+        if any(x in t for x in ["code review", "review code", "security scan", "quality check", "lint", "best practice"]):
+            return "Code Reviewer"
+
+        if any(x in t for x in ["meeting agenda", "facilitate meeting", "action item", "meeting note", "standup", "retrospective"]):
+            return "Meeting Facilitator"
+
+        if any(x in t for x in ["security audit", "vulnerability", "penetration", "compliance scan", "security assessment"]):
+            return "Security Auditor"
 
         return "Chatbot"
 
@@ -582,6 +612,10 @@ class NexusAIRuntime:
         )
 
     def _run_planner(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "planning"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Planner completed", thought + [f"[{ai_name}] Model backend produced a plan using Knowledge context."], [f"[{ai_name}] Returned structured plan."], ["Next: approve or adjust plan."], model.text)
+
         result = (
             f"Plan for: {task}\n\n"
             "1. Define the exact desired outcome.\n"
@@ -595,7 +629,7 @@ class NexusAIRuntime:
             "- Missing executor/backend\n\n"
             "Approval point: anything that changes files, sends data, or controls apps."
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Planner completed", thought + [f"[{ai_name}] Built a local governed plan."], [f"[{ai_name}] Planner capability executed locally."], ["Next: approve or adjust plan."], result)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Planner completed (local fallback)", thought + [f"[{ai_name}] Built a local governed plan (model backend not connected)."], [f"[{ai_name}] Planner capability executed locally."], ["Next: approve or adjust plan. Connect a model backend for AI-powered planning."], result)
 
     def _run_document_processor(self, task, ai_name, meta, knowledge, thought):
         file_path = self._extract_path(task)
@@ -629,6 +663,10 @@ class NexusAIRuntime:
         return RuntimeResult(RuntimeStatus.COMPLETED, "Archived", thought + [f"[{ai_name}] Archive wrote a local artifact."], [f"[{ai_name}] Archived item: {path}"], ["Next: retrieve by archive path/date."], f"Archived to:\n{path}")
 
     def _run_tutor(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "tutoring"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Tutor completed", thought + [f"[{ai_name}] Model backend produced tutoring content using Knowledge context."], [f"[{ai_name}] Returned lesson/explanation."], ["Next: user answers check question or requests next topic."], model.text)
+
         result = (
             f"Tutor mode for: {task}\n\n"
             "Explanation path:\n"
@@ -638,9 +676,13 @@ class NexusAIRuntime:
             "4. Adjust difficulty based on the answer.\n\n"
             "Question: What part should I explain first?"
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Tutor completed", thought + [f"[{ai_name}] Tutor capability executed locally."], [f"[{ai_name}] Created lesson scaffold."], ["Next: user answers check question."], result)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Tutor completed (local fallback)", thought + [f"[{ai_name}] Tutor capability executed locally (model backend not connected)."], [f"[{ai_name}] Created lesson scaffold."], ["Next: user answers check question. Connect a model backend for AI-powered tutoring."], result)
 
     def _run_business(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "business"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Business workflow completed", thought + [f"[{ai_name}] Model backend produced business workflow using Knowledge context."], [f"[{ai_name}] Returned SOP/draft/checklist."], ["Next: review and approve outward actions."], model.text)
+
         result = (
             f"Business workflow for: {task}\n\n"
             "Draft-safe workflow:\n"
@@ -650,7 +692,109 @@ class NexusAIRuntime:
             "4. Wait for review before sending or publishing.\n\n"
             "Approval required before external send/publish."
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Business workflow completed", thought + [f"[{ai_name}] Business workflow executed locally."], [f"[{ai_name}] Produced draft-safe workflow."], ["Next: review and approve outward actions."], result)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Business workflow completed (local fallback)", thought + [f"[{ai_name}] Business workflow executed locally (model backend not connected)."], [f"[{ai_name}] Produced draft-safe workflow."], ["Next: review and approve outward actions. Connect a model backend for AI-powered business workflows."], result)
+
+    def _run_customer_support(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "customer_support"))
+        if model.error:
+            return self._backend_failure_result(ai_name, thought, model)
+        if model.text:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Customer support completed", thought + [f"[{ai_name}] Model backend produced support response using Knowledge context."], [f"[{ai_name}] Returned customer-safe response."], ["Next: review response before sending to customer."], model.text)
+
+        return RuntimeResult(
+            RuntimeStatus.FAILED,
+            "No model backend connected",
+            thought + [f"[{ai_name}] No model backend connected; cannot produce a real customer support response."],
+            [f"[{ai_name}] Task did not complete because no backend answered."],
+            ["Next: connect Ollama/OpenAI or configure Backend settings."],
+            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
+        )
+
+    def _run_hephaestus(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "hephaestus_relay"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Hephaestus brief completed", thought + [f"[{ai_name}] Model backend produced design brief using Knowledge context."], [f"[{ai_name}] Returned structured handoff brief."], ["Next: review brief before handoff to Hephaestus."], model.text)
+
+        result = (
+            f"Hephaestus Relay brief for: {task}\n\n"
+            "Structured brief:\n"
+            "1. Purpose: What is this design meant to achieve?\n"
+            "2. Constraints: What limits apply (materials, scale, cost, time)?\n"
+            "3. Unknowns: What information is missing before handoff?\n"
+            "4. Scale: What size/volume/throughput is expected?\n"
+            "5. Materials: What materials or systems are relevant?\n\n"
+            "This is a local scaffold. Connect a model backend for AI-generated briefs."
+        )
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Hephaestus brief completed (local fallback)", thought + [f"[{ai_name}] Hephaestus Relay executed locally (model backend not connected)."], [f"[{ai_name}] Produced structured brief scaffold."], ["Next: fill in unknowns and review. Connect a model backend for AI-powered briefs."], result)
+
+    def _run_data_analyst(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "data_analysis"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Data analysis completed", thought + [f"[{ai_name}] Model backend produced data analysis using Knowledge context."], [f"[{ai_name}] Returned analysis with insights."], ["Next: review findings and visualize."], model.text)
+
+        result = (
+            f"Data analysis for: {task}\n\n"
+            "Analysis framework:\n"
+            "1. Data source: Identify where the data comes from.\n"
+            "2. Summary statistics: Count, mean, median, range, std dev.\n"
+            "3. Trends: Look for patterns over time or categories.\n"
+            "4. Outliers: Flag unusual data points.\n"
+            "5. Visualization suggestions: Charts that would clarify the data.\n\n"
+            "This is a local scaffold. Connect a model backend for AI-powered analysis."
+        )
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Data analysis completed (local fallback)", thought + [f"[{ai_name}] Data Analyst Pro executed locally (model backend not connected)."], [f"[{ai_name}] Produced analysis framework."], ["Next: provide data for analysis. Connect a model backend for AI-powered insights."], result)
+
+    def _run_code_reviewer(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "code_review"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Code review completed", thought + [f"[{ai_name}] Model backend produced code review using Knowledge context."], [f"[{ai_name}] Returned review with findings."], ["Next: address flagged issues before merging."], model.text)
+
+        result = (
+            f"Code review for: {task}\n\n"
+            "Review checklist:\n"
+            "1. Security: Check for injection, auth bypass, sensitive data exposure.\n"
+            "2. Quality: Naming, structure, complexity, duplication.\n"
+            "3. Performance: N+1 queries, unnecessary allocations, hot paths.\n"
+            "4. Best practices: Language idioms, framework conventions.\n"
+            "5. Tests: Coverage, edge cases, integration tests.\n\n"
+            "This is a local scaffold. Connect a model backend for AI-powered reviews."
+        )
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Code review completed (local fallback)", thought + [f"[{ai_name}] Code Reviewer executed locally (model backend not connected)."], [f"[{ai_name}] Produced review checklist."], ["Next: provide code for review. Connect a model backend for AI-powered analysis."], result)
+
+    def _run_meeting_facilitator(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "meeting_facilitation"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Meeting facilitation completed", thought + [f"[{ai_name}] Model backend produced meeting plan using Knowledge context."], [f"[{ai_name}] Returned agenda/notes/action items."], ["Next: review and distribute to attendees."], model.text)
+
+        result = (
+            f"Meeting facilitation for: {task}\n\n"
+            "Meeting plan:\n"
+            "1. Agenda: List topics with time allocations.\n"
+            "2. Attendees: Who needs to be present and why.\n"
+            "3. Discussion items: Key points to cover.\n"
+            "4. Action items: Owner, task, deadline for each.\n"
+            "5. Follow-up: Next meeting or check-in schedule.\n\n"
+            "This is a local scaffold. Connect a model backend for AI-powered facilitation."
+        )
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Meeting facilitation completed (local fallback)", thought + [f"[{ai_name}] Meeting Facilitator executed locally (model backend not connected)."], [f"[{ai_name}] Produced meeting plan scaffold."], ["Next: fill in agenda details. Connect a model backend for AI-powered facilitation."], result)
+
+    def _run_security_auditor(self, task, ai_name, meta, knowledge, thought):
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "security_audit"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Security audit completed", thought + [f"[{ai_name}] Model backend produced security audit using Knowledge context."], [f"[{ai_name}] Returned audit with findings and remediation."], ["Next: address critical vulnerabilities first."], model.text)
+
+        result = (
+            f"Security audit for: {task}\n\n"
+            "Audit checklist:\n"
+            "1. Vulnerability scan: Check for known CVEs and weak patterns.\n"
+            "2. Access control: Review auth, authz, privilege escalation.\n"
+            "3. Data protection: Encryption at rest/in transit, PII handling.\n"
+            "4. Configuration: Default credentials, open ports, exposed services.\n"
+            "5. Compliance: Check against relevant standards (GDPR, SOC2, etc.).\n\n"
+            "This is a local scaffold. Connect a model backend for AI-powered auditing."
+        )
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Security audit completed (local fallback)", thought + [f"[{ai_name}] Security Auditor executed locally (model backend not connected)."], [f"[{ai_name}] Produced audit checklist."], ["Next: provide code/config for audit. Connect a model backend for AI-powered scanning."], result)
 
     def _classify_tool_risk(self, action_type: str):
         """Return RiskLevel for a tool action."""

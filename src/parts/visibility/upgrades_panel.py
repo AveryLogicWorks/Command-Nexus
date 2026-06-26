@@ -828,3 +828,234 @@ if __name__ == "__main__":
     print(f"Bundle Discount: {pricing['discount_percent']}% (-${pricing['discount_amount']})")
     print(f"Final Price: ${pricing['final_price']}")
     print(f"You Save: ${pricing['savings']}")
+
+
+# ---------------------------------------------------------------------------
+# Upgrades Dialog — visible UI for browsing and purchasing upgrades
+# ---------------------------------------------------------------------------
+
+import json
+from pathlib import Path
+
+
+_PURCHASED_FILE = Path.home() / ".command_nexus" / "purchased_upgrades.json"
+
+
+def load_purchased_upgrades() -> list[str]:
+    """Load the list of purchased upgrade IDs from disk."""
+    try:
+        if _PURCHASED_FILE.exists():
+            data = json.loads(_PURCHASED_FILE.read_text(encoding="utf-8"))
+            return data.get("purchased", [])
+    except Exception:
+        pass
+    return []
+
+
+def save_purchased_upgrades(ids: list[str]) -> None:
+    """Save the list of purchased upgrade IDs to disk."""
+    try:
+        _PURCHASED_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _PURCHASED_FILE.write_text(
+            json.dumps({"purchased": ids}, indent=2), encoding="utf-8"
+        )
+    except Exception:
+        pass
+
+
+def is_upgrade_purchased(upgrade_id: str) -> bool:
+    """Check if a specific upgrade has been purchased."""
+    return upgrade_id in load_purchased_upgrades()
+
+
+class UpgradesDialog(QDialog):
+    """Full upgrades catalog dialog with purchase tracking."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Command Nexus — Upgrades Store")
+        self.resize(1000, 700)
+        self._purchased = load_purchased_upgrades()
+        layout = QVBoxLayout(self)
+
+        # Header
+        header = QLabel("Premium Upgrades")
+        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #58a6ff; padding: 8px;")
+        layout.addWidget(header)
+
+        subheader = QLabel(
+            f"{len(UPGRADE_FEATURES)} premium features available. "
+            f"{len(self._purchased)} purchased."
+        )
+        subheader.setStyleSheet("font-size: 13px; color: #8b949e; padding: 4px;")
+        layout.addWidget(subheader)
+
+        # Scroll area for upgrade cards
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+
+        for category in UpgradeCategory:
+            cat_upgrades = get_upgrades_by_category(category)
+            if not cat_upgrades:
+                continue
+
+            cat_label = QLabel(f"  {category.name.replace('_', ' ')}")
+            cat_label.setStyleSheet(
+                "font-size: 16px; font-weight: bold; color: #f0883e; "
+                "padding: 8px 4px 4px 4px; border-bottom: 1px solid #30363d;"
+            )
+            scroll_layout.addWidget(cat_label)
+
+            for upgrade in cat_upgrades:
+                card = self._build_upgrade_card(upgrade)
+                scroll_layout.addWidget(card)
+
+        scroll_layout.addStretch(1)
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll, stretch=1)
+
+        # Footer with bundle info
+        footer = QLabel(
+            f"Bundle discounts: 3+ upgrades = 10% off, 5+ = 15% off, 10+ = 25% off"
+        )
+        footer.setStyleSheet("font-size: 12px; color: #8b949e; padding: 4px;")
+        layout.addWidget(footer)
+
+        # Close button
+        btn_close = QPushButton("Close")
+        btn_close.setStyleSheet(
+            "background-color: #30363d; color: #c9d1d9; font-weight: bold; "
+            "padding: 8px 24px; border-radius: 4px;"
+        )
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close)
+
+    def _build_upgrade_card(self, upgrade: UpgradeFeature) -> QFrame:
+        """Build a single upgrade card widget."""
+        card = QFrame()
+        card.setStyleSheet(
+            "QFrame { background-color: #161b22; border: 1px solid #30363d; "
+            "border-radius: 6px; padding: 8px; margin: 4px; }"
+        )
+        card_layout = QVBoxLayout(card)
+
+        # Top row: icon + name + price
+        top = QHBoxLayout()
+        icon_label = QLabel(upgrade.icon)
+        icon_label.setStyleSheet("font-size: 24px;")
+        top.addWidget(icon_label)
+
+        name_label = QLabel(upgrade.name)
+        name_label.setStyleSheet("font-size: 15px; font-weight: bold; color: #c9d1d9;")
+        top.addWidget(name_label, stretch=1)
+
+        price_label = QLabel(upgrade.price)
+        price_label.setStyleSheet("font-size: 15px; font-weight: bold; color: #3fb950;")
+        top.addWidget(price_label)
+
+        if upgrade.popular:
+            pop = QLabel("POPULAR")
+            pop.setStyleSheet(
+                "background-color: #f0883e; color: white; font-size: 10px; "
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px;"
+            )
+            top.addWidget(pop)
+
+        if upgrade.new:
+            new_tag = QLabel("NEW")
+            new_tag.setStyleSheet(
+                "background-color: #238636; color: white; font-size: 10px; "
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px;"
+            )
+            top.addWidget(new_tag)
+
+        card_layout.addLayout(top)
+
+        # Description
+        desc = QLabel(upgrade.description)
+        desc.setStyleSheet("font-size: 12px; color: #8b949e; padding: 4px 0;")
+        desc.setWordWrap(True)
+        card_layout.addWidget(desc)
+
+        # Benefits
+        if upgrade.benefits:
+            benefits_text = "• " + "\n• ".join(upgrade.benefits[:3])
+            benefits = QLabel(benefits_text)
+            benefits.setStyleSheet("font-size: 11px; color: #6e7681; padding: 2px 0;")
+            benefits.setWordWrap(True)
+            card_layout.addWidget(benefits)
+
+        # Bottom row: status / purchase button
+        bottom = QHBoxLayout()
+        is_purchased = upgrade.id in self._purchased
+
+        if is_purchased:
+            status = QLabel("OWNED")
+            status.setStyleSheet(
+                "color: #3fb950; font-weight: bold; font-size: 13px; padding: 4px 12px;"
+            )
+            bottom.addWidget(status)
+            bottom.addStretch(1)
+        else:
+            # Check requirements
+            reqs_met = all(req in self._purchased for req in upgrade.requires)
+            if not reqs_met and upgrade.requires:
+                req_names = [get_upgrade_by_id(r).name if get_upgrade_by_id(r) else r for r in upgrade.requires]
+                status = QLabel(f"Requires: {', '.join(req_names)}")
+                status.setStyleSheet("color: #f85149; font-size: 12px; padding: 4px;")
+                bottom.addWidget(status)
+                bottom.addStretch(1)
+            else:
+                bottom.addStretch(1)
+                btn_buy = QPushButton("Purchase")
+                btn_buy.setStyleSheet(
+                    "background-color: #238636; color: white; font-weight: bold; "
+                    "padding: 6px 20px; border-radius: 4px;"
+                )
+                btn_buy.clicked.connect(lambda checked, uid=upgrade.id: self._purchase(uid))
+                bottom.addWidget(btn_buy)
+
+        card_layout.addLayout(bottom)
+        return card
+
+    def _purchase(self, upgrade_id: str):
+        """Mark an upgrade as purchased."""
+        if upgrade_id in self._purchased:
+            return
+        upgrade = get_upgrade_by_id(upgrade_id)
+        if not upgrade:
+            return
+        # Check requirements
+        reqs_met = all(req in self._purchased for req in upgrade.requires)
+        if not reqs_met:
+            req_names = [get_upgrade_by_id(r).name if get_upgrade_by_id(r) else r for r in upgrade.requires]
+            QMessageBox.warning(
+                self, "Requirements Not Met",
+                f"This upgrade requires: {', '.join(req_names)}.\n"
+                "Purchase those first."
+            )
+            return
+
+        reply = QMessageBox.question(
+            self, "Confirm Purchase",
+            f"Purchase '{upgrade.name}' for {upgrade.price}?\n\n"
+            "This is a demo purchase — no payment will be processed.\n"
+            "The upgrade will be marked as owned.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._purchased.append(upgrade_id)
+        save_purchased_upgrades(self._purchased)
+        QMessageBox.information(
+            self, "Purchase Complete",
+            f"'{upgrade.name}' has been unlocked!\n\n"
+            "Restart Command Nexus for the upgrade to take full effect."
+        )
+        # Refresh the dialog
+        self.accept()
+        dlg = UpgradesDialog(self.parent())
+        dlg.exec()

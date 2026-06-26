@@ -492,6 +492,7 @@ class NavigationBar(QWidget):
     open_constraints = pyqtSignal()
     open_governance = pyqtSignal()
     open_customer_ai = pyqtSignal()
+    open_upgrades = pyqtSignal()
     voice_toggled = pyqtSignal(bool)
     mic_clicked = pyqtSignal()
 
@@ -525,7 +526,7 @@ class NavigationBar(QWidget):
 
         btn_forge.clicked.connect(self.open_forge.emit)
         btn_book.clicked.connect(self.open_book.emit)
-        btn_constraints.clicked.connect(self.open_constraints.emit)
+        btn_constraints.clicked.connect(self.open_upgrades.emit)
         btn_governance.clicked.connect(self.open_governance.emit)
         btn_customer_ai.clicked.connect(self.open_customer_ai.emit)
         btn_tour.clicked.connect(self._on_tour_clicked)

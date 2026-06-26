@@ -151,6 +151,7 @@ class CommandNexusApp:
             nav.open_constraints.connect(self._open_constraints)
             nav.open_governance.connect(self._open_governance)
             nav.open_customer_ai.connect(self._open_customer_ai)
+            nav.open_upgrades.connect(self._open_upgrades)
         except Exception as e:
             QMessageBox.critical(None, "Navigation Error", f"Failed to wire navigation signals: {e}")
             self._cleanup()
@@ -298,6 +299,12 @@ class CommandNexusApp:
             self._constraints = ConstraintsWindow()
         self._constraints.show()
         self._constraints.raise_()
+
+    def _open_upgrades(self):
+        """Open the Upgrades Store dialog."""
+        from .parts.visibility.upgrades_panel import UpgradesDialog
+        dlg = UpgradesDialog(self._visibility)
+        dlg.exec()
 
     def _open_governance(self):
         """Show Governance Policy dialog with embedded Parental Controls button."""
