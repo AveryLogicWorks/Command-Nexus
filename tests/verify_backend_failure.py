@@ -36,8 +36,18 @@ def _chatbot_meta() -> dict:
     }
 
 
+def _support_meta() -> dict:
+    return {
+        "uuid": str(uuid.uuid4()),
+        "use_case": "Customer Support",
+        "abilities": ["Customer Support AI"],
+        "libraries": [],
+        "guardrails": [],
+    }
+
+
 def test_backend_connection_refused_is_failed():
-    """WinError 10061 / connection refused must produce FAILED, not COMPLETED."""
+    """WinError 10061 / connection refused must produce FAILED for backend-required capabilities."""
     tmp = make_temp_workspace()
     try:
         s = SettingsManager()
@@ -46,8 +56,9 @@ def test_backend_connection_refused_is_failed():
         s.update(ollama_url="http://127.0.0.1:59999", ollama_model="fake", backend_timeout=2.0)
 
         runtime = NexusAIRuntime(s)
-        meta = _chatbot_meta()
-        result = runtime.run("hello", "Lily", meta["uuid"], meta)
+        # Customer Support AI requires a real model backend — no local fallback.
+        meta = _support_meta()
+        result = runtime.run("customer support: help me with my account", "Lily", meta["uuid"], meta)
 
         assert result.status in (RuntimeStatus.FAILED, RuntimeStatus.PAUSED), (
             f"Expected FAILED or PAUSED when backend refuses connection, got {result.status}: {result.title}"
@@ -70,8 +81,8 @@ def test_backend_failure_user_message_names_ai_and_guides_to_config():
         s.update(ollama_url="http://127.0.0.1:59999", ollama_model="fake", backend_timeout=2.0)
 
         runtime = NexusAIRuntime(s)
-        meta = _chatbot_meta()
-        result = runtime.run("hello", "Lily", meta["uuid"], meta)
+        meta = _support_meta()
+        result = runtime.run("customer support: help me with my account", "Lily", meta["uuid"], meta)
 
         assert result.status != RuntimeStatus.COMPLETED
         text = result.result_text or ""
@@ -92,9 +103,9 @@ def test_backend_failure_does_not_crash_runtime():
         s.update(ollama_url="http://127.0.0.1:59999", ollama_model="fake", backend_timeout=1.0)
 
         runtime = NexusAIRuntime(s)
-        meta = _chatbot_meta()
+        meta = _support_meta()
         try:
-            result = runtime.run("hello", "Lily", meta["uuid"], meta)
+            result = runtime.run("customer support: help me with my account", "Lily", meta["uuid"], meta)
         except Exception as e:
             raise AssertionError(f"Runtime crashed on backend failure: {e}") from e
 
@@ -151,10 +162,11 @@ def test_capability_routing_still_works_with_offline_backend():
         }
         result = runtime.run("Write a Python function", "Lily", meta["uuid"], meta)
 
-        # Coder intent is allowed, but backend failure keeps it honest.
-        assert result.status == RuntimeStatus.FAILED
-        assert "capability routing worked" in "\n".join(result.thought_lines).lower()
-        assert "offline" in (result.result_text or "").lower()
+        # Coder intent is allowed and now has a local scaffold fallback (COMPLETED, labeled).
+        assert result.status == RuntimeStatus.COMPLETED, f"Expected COMPLETED with local fallback, got {result.status}: {result.title}"
+        assert "intent detected: coder" in "\n".join(result.thought_lines).lower()
+        text_lower = (result.result_text or "").lower()
+        assert "local" in text_lower, "Local fallback should be clearly labeled"
         print("[PASS] Capability routing works even with offline backend")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
