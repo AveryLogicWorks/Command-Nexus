@@ -317,12 +317,17 @@ class DemoTourTooltip(QFrame):
             self._next_btn.setStyleSheet(
                 "background-color: #484f58; color: #8b949e; padding: 8px 20px; border-radius: 6px;"
             )
+            # Skip button must always be enabled — tour is never forced
+            self._skip_btn.setEnabled(True)
+            self._skip_btn.setText("Skip Tour ✕")
         else:
             self._next_btn.setText("Next →")
             self._next_btn.setEnabled(True)
             self._next_btn.setStyleSheet(
                 "background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px;"
             )
+            self._skip_btn.setEnabled(True)
+            self._skip_btn.setText("Skip Tour ✕")
     
     def set_buttons(self, on_back=None, on_next=None, on_skip=None):
         """Connect button signals."""
@@ -768,42 +773,58 @@ class DemoTourController(QWidget):
             )
     
     def _install_event_filter(self):
-        """Install event filter to watch for clicks on target."""
+        """Install event filter on the application to watch for clicks anywhere."""
         if not self._event_filter_installed and self._pending_click_target:
-            self._pending_click_target.installEventFilter(self)
+            app = QApplication.instance()
+            app.installEventFilter(self)
             self._event_filter_installed = True
     
     def _remove_event_filter(self):
-        """Remove event filter."""
-        if self._event_filter_installed and self._pending_click_target:
-            self._pending_click_target.removeEventFilter(self)
+        """Remove event filter from application."""
+        if self._event_filter_installed:
+            app = QApplication.instance()
+            app.removeEventFilter(self)
             self._event_filter_installed = False
             self._pending_click_target = None
     
     def eventFilter(self, obj, event):
-        """Watch for click events on target widget."""
-        if obj == self._pending_click_target and event.type() == QEvent.Type.MouseButtonRelease:
-            # User clicked the target!
-            if self._current_step < len(self._steps):
-                step = self._steps[self._current_step]
-                if step.on_target_clicked:
-                    step.on_target_clicked()
-                
-                # Remove event filter immediately so the click reaches the widget
-                self._remove_event_filter()
-                
-                # Auto-advance after delay — longer if this step opens a new window
-                delay = 1500 if step.target_widget_name and step.target_widget_name.startswith("nav_") else 500
-                QTimer.singleShot(delay, self._on_next)
-                
-                if self._audit:
-                    self._audit.log(tool="DemoTour", action="STEP_ACTION_COMPLETED",
-                                  target=f"Step {self._current_step + 1}: {step.title}",
-                                  approved=True, status="info")
+        """Watch for click events anywhere — check if click lands on target widget."""
+        if (self._pending_click_target and 
+            event.type() == QEvent.Type.MouseButtonPress and
+            isinstance(obj, QWidget)):
             
-            return False  # Let the click reach the widget so it actually works
+            target = self._pending_click_target
+            # Check if the clicked object is the target or a child of the target
+            if obj is target or self._is_descendant(obj, target):
+                if self._current_step < len(self._steps):
+                    step = self._steps[self._current_step]
+                    if step.on_target_clicked:
+                        step.on_target_clicked()
+                    
+                    # Remove event filter immediately
+                    self._remove_event_filter()
+                    
+                    # Auto-advance after delay — longer if this step opens a new window
+                    delay = 1500 if step.target_widget_name and step.target_widget_name.startswith("nav_") else 500
+                    QTimer.singleShot(delay, self._on_next)
+                    
+                    if self._audit:
+                        self._audit.log(tool="DemoTour", action="STEP_ACTION_COMPLETED",
+                                      target=f"Step {self._current_step + 1}: {step.title}",
+                                      approved=True, status="info")
+                
+                return False  # Let the click reach the widget
         
         return super().eventFilter(obj, event)
+    
+    def _is_descendant(self, child: QWidget, ancestor: QWidget) -> bool:
+        """Check if child is a descendant of ancestor."""
+        current = child
+        while current is not None:
+            if current is ancestor:
+                return True
+            current = current.parentWidget()
+        return False
     
     def _on_next(self):
         """Go to next step."""
