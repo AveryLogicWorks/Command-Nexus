@@ -6,6 +6,13 @@ Connects to the adaptive CustomerAIModel and provides a chat interface.
 """
 from __future__ import annotations
 
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,

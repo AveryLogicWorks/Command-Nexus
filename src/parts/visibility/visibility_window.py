@@ -1,3 +1,10 @@
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 import sys
 import time
 import json
@@ -790,6 +797,12 @@ class VisibilityWindow(QMainWindow):
 
         # Menu bar
         menu = self.menuBar()
+        
+        # Trademark label on the left side of the menu bar
+        tm_label = QLabel("  Command Nexus\u2122  ")
+        tm_label.setStyleSheet("color: #58a6ff; font-weight: bold; font-size: 14px; padding: 0 8px;")
+        menu.setCornerWidget(tm_label, Qt.Corner.TopLeftCorner)
+        
         file_menu = menu.addMenu("File")
         act_quit = file_menu.addAction("Quit")
         act_quit.triggered.connect(self.close)
@@ -807,6 +820,19 @@ class VisibilityWindow(QMainWindow):
         act_check.triggered.connect(self._check_backend)
         act_backend = backend_menu.addAction("Configure AI Backend")
         act_backend.triggered.connect(self._show_backend_config)
+
+        help_menu = menu.addMenu("Help")
+        act_about = help_menu.addAction("About Command Nexus\u2122")
+        act_about.triggered.connect(self._show_about)
+
+    def _show_about(self):
+        try:
+            from ...core.ip_watermark import get_copyright_header, get_build_fingerprint
+            fp = get_build_fingerprint()
+            info = get_copyright_header() + f"\n\nBuild Time: {fp['build_time']}"
+        except Exception:
+            info = "Command Nexus\u2122\nCopyright (c) 2026 Avery Logic Works — All Rights Reserved"
+        QMessageBox.about(self, "About Command Nexus\u2122", info)
 
     def _setup_simulator(self):
         self._sim = AuditSimulator()

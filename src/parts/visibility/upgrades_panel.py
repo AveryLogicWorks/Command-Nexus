@@ -1,11 +1,23 @@
-"""
-EXTENSIVE UPGRADE SYSTEM FOR COMMAND NEXUS
-============================================
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
 
-20+ Premium features that make Command Nexus "two or three steps above the rest"
+"""
+PREMIUM UPGRADE CATALOG FOR COMMAND NEXUS
+==========================================
+
+Implementable features only. No vaporware.
+Pricing: individual users get affordable rates, enterprise pays market rate.
 
 Usage: Import into visibility_window.py or create a dedicated upgrades dialog.
 """
+
+import json
+import threading
+from pathlib import Path
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Callable
@@ -13,29 +25,30 @@ from enum import Enum, auto
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QGridLayout, QFrame, QProgressBar, QCheckBox,
-    QDialog, QDialogButtonBox, QMessageBox, QTextEdit
+    QDialog, QDialogButtonBox, QMessageBox, QTextEdit,
+    QLineEdit, QInputDialog, QProgressDialog,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QPalette
+
+from ...core.paypal_integration import PayPalClient, PayPalCaptureResult
+from ...core.settings_manager import SettingsManager
 
 
 class UpgradeCategory(Enum):
     """Categories for organizing upgrades."""
     APPEARANCE = auto()
     FUNCTIONALITY = auto()
-    INTEGRATION = auto()
     ANALYTICS = auto()
     SECURITY = auto()
-    COLLABORATION = auto()
     PERFORMANCE = auto()
-    SUPPORT = auto()
 
 
 class UpgradeTier(Enum):
     """Pricing tiers for upgrades."""
     BASIC = "$4.99"
     STANDARD = "$9.99"
-    PRO = "$19.99"
+    PRO = "$14.99"
     ENTERPRISE = "$49.99"
     ELITE = "$99.99"
 
@@ -49,24 +62,24 @@ class UpgradeFeature:
     detailed_description: str
     category: UpgradeCategory
     price: str
-    icon: str  # Emoji or icon character
+    icon: str
     benefits: List[str] = field(default_factory=list)
-    requires: List[str] = field(default_factory=list)  # IDs of required upgrades
+    requires: List[str] = field(default_factory=list)
     incompatible_with: List[str] = field(default_factory=list)
-    popular: bool = False  # Highlight as popular
-    new: bool = False  # Highlight as new
-    limited_time: bool = False  # Limited time offer
+    popular: bool = False
+    new: bool = False
+    limited_time: bool = False
 
 
-# EXTENSIVE UPGRADE DATABASE
-# 20+ features organized by category
+# PREMIUM UPGRADE CATALOG
+# Only features that can be implemented in this desktop application
 
 UPGRADE_FEATURES = [
-    # === APPEARANCE UPGRADES ===
+    # === APPEARANCE ===
     UpgradeFeature(
         id="visual_themes_pack",
         name="Visual Themes Pack",
-        description="25+ professional themes including dark, light, neon, nature, and corporate styles",
+        description="25+ professional themes: dark, light, neon, nature, and corporate styles",
         detailed_description="""
 Transform Command Nexus with premium visual themes:
 • Dark themes: Midnight, Deep Ocean, Matrix, Cyberpunk, Void
@@ -88,83 +101,28 @@ Transform Command Nexus with premium visual themes:
         ],
         popular=True
     ),
-    
-    UpgradeFeature(
-        id="ai_avatar_pack",
-        name="AI Avatar Pack",
-        description="50+ customizable AI avatars with animations and expressions",
-        detailed_description="""
-Bring your AI to life with animated avatars:
-• Professional avatars: Business, Medical, Legal, Technical
-• Character avatars: Wizard, Robot, Alien, Animal mascots
-• Anime/Cartoon styles: 20+ anime-inspired characters
-• Realistic human avatars with various ethnicities and ages
-• Animated expressions: Happy, thinking, surprised, concerned
-• Custom avatar builder with 100+ components
-• Voice lip-sync animation
-• Desktop presence mode (avatar stays on screen)
-        """,
-        category=UpgradeCategory.APPEARANCE,
-        price="$14.99",
-        icon="👤",
-        benefits=[
-            "Makes AI interactions more engaging and personal",
-            "Build trust with professional avatar personas",
-            "Fun factor increases user retention",
-            "Accessibility for users who prefer visual interaction"
-        ],
-        new=True
-    ),
-    
-    UpgradeFeature(
-        id="voice_pack",
-        name="Premium Voice Pack",
-        description="100+ additional voices including celebrity impressions and regional accents",
-        detailed_description="""
-Expand your AI's voice capabilities:
-• Celebrity-style voices (inspired by, not exact)
-• Regional accents: British, Australian, Irish, Scottish, Indian, etc.
-• Character voices: Robot, Monster, Elf, Dwarf, Alien
-• Age variations: Child, Teen, Young Adult, Middle Age, Senior
-• Emotional voices: Excited, Calm, Serious, Friendly, Professional
-• Singing voice for generating songs and jingles
-• Voice mixing (blend two voices together)
-• Custom voice training (clone your own voice)
-        """,
-        category=UpgradeCategory.APPEARANCE,
-        price="$19.99",
-        icon="🔊",
-        benefits=[
-            "Perfect for content creation and voiceovers",
-            "Accessibility for users with hearing preferences",
-            "Match voice to content type and audience",
-            "Increased engagement through variety"
-        ],
-        popular=True
-    ),
-    
-    # === FUNCTIONALITY UPGRADES ===
+
+    # === FUNCTIONALITY ===
     UpgradeFeature(
         id="export_pack",
         name="Export Pack",
-        description="Export to PDF, DOCX, HTML, Markdown, LaTeX, and more formats",
+        description="Export to PDF, HTML, Markdown, LaTeX, and more formats",
         detailed_description="""
 Professional document export capabilities:
 • PDF export with customizable styling and watermarks
-• Microsoft Word (.docx) with formatting preserved
 • HTML export for web publishing
 • Markdown for developers and writers
 • LaTeX for academic and scientific papers
 • EPUB for e-books
 • JSON/XML for data exchange
-• CSV/Excel for tabular data
+• CSV for tabular data
 • Automatic table of contents generation
 • Professional cover page templates
 • Header/footer customization
 • Page numbering and formatting
         """,
         category=UpgradeCategory.FUNCTIONALITY,
-        price="$14.99",
+        price="$9.99",
         icon="📄",
         benefits=[
             "Professional document delivery to clients",
@@ -173,97 +131,7 @@ Professional document export capabilities:
             "Academic paper formatting included"
         ]
     ),
-    
-    UpgradeFeature(
-        id="knowledge_base",
-        name="Knowledge Base Builder",
-        description="Import documents, websites, and create searchable knowledge bases",
-        detailed_description="""
-Turn Command Nexus into an expert on any topic:
-• Import PDF, Word, TXT, and Markdown documents
-• Web scraping: Import entire websites or specific pages
-• YouTube transcript import
-• Confluence, Notion, and Google Docs integration
-• Automatic summarization and indexing
-• Semantic search across all documents
-• Source citation when using knowledge base
-• Knowledge base sharing between AIs
-• Version control for knowledge bases
-• Real-time syncing with cloud sources
-• Support for 50+ file formats
-        """,
-        category=UpgradeCategory.FUNCTIONALITY,
-        price="$24.99",
-        icon="📚",
-        benefits=[
-            "AI becomes an expert on your specific domain",
-            "No need to re-upload documents repeatedly",
-            "Source verification and citation tracking",
-            "Share institutional knowledge across team"
-        ],
-        popular=True,
-        new=True
-    ),
-    
-    UpgradeFeature(
-        id="code_execution",
-        name="Code Sandbox",
-        description="Execute code in sandboxed environment with 20+ languages",
-        detailed_description="""
-Run and test code directly in Command Nexus:
-• Python, JavaScript, TypeScript execution
-• Java, C++, C#, Go, Rust support
-• SQL database sandbox (SQLite, PostgreSQL)
-• HTML/CSS/JS preview with live rendering
-• Jupyter notebook compatibility
-• Package manager integration (pip, npm, etc.)
-• Error highlighting and debugging assistance
-• Performance profiling and optimization suggestions
-• Secure sandboxed environment (no system access)
-• Automatic dependency installation
-• Unit test execution and reporting
-        """,
-        category=UpgradeCategory.FUNCTIONALITY,
-        price="$19.99",
-        icon="💻",
-        benefits=[
-            "Test code before implementing",
-            "Learn programming with immediate feedback",
-            "Data analysis and visualization",
-            "Prototyping without setting up environment"
-        ]
-    ),
-    
-    UpgradeFeature(
-        id="image_generation",
-        name="AI Image Studio",
-        description="Generate images with DALL-E, Stable Diffusion, and custom models",
-        detailed_description="""
-Create visual content with integrated image generation:
-• DALL-E 3 integration (requires OpenAI API key)
-• Stable Diffusion local and cloud options
-• Image editing and inpainting
-• Style transfer between images
-• Upscaling and enhancement (2x, 4x, 8x)
-• Background removal and replacement
-• Face restoration and enhancement
-• Bulk generation from prompts list
-• Automatic prompt optimization
-• Gallery management and organization
-• Export in multiple formats and sizes
-        """,
-        category=UpgradeCategory.FUNCTIONALITY,
-        price="$29.99",
-        icon="🎨",
-        benefits=[
-            "Create marketing materials and social media content",
-            "Visualize concepts and ideas instantly",
-            "Generate avatars, logos, and branding",
-            "No separate image generation tool needed"
-        ],
-        new=True
-    ),
-    
+
     UpgradeFeature(
         id="advanced_memory",
         name="Advanced Memory System",
@@ -273,7 +141,6 @@ Supercharge your AI's memory capabilities:
 • Unlimited conversation history (not just recent messages)
 • Long-term fact storage across all conversations
 • User preference learning and adaptation
-• Context window up to 128K tokens
 • Memory search and retrieval
 • Selective memory (forget specific topics)
 • Memory import/export for backup
@@ -283,7 +150,7 @@ Supercharge your AI's memory capabilities:
 • Priority memory for important facts
         """,
         category=UpgradeCategory.FUNCTIONALITY,
-        price="$19.99",
+        price="$14.99",
         icon="🧠",
         benefits=[
             "AI remembers everything you've ever discussed",
@@ -293,90 +160,25 @@ Supercharge your AI's memory capabilities:
         ],
         popular=True
     ),
-    
-    # === INTEGRATION UPGRADES ===
-    UpgradeFeature(
-        id="integration_pack",
-        name="Integration Hub",
-        description="Connect with Slack, Discord, Teams, email, and 50+ other services",
-        detailed_description="""
-Connect Command Nexus to your workflow:
-• Messaging: Slack, Discord, Microsoft Teams, Telegram
-• Email: Gmail, Outlook, SMTP integration
-• Cloud Storage: Google Drive, Dropbox, OneDrive, Box
-• Project Management: Jira, Trello, Asana, Monday.com
-• CRM: Salesforce, HubSpot, Pipedrive
-• Social Media: Twitter, LinkedIn, Facebook posting
-• Calendar: Google Calendar, Outlook, Calendly
-• Video: Zoom, Teams, Google Meet integration
-• Automation: Zapier, Make.com, IFTTT
-• Git: GitHub, GitLab, Bitbucket integration
-• Database: Direct SQL connections
-• API: Custom webhook and API integrations
-        """,
-        category=UpgradeCategory.INTEGRATION,
-        price="$29.99",
-        icon="🔌",
-        benefits=[
-            "AI works within your existing tools",
-            "Automate repetitive tasks across platforms",
-            "Centralized command center for all apps",
-            "No more context switching between tools"
-        ],
-        popular=True
-    ),
-    
-    UpgradeFeature(
-        id="api_access",
-        name="Developer API",
-        description="REST API for external integrations and custom applications",
-        detailed_description="""
-Build custom applications with Command Nexus:
-• Full REST API access
-• GraphQL endpoint option
-• WebSocket support for real-time streaming
-• SDK for Python, JavaScript, Java, Go
-• API key management and rotation
-• Rate limit increases (10x default)
-• Webhook notifications
-• Custom endpoint creation
-• White-label API responses
-• Dedicated API documentation
-• Priority API support
-• Usage analytics and monitoring
-        """,
-        category=UpgradeCategory.INTEGRATION,
-        price="$49.99",
-        icon="⚙️",
-        benefits=[
-            "Build custom tools on top of Command Nexus",
-            "Integrate AI into your own applications",
-            "Automate at scale with API calls",
-            "Resell or distribute AI-powered features"
-        ],
-        requires=["integration_pack"]
-    ),
-    
+
     UpgradeFeature(
         id="custom_models",
         name="Custom Model Connector",
-        description="Connect your own LLM endpoints (OpenAI, Anthropic, local models)",
+        description="Connect your own LLM endpoints: OpenAI, Anthropic, local models",
         detailed_description="""
 Use any AI model you want, not just defaults:
-• OpenAI GPT-4, GPT-4 Turbo, GPT-3.5 fine-tuned models
+• OpenAI GPT-4, GPT-4 Turbo, GPT-3.5 models
 • Anthropic Claude 3 (all versions)
 • Google Gemini Pro and Ultra
-• Local models: Llama 2/3, Mistral, Mixtral
+• Local models: Llama 2/3, Mistral, Mixtral, Qwen
 • Self-hosted endpoints
 • Azure OpenAI Service
-• AWS Bedrock integration
 • Model fallback (if one fails, use backup)
 • Model comparison mode (ask multiple models)
 • Cost optimization (auto-select cheapest adequate model)
-• Custom model fine-tuning pipeline
         """,
-        category=UpgradeCategory.INTEGRATION,
-        price="$19.99",
+        category=UpgradeCategory.FUNCTIONALITY,
+        price="$14.99",
         icon="🤖",
         benefits=[
             "Use the best model for each specific task",
@@ -385,8 +187,37 @@ Use any AI model you want, not just defaults:
             "Access latest models immediately"
         ]
     ),
-    
-    # === ANALYTICS UPGRADES ===
+
+    UpgradeFeature(
+        id="automation_pack",
+        name="Workflow Automation",
+        description="Create scheduled tasks, triggers, and automated AI workflows",
+        detailed_description="""
+Automate repetitive AI tasks:
+• Scheduled tasks (run AI at specific times)
+• Trigger-based automation (on event, run AI)
+• Conditional logic (if/then/else)
+• Loop and iteration support
+• Recurring report generation
+• Automatic data processing pipelines
+• AI chain workflows (multiple AIs in sequence)
+• Error handling and retry logic
+• Notification and alert system
+• Template library of common workflows
+        """,
+        category=UpgradeCategory.FUNCTIONALITY,
+        price="$19.99",
+        icon="⚡",
+        benefits=[
+            "Save hours on repetitive tasks",
+            "24/7 automated processing",
+            "Consistent results without manual work",
+            "Focus on high-value creative work"
+        ],
+        new=True
+    ),
+
+    # === ANALYTICS ===
     UpgradeFeature(
         id="analytics_pack",
         name="Analytics Dashboard",
@@ -399,10 +230,7 @@ Understand and optimize your AI usage:
 • Response time analytics
 • Feature usage breakdown (which features you use most)
 • Peak usage times and patterns
-• Comparison to average users
 • Goal setting and tracking
-• Weekly/monthly reports via email
-• Team analytics (for multi-user plans)
 • Export analytics data
 • Custom dashboard creation
         """,
@@ -416,28 +244,26 @@ Understand and optimize your AI usage:
             "Make data-driven decisions about usage"
         ]
     ),
-    
+
     UpgradeFeature(
         id="content_analytics",
         name="Content Intelligence",
-        description="Analyze your generated content for quality, readability, and SEO",
+        description="Analyze generated content for quality, readability, and SEO",
         detailed_description="""
 Professional content analysis tools:
 • Readability scoring (Flesch-Kincaid, etc.)
 • SEO optimization suggestions
 • Tone and sentiment analysis
-• Plagiarism detection
 • Grammar and style checking (beyond basic)
 • Keyword density analysis
 • Content originality scoring
 • Audience appropriateness checking
 • Fact-checking assistance
 • Citation and source verification
-• Content performance prediction
 • A/B testing suggestions for copy
         """,
         category=UpgradeCategory.ANALYTICS,
-        price="$14.99",
+        price="$9.99",
         icon="📈",
         benefits=[
             "Ensure content quality before publishing",
@@ -447,22 +273,46 @@ Professional content analysis tools:
         ],
         new=True
     ),
-    
-    # === SECURITY UPGRADES ===
+
+    # === SECURITY ===
+    UpgradeFeature(
+        id="backup_pack",
+        name="Backup & Sync",
+        description="Automatic backup, version history, and device sync",
+        detailed_description="""
+Never lose your work again:
+• Automatic backup every 5 minutes
+• 1-year version history (rollback to any point)
+• Sync across unlimited devices
+• Offline mode with automatic sync when connected
+• Encrypted backup storage
+• Selective sync (choose what to sync)
+• Export all data anytime
+• Scheduled backup reports
+• Disaster recovery (full restore)
+        """,
+        category=UpgradeCategory.SECURITY,
+        price="$9.99",
+        icon="☁️",
+        benefits=[
+            "Never lose work to crashes or accidents",
+            "Work from multiple devices seamlessly",
+            "Peace of mind with automatic backups",
+            "Version history prevents mistakes"
+        ],
+        popular=True
+    ),
+
     UpgradeFeature(
         id="security_pack",
         name="Enterprise Security",
-        description="SSO, 2FA, audit logs, and advanced security features",
+        description="2FA, audit logs, encryption, and advanced security features",
         detailed_description="""
 Bank-grade security for sensitive work:
-• Single Sign-On (SSO): SAML, OAuth2, OpenID Connect
-• Two-factor authentication (2FA) with TOTP/SMS
-• Hardware security key support (YubiKey)
+• Two-factor authentication (2FA) with TOTP
 • Comprehensive audit logs (who did what, when)
-• IP allowlisting and geo-restriction
 • Session management and remote logout
 • End-to-end encryption option
-• Data residency controls (choose data location)
 • Automatic security scanning
 • Vulnerability alerts
 • Compliance reporting (GDPR, SOC2)
@@ -479,154 +329,26 @@ Bank-grade security for sensitive work:
         ],
         requires=["backup_pack"]
     ),
-    
-    UpgradeFeature(
-        id="compliance_pack",
-        name="Compliance Suite",
-        description="GDPR, HIPAA, SOC2, and industry-specific compliance tools",
-        detailed_description="""
-Stay compliant with industry regulations:
-• GDPR compliance: Data deletion, portability, consent management
-• HIPAA compliance for healthcare (BAA available)
-• SOC2 Type II controls and reporting
-• PCI DSS for payment handling
-• FERPA for educational institutions
-• CCPA/CPRA for California privacy
-• Automatic PII detection and redaction
-• Data retention policy enforcement
-• Right to be forgotten automation
-• Compliance reporting dashboard
-• Audit trail exports
-• Legal hold capabilities
-        """,
-        category=UpgradeCategory.SECURITY,
-        price="$99.99",
-        icon="⚖️",
-        benefits=[
-            "Avoid costly compliance violations",
-            "Win enterprise and government contracts",
-            "Automated compliance reduces manual work",
-            "Legal protection with proper documentation"
-        ],
-        requires=["security_pack"]
-    ),
-    
-    UpgradeFeature(
-        id="backup_pack",
-        name="Cloud Backup & Sync",
-        description="Automatic cloud backup, version history, and device sync",
-        detailed_description="""
-Never lose your work again:
-• Automatic cloud backup every 5 minutes
-• 1-year version history (rollback to any point)
-• Sync across unlimited devices
-• Offline mode with automatic sync when connected
-• Encrypted backup storage
-• Selective sync (choose what to sync)
-• Backup to your own cloud (S3, GCS, Azure)
-• Export all data anytime
-• Scheduled backup reports
-• Disaster recovery (full restore)
-• Team shared backup spaces
-• Mobile app sync support
-        """,
-        category=UpgradeCategory.SECURITY,
-        price="$9.99",
-        icon="☁️",
-        benefits=[
-            "Never lose work to crashes or accidents",
-            "Work from multiple devices seamlessly",
-            "Peace of mind with automatic backups",
-            "Version history prevents mistakes"
-        ],
-        popular=True
-    ),
-    
-    # === COLLABORATION UPGRADES ===
-    UpgradeFeature(
-        id="multiuser_pack",
-        name="Team Collaboration",
-        description="Multi-user support, shared workspaces, and team management",
-        detailed_description="""
-Work together with your team:
-• Unlimited team members
-• Shared AI configurations and prompts
-• Team knowledge bases
-• Collaborative editing (work on same document)
-• Comment and review system
-• Team chat and mentions
-• Role-based permissions (Admin, Editor, Viewer)
-• Department organization
-• Shared templates library
-• Team usage analytics
-• Billing consolidation
-• Team activity feed
-• Approval workflows
-        """,
-        category=UpgradeCategory.COLLABORATION,
-        price="$29.99/user",
-        icon="👥",
-        benefits=[
-            "Share AI configurations across team",
-            "Consistent AI behavior for entire organization",
-            "Collaborate on complex projects",
-            "Centralized billing and management"
-        ]
-    ),
-    
-    UpgradeFeature(
-        id="automation_pack",
-        name="Workflow Automation",
-        description="Create workflows, triggers, and scheduled AI tasks",
-        detailed_description="""
-Automate repetitive AI tasks:
-• Visual workflow builder (drag-and-drop)
-• Scheduled tasks (run AI at specific times)
-• Trigger-based automation (on event, run AI)
-• Conditional logic (if/then/else)
-• Loop and iteration support
-• Integration with external triggers
-• Recurring report generation
-• Automatic data processing pipelines
-• AI chain workflows (multiple AIs in sequence)
-• Error handling and retry logic
-• Notification and alert system
-• Template library of common workflows
-        """,
-        category=UpgradeCategory.COLLABORATION,
-        price="$24.99",
-        icon="⚡",
-        benefits=[
-            "Save hours on repetitive tasks",
-            "24/7 automated processing",
-            "Consistent results without manual work",
-            "Focus on high-value creative work"
-        ],
-        new=True
-    ),
-    
-    # === PERFORMANCE UPGRADES ===
+
+    # === PERFORMANCE ===
     UpgradeFeature(
         id="priority_processing",
         name="Priority Processing",
-        description="3x faster responses and priority queue access",
+        description="Faster responses, smart caching, and priority queue access",
         detailed_description="""
 Get answers faster with priority access:
-• 3x faster response times (guaranteed < 2 seconds)
+• Faster response times (guaranteed < 2 seconds)
 • Dedicated processing resources
 • Priority queue (skip the line)
 • Higher rate limits (5x default)
 • Larger context windows available
 • Concurrent request handling
 • Reduced latency for all operations
-• GPU acceleration when available
 • Smart caching for repeated queries
 • Pre-warmed models (no cold start)
-• 99.9% uptime SLA
-• Direct connection (no shared infrastructure)
         """,
         category=UpgradeCategory.PERFORMANCE,
-        price="$19.99",
+        price="$14.99",
         icon="🚀",
         benefits=[
             "Get answers instantly, no waiting",
@@ -636,91 +358,29 @@ Get answers faster with priority access:
         ],
         popular=True
     ),
-    
-    UpgradeFeature(
-        id="unlimited_pack",
-        name="Unlimited Everything",
-        description="Remove all limits: unlimited AI agents, messages, and features",
-        detailed_description="""
-No limits, no restrictions:
-• Unlimited AI agents (create as many as you want)
-• Unlimited messages per month
-• Unlimited knowledge base documents
-• Unlimited file uploads
-• Unlimited API calls
-• Unlimited team members
-• Unlimited storage
-• Unlimited automations
-• Unlimited exports
-• Unlimited voice generations
-• Unlimited image generations
-• Priority support included
-        """,
-        category=UpgradeCategory.PERFORMANCE,
-        price="$49.99",
-        icon="♾️",
-        benefits=[
-            "Never worry about hitting limits",
-            "Scale without constraints",
-            "Predictable pricing (no overages)",
-            "Best value for power users"
-        ],
-        popular=True
-    ),
-    
-    # === SUPPORT UPGRADES ===
-    UpgradeFeature(
-        id="extended_support",
-        name="White Glove Support",
-        description="Priority phone support, dedicated account manager, and custom training",
-        detailed_description="""
-Premium support experience:
-• Phone support (business hours)
-• Dedicated account manager
-• 1-hour response time guarantee
-• Screen sharing and remote assistance
-• Custom AI training sessions
-• Onboarding assistance
-• Quarterly business reviews
-• Priority bug fixes
-• Feature request prioritization
-• Early access to beta features
-• Custom development consultation
-• Success planning and optimization
-        """,
-        category=UpgradeCategory.SUPPORT,
-        price="$99.99",
-        icon="🎩",
-        benefits=[
-            "Direct access to support team",
-            "Personalized success planning",
-            "Fast resolution of any issues",
-            "Expert guidance on best practices"
-        ],
-        requires=["priority_processing"]
-    ),
-    
+
+    # === ENTERPRISE ===
     UpgradeFeature(
         id="white_label",
         name="White Label License",
-        description="Remove Command Nexus branding and add your own",
+        description="Remove Command Nexus branding and add your own — full reseller rights",
         detailed_description="""
 Make it your own:
 • Remove all "Command Nexus" branding
 • Add your company logo and colors
-• Custom domain support (ai.yourcompany.com)
+• Custom domain support
 • Branded email notifications
 • Custom terms of service
-• White-labeled mobile apps
 • Branded documentation
 • Custom login page
 • Branded billing and invoices
 • Reseller rights (sell to your customers)
 • Revenue share options available
 • Marketing material templates
+• Priority bug fixes included
         """,
-        category=UpgradeCategory.SUPPORT,
-        price="$199.99",
+        category=UpgradeCategory.SECURITY,
+        price="$499.99",
         icon="🏷️",
         benefits=[
             "Present as your own product",
@@ -728,7 +388,7 @@ Make it your own:
             "Resell and keep profits",
             "Enterprise-ready appearance"
         ],
-        requires=["multiuser_pack", "security_pack"]
+        requires=["security_pack"]
     ),
 ]
 
@@ -834,10 +494,6 @@ if __name__ == "__main__":
 # Upgrades Dialog — visible UI for browsing and purchasing upgrades
 # ---------------------------------------------------------------------------
 
-import json
-from pathlib import Path
-
-
 _PURCHASED_FILE = Path.home() / ".command_nexus" / "purchased_upgrades.json"
 
 
@@ -876,6 +532,9 @@ class UpgradesDialog(QDialog):
         self.setWindowTitle("Command Nexus — Upgrades Store")
         self.resize(1000, 700)
         self._purchased = load_purchased_upgrades()
+        self._settings = SettingsManager()
+        self._paypal = PayPalClient(self._settings)
+        self._purchase_thread: threading.Thread | None = None
         layout = QVBoxLayout(self)
 
         # Header
@@ -889,6 +548,30 @@ class UpgradesDialog(QDialog):
         )
         subheader.setStyleSheet("font-size: 13px; color: #8b949e; padding: 4px;")
         layout.addWidget(subheader)
+
+        # PayPal status bar
+        self._paypal_status = QLabel(self._paypal_status_text())
+        self._paypal_status.setStyleSheet(
+            "font-size: 11px; color: #8b949e; padding: 2px 8px; "
+            "background-color: #161b22; border: 1px solid #30363d; border-radius: 4px;"
+        )
+        paypal_row = QHBoxLayout()
+        paypal_row.addWidget(self._paypal_status, stretch=1)
+        btn_paypal_config = QPushButton("Configure PayPal")
+        btn_paypal_config.setStyleSheet(
+            "background-color: #30363d; color: #c9d1d9; padding: 4px 12px; "
+            "border-radius: 4px; font-size: 11px;"
+        )
+        btn_paypal_config.clicked.connect(self._open_paypal_config)
+        paypal_row.addWidget(btn_paypal_config)
+        btn_verify = QPushButton("Verify Order ID")
+        btn_verify.setStyleSheet(
+            "background-color: #30363d; color: #c9d1d9; padding: 4px 12px; "
+            "border-radius: 4px; font-size: 11px;"
+        )
+        btn_verify.clicked.connect(self._manual_verify_order)
+        paypal_row.addWidget(btn_verify)
+        layout.addLayout(paypal_row)
 
         # Scroll area for upgrade cards
         scroll = QScrollArea()
@@ -1020,13 +703,116 @@ class UpgradesDialog(QDialog):
         card_layout.addLayout(bottom)
         return card
 
+    def _paypal_status_text(self) -> str:
+        if self._paypal.is_configured():
+            mode = "Sandbox" if self._settings.get().paypal_sandbox else "Live"
+            return f"PayPal: Connected ({mode} mode)"
+        return "PayPal: Not configured — click 'Configure PayPal' to enable real purchases"
+
+    def _open_paypal_config(self):
+        """Open a small dialog to configure PayPal Client ID."""
+        s = self._settings.get()
+        dlg = QDialog(self)
+        dlg.setWindowTitle("PayPal Configuration")
+        dlg.setFixedWidth(500)
+        dlg_layout = QVBoxLayout(dlg)
+
+        dlg_layout.addWidget(QLabel("PayPal Client ID:"))
+        client_id_input = QLineEdit(s.paypal_client_id)
+        client_id_input.setStyleSheet(
+            "background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px;"
+        )
+        dlg_layout.addWidget(client_id_input)
+
+        dlg_layout.addWidget(QLabel(
+            "Get your Client ID from:\n"
+            "PayPal Developer Dashboard → My Apps & Credentials → REST API Apps\n"
+            "Create an app, copy the Client ID. The Client Secret is NOT needed\n"
+            "for the client-side flow used by Command Nexus."
+        ))
+
+        sandbox_check = QCheckBox("Use Sandbox (test mode — no real charges)")
+        sandbox_check.setChecked(s.paypal_sandbox)
+        dlg_layout.addWidget(sandbox_check)
+
+        btn_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_box.accepted.connect(dlg.accept)
+        btn_box.rejected.connect(dlg.reject)
+        dlg_layout.addWidget(btn_box)
+
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._settings.update(
+                paypal_client_id=client_id_input.text().strip(),
+                paypal_sandbox=sandbox_check.isChecked(),
+            )
+            self._paypal = PayPalClient(self._settings)
+            self._paypal_status.setText(self._paypal_status_text())
+            QMessageBox.information(
+                self, "PayPal Configured",
+                "PayPal configuration saved. You can now make real purchases.\n\n"
+                + ("Sandbox mode: no real charges will occur." if sandbox_check.isChecked()
+                   else "LIVE mode: real charges will be processed.")
+            )
+
+    def _manual_verify_order(self):
+        """Manually verify a PayPal Order ID (fallback when callback fails)."""
+        if not self._paypal.is_configured():
+            QMessageBox.warning(self, "PayPal Not Configured", "Configure PayPal first.")
+            return
+
+        order_id, ok = QInputDialog.getText(
+            self, "Verify PayPal Order",
+            "Enter your PayPal Order ID:\n"
+            "(Found on your PayPal receipt or after payment completion)",
+        )
+        if not ok or not order_id.strip():
+            return
+
+        result = self._paypal.verify_order_id(order_id.strip())
+        if result.success:
+            # Find which upgrade this order was for — check purchase_units reference_id
+            # For manual verification, we need to ask which upgrade
+            upgrade_names = [u.name for u in UPGRADE_FEATURES if u.id not in self._purchased]
+            if not upgrade_names:
+                QMessageBox.information(self, "All Owned", "All upgrades are already purchased.")
+                return
+            choice, ok2 = QInputDialog.getItem(
+                self, "Select Upgrade",
+                "Which upgrade did you purchase?",
+                upgrade_names, 0, False,
+            )
+            if not ok2 or not choice:
+                return
+            upgrade = next((u for u in UPGRADE_FEATURES if u.name == choice), None)
+            if upgrade and upgrade.id not in self._purchased:
+                self._purchased.append(upgrade.id)
+                save_purchased_upgrades(self._purchased)
+                QMessageBox.information(
+                    self, "Purchase Verified",
+                    f"'{upgrade.name}' has been unlocked!\n"
+                    f"PayPal Order: {result.order_id}\n"
+                    f"Payer: {result.payer_email or 'N/A'}"
+                )
+                self.accept()
+                dlg = UpgradesDialog(self.parent())
+                dlg.exec()
+        else:
+            QMessageBox.warning(
+                self, "Verification Failed",
+                f"Could not verify order.\n\n{result.error}\n\n"
+                f"Order ID: {result.order_id}\nStatus: {result.status}"
+            )
+
     def _purchase(self, upgrade_id: str):
-        """Mark an upgrade as purchased."""
+        """Purchase an upgrade via PayPal."""
         if upgrade_id in self._purchased:
             return
         upgrade = get_upgrade_by_id(upgrade_id)
         if not upgrade:
             return
+
         # Check requirements
         reqs_met = all(req in self._purchased for req in upgrade.requires)
         if not reqs_met:
@@ -1038,8 +824,102 @@ class UpgradesDialog(QDialog):
             )
             return
 
+        # Check if PayPal is configured
+        if not self._paypal.is_configured():
+            reply = QMessageBox.question(
+                self, "PayPal Not Configured",
+                "PayPal is not configured. Would you like to configure it now?\n\n"
+                "Without PayPal, purchases are demo-only (no real payment).",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._open_paypal_config()
+                if not self._paypal.is_configured():
+                    return
+            else:
+                # Fallback to demo purchase
+                self._demo_purchase(upgrade)
+                return
+
+        # Confirm purchase
+        mode = "SANDBOX (test — no real charge)" if self._settings.get().paypal_sandbox else "LIVE (real charge)"
         reply = QMessageBox.question(
             self, "Confirm Purchase",
+            f"Purchase '{upgrade.name}' for {upgrade.price}?\n\n"
+            f"PayPal mode: {mode}\n\n"
+            "Your browser will open to PayPal for secure checkout.\n"
+            "After payment, return to Command Nexus automatically.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Disable the dialog during purchase
+        self.setEnabled(False)
+        self._purchase_progress = QProgressDialog(
+            "Processing PayPal checkout...", "Cancel", 0, 0, self
+        )
+        self._purchase_progress.setWindowTitle("PayPal Checkout")
+        self._purchase_progress.setCancelButton(None)
+        self._purchase_progress.show()
+
+        # Run PayPal flow in a background thread
+        def run_purchase():
+            result = self._paypal.purchase_upgrade(
+                upgrade_id=upgrade.id,
+                upgrade_name=upgrade.name,
+                price=upgrade.price,
+                description=upgrade.description,
+                on_status=lambda msg: QTimer.singleShot(0, lambda: self._purchase_progress.setLabelText(msg)),
+            )
+            # Handle result on the main thread
+            QTimer.singleShot(0, lambda: self._handle_purchase_result(result, upgrade))
+
+        self._purchase_thread = threading.Thread(target=run_purchase, daemon=True)
+        self._purchase_thread.start()
+
+    def _handle_purchase_result(self, result: PayPalCaptureResult, upgrade: UpgradeFeature):
+        """Handle PayPal purchase result on the main thread."""
+        self._purchase_progress.close()
+        self.setEnabled(True)
+
+        if result.success:
+            self._purchased.append(upgrade.id)
+            save_purchased_upgrades(self._purchased)
+            QMessageBox.information(
+                self, "Purchase Complete",
+                f"'{upgrade.name}' has been unlocked!\n\n"
+                f"PayPal Order: {result.order_id}\n"
+                f"Payer: {result.payer_email or 'N/A'}\n\n"
+                "Restart Command Nexus for the upgrade to take full effect."
+            )
+            self.accept()
+            dlg = UpgradesDialog(self.parent())
+            dlg.exec()
+        else:
+            if result.status == "TIMEOUT":
+                # Offer manual verification
+                reply = QMessageBox.question(
+                    self, "Payment Timeout",
+                    f"PayPal callback was not received.\n\n"
+                    f"Order ID: {result.order_id}\n\n"
+                    "If you completed the payment on PayPal, you can verify it manually.\n"
+                    "Would you like to verify the Order ID now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    self._manual_verify_order()
+            else:
+                QMessageBox.warning(
+                    self, "Purchase Failed",
+                    f"PayPal purchase failed.\n\n{result.error}\n\n"
+                    f"Order ID: {result.order_id}"
+                )
+
+    def _demo_purchase(self, upgrade: UpgradeFeature):
+        """Fallback demo purchase when PayPal is not configured."""
+        reply = QMessageBox.question(
+            self, "Demo Purchase",
             f"Purchase '{upgrade.name}' for {upgrade.price}?\n\n"
             "This is a demo purchase — no payment will be processed.\n"
             "The upgrade will be marked as owned.",
@@ -1047,15 +927,13 @@ class UpgradesDialog(QDialog):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-
-        self._purchased.append(upgrade_id)
+        self._purchased.append(upgrade.id)
         save_purchased_upgrades(self._purchased)
         QMessageBox.information(
             self, "Purchase Complete",
             f"'{upgrade.name}' has been unlocked!\n\n"
             "Restart Command Nexus for the upgrade to take full effect."
         )
-        # Refresh the dialog
         self.accept()
         dlg = UpgradesDialog(self.parent())
         dlg.exec()

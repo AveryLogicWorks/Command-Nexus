@@ -10,6 +10,13 @@ can pretend to be finished when it is not.
 """
 from __future__ import annotations
 
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 from enum import Enum
 
 

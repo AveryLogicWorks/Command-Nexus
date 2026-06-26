@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 from ...core.obfuscation_manager import get_obfuscation_manager
 from ...core.license_manager import get_license_manager
 from ...core.nexus_use_lockafire import check_use_lock, UseLockArea
@@ -28,8 +35,9 @@ ABILITY_SURFACES = {
     "Agent": "Tool proposal surface with approval and audit scaffolding",
     "Tutor": "Tutor workflow with explain, quiz, lesson, study-sheet, and accessibility modes",
     "Business Workflow": "SOP, checklist, support draft, handoff, and automation-plan workspace",
-    "Hephaestus Relay": "Design-brief intake and Hephaestus-ready handoff without ProtoBrain internals",
 }
+
+# Hephaestus Relay description removed — capability is PAUSED for this build
 
 # Action hints for capabilities (placeholder behaviors)
 CAPABILITY_ACTIONS: dict[str, str] = {
@@ -1052,7 +1060,7 @@ from .capability_actions import (
     ToolUserCapabilityDialog,
     TutorCapabilityDialog,
     BusinessWorkflowCapabilityDialog,
-    HephaestusRelayCapabilityDialog,
+    # HephaestusRelayCapabilityDialog — reserved for future Hephaestus integration
 )
 
 
@@ -1273,17 +1281,7 @@ NEXUS_LIBRARIES: list[dict] = [
         "integration_target": "Approval / Governance",
         "risk_level": "Low",
     },
-    {
-        "id": "hephaestus_brief_lib",
-        "name": "Hephaestus Briefing Library",
-        "description": "Design brief creation, ideation organization, and Hephaestus ProtoBrain handoff formatting. Does not perform prototype modeling.",
-        "category": "Design / Prototype",
-        "applies_to": ["Creative Writer", "Strategic Planner", "Workflow Automator"],
-        "enabled_by_default": False,
-        "integration_target": "Hephaestus ProtoBrain",
-        "proprietary": True,
-        "risk_level": "Medium",
-    },
+    # Hephaestus Briefing Library removed — will be added when Hephaestus integration is enabled
 ]
 
 
@@ -2552,15 +2550,7 @@ class AIForgeWindow(QMainWindow):
                 "personality": {"creativity": 60, "formality": 55, "caution": 70},
                 "notes": "Strategy planner + risk checker + decision helper + workflow organizer.",
             },
-            {
-                "name": "Hephaestus Relay",
-                "use_case": UseCaseClass.ALL_ROUNDER,
-                "capabilities": ["Creative Writer", "Strategic Planner", "Workflow Automator", "Document Processor"],
-                "guardrails": ["Always summarize long outputs before detail", "Always suggest alternatives when declining a request"],
-                "libraries": ["Hephaestus Briefing Library", "Communication Library", "Project Memory Library"],
-                "personality": {"creativity": 70, "formality": 50, "caution": 65},
-                "notes": "Design-brief assistant + ideation organizer + Hephaestus handoff formatter (amplifies Hephaestus, does not replace it).",
-            },
+            # Hephaestus Relay starter removed — will be added when Hephaestus integration is enabled
         ]
 
         for tpl in starters:

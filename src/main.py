@@ -1,3 +1,10 @@
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 import sys
 from pathlib import Path
 
@@ -17,15 +24,18 @@ from src.parts.constraints.constraints_window import ConstraintsWindow
 from src.parts.watcher.watcher_window import WatcherEngine
 from src.parts.owner.owner_console import OwnerConsole
 from src.parts.customer_support.customer_ai_window import CustomerAIWindow
+from src.parts.prototyper import PrototyperWindow  # reserved for future Hephaestus integration
 from src.parts.tour.demo_tour import start_demo_tour, DemoTourController
 from src.core.governance import GovernanceEngine
 from src.core.settings_manager import SettingsManager
 from src.core.approval_gate import ApprovalGate
 from src.core.audit_logger import AuditLogger
 from src.core.command_router import CommandRouter, ToolRegistry, LocalCommandServer
+from src.core.approval_gate import RiskLevel
 from src.core.license_manager import get_license_manager
 from src.core.license_dialog import LicenseActivationDialog
 from src.core.tripwire_manager import TripwireManager, WatcherMode
+from src.core.ip_watermark import get_build_fingerprint, get_watermark_string
 
 
 class CommandNexusApp:
@@ -63,6 +73,14 @@ class CommandNexusApp:
         except Exception as e:
             QMessageBox.critical(None, "Initialization Error", f"Failed to initialize core systems: {e}")
             sys.exit(1)
+
+        # Log build fingerprint for IP traceability
+        try:
+            fp = get_build_fingerprint()
+            self._audit.log(tool="System", action="BUILD_FINGERPRINT",
+                          target=fp["build_id"], approved=True, status="info")
+        except Exception:
+            pass
 
         # License check
         try:
@@ -140,10 +158,7 @@ class CommandNexusApp:
             self._cleanup()
             sys.exit(1)
 
-        # Show guided tour on first run (or if forced via settings)
-        self._maybe_show_tour()
-
-        # Navigation signal wiring
+        # Navigation signal wiring — MUST be before tour so buttons work during tour
         try:
             nav = self._visibility._nav
             nav.open_forge.connect(self._open_forge)
@@ -156,6 +171,9 @@ class CommandNexusApp:
             QMessageBox.critical(None, "Navigation Error", f"Failed to wire navigation signals: {e}")
             self._cleanup()
             sys.exit(1)
+
+        # Show guided tour on first run (after signals are wired so buttons work)
+        self._maybe_show_tour()
 
         # Wire the already-created Watcher to the UI and owner console.
         try:
@@ -185,6 +203,7 @@ class CommandNexusApp:
         self._book = None
         self._constraints = None
         self._customer_ai = None
+        self._prototyper = None  # reserved for future Hephaestus integration
         self._tour_controller: DemoTourController = None
 
     def _maybe_show_tour(self):
@@ -276,7 +295,15 @@ class CommandNexusApp:
 
     def _route_book_command(self, command: str):
         """Route a command from the Knowledge window to the AI. Memory is NEVER included."""
-        self._router.route(command, source="book_command")
+        self._router.route(
+            action=command,
+            tool_uuid="chat",
+            description=command,
+            rationale="Book command",
+            targets=[],
+            risk=RiskLevel.LOW,
+            require_approval=False,
+        )
 
     def _on_ai_activated(self, uuid: str, name: str):
         self._visibility.add_ai_session(uuid, name)
@@ -323,6 +350,14 @@ class CommandNexusApp:
             self._customer_ai.escalation_needed.connect(self._on_customer_escalation)
         self._customer_ai.show()
         self._customer_ai.raise_()
+
+    # Prototyper (Hephaestus) integration reserved for future release
+    # def _open_prototyper(self):
+    #     """Open the 3D Prototyper workspace."""
+    #     if self._prototyper is None:
+    #         self._prototyper = PrototyperWindow(self._audit, self._visibility)
+    #     self._prototyper.show()
+    #     self._prototyper.raise_()
 
     def _on_customer_escalation(self, customer_id: str, issue_type: str):
         """Handle customer issue escalation."""

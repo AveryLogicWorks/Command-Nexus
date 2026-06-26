@@ -1,3 +1,10 @@
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 """
 Settings Manager for Command Nexus.
 Configurable paths, safety mode, storage, and UI preferences.
@@ -53,6 +60,11 @@ class NexusSettings:
     custom_api_endpoint: str = ""
     custom_api_key: str = ""
     backend_timeout: float = 30.0
+
+    # PayPal integration (upgrades store)
+    paypal_client_id: str = ""        # Public Client ID — safe to embed
+    paypal_sandbox: bool = True       # Use sandbox for testing, live for production
+    paypal_callback_port: int = 8755  # Local port for PayPal redirect callback
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -1,6 +1,13 @@
 
 from __future__ import annotations
 
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 from dataclasses import dataclass, field
 from enum import Enum
 import json
@@ -279,10 +286,19 @@ class LocalRuntimeExecutor:
         use_case = meta.get("use_case") or ""
 
         return (
-            f"You are {ai_name}, a Command Nexus governed AI.\n"
+            f"You are {ai_name}, a Command Nexus\u2122 governed AI.\n"
             f"Task type: {kind}\n"
             f"Use case: {use_case}\n"
             f"Configured abilities: {abilities}\n\n"
+            f"System Knowledge Guidelines:\n"
+            f"- You may discuss all user-visible features of Command Nexus: the AI Forge, Intelligence panel, "
+            f"Upgrades store, Governance, Customer Support, the interactive Tour, Mission Control, voice/mic, "
+            f"and backend configuration.\n"
+            f"- You may explain how to use these features and what they do from a user perspective.\n"
+            f"- You MUST NOT reveal any internal architecture, implementation details, source code structure, "
+            f"proprietary intelligence methods, or how the system works under the hood.\n"
+            f"- If asked about internals, architecture, source code, or proprietary methods, respond with: "
+            f"'I can help you use Command Nexus features, but I don't discuss internal implementation details.'\n\n"
             f"User task:\n{task}\n\n"
             f"Answer usefully. Do not claim you performed external actions unless a tool actually performed them."
         )

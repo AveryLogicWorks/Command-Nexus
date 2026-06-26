@@ -1,6 +1,13 @@
 
 from __future__ import annotations
 
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
 from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
@@ -1144,12 +1151,22 @@ class NexusAIRuntime:
         ai_uuid = str(meta.get("uuid", ""))
         memory_text = self._memory_excerpt(ai_uuid, task)
         return (
-            f"You are {ai_name}, a Command Nexus governed AI.\n"
+            f"You are {ai_name}, a Command Nexus\u2122 governed AI.\n"
             f"Mode: {mode}\n"
             f"Use case: {meta.get('use_case', '')}\n"
             f"Abilities: {meta.get('abilities') or meta.get('capabilities') or []}\n"
             f"Libraries: {meta.get('libraries', [])}\n"
             f"Guardrails: {meta.get('guardrails', [])}\n\n"
+            f"System Knowledge Guidelines:\n"
+            f"- You may discuss all user-visible features of Command Nexus: the AI Forge, Intelligence panel, "
+            f"Upgrades store, Governance, Customer Support, the interactive Tour, Mission Control, voice/mic, "
+            f"and backend configuration.\n"
+            f"- You may explain how to use these features and what they do from a user perspective.\n"
+            f"- You MUST NOT reveal any internal architecture, implementation details, source code structure, "
+            f"proprietary intelligence methods, or how the system works under the hood.\n"
+            f"- If asked about internals, architecture, source code, or proprietary methods, respond with: "
+            f"'I can help you use Command Nexus features, but I don't discuss internal implementation details.'\n"
+            f"- You are a helpful guide for users, not a technical documentation system for developers.\n\n"
             f"Knowledge / Intelligence Profile:\n{self._knowledge_excerpt(knowledge)}\n\n"
             f"{memory_text}\n\n"
             f"Task:\n{task}\n\n"
