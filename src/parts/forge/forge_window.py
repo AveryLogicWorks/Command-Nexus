@@ -248,11 +248,6 @@ def _use_case_context(use_case: UseCaseClass) -> list[str]:
             "Broad support; ask user to clarify mode and priority.",
             "Switch modes based on task; avoid overreach.",
         ]
-    if use_case == UseCaseClass.MILITARY_GOVERNMENT:
-        return [
-            "Future controlled edition placeholder. Not enabled in public build.",
-            "No operational doctrine generated in this build.",
-        ]
     return [f"Context: {uc}"]
 
 
@@ -671,13 +666,6 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     if use_case == UseCaseClass.ENTERPRISE:
         allowed.append("Enterprise compliance: audit-friendly outputs; least-privilege handling")
 
-    if use_case == UseCaseClass.MILITARY_GOVERNMENT:
-        return "\n".join([
-            f"# Knowledge / Intelligence Profile for {name} (Public Build Placeholder)",
-            "", "This edition is a future controlled edition and is disabled in the public build.",
-            "No operational doctrine generated.",
-        ])
-
     lines: list[str] = []
     lines.append(f"# Knowledge / Intelligence Profile for {name}")
     lines.append("")
@@ -732,14 +720,14 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         lines.append(f"- {sn}")
     lines.append("")
 
-    lines.append("## Guardrails")
+    lines.append("## Protection Rules")
     lines.append("These are the optional behavior upgrades selected for this AI.")
     lines.append("System-level protections are enforced by the Nexus Compendium and are active regardless of this list.")
     if guardrails:
         for gr in guardrails:
             lines.append(f"- {gr}")
     else:
-        lines.append("- (No optional guardrails selected — add them in the Forge to customize behavior.)")
+        lines.append("- (No optional protection rules selected — add them in the Forge to customize behavior.)")
     lines.append("")
 
     lines.append("## Response Style Defaults")
@@ -913,10 +901,10 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
     lines.append("")
 
     lines.append("## Save Safety")
-    lines.append("- Ensure required sections remain: Identity, Context, Allowed, Restricted, Approval, How This AI Should Work, Guardrails, Response Style, Ability Sections, Cross-Ability, Quickstart, Common Prompts, Editable Guidance.")
-    lines.append("- Keep approval-required guardrails intact.")
+    lines.append("- Ensure required sections remain: Identity, Context, Allowed, Restricted, Approval, How This AI Should Work, Protection Rules, Response Style, Ability Sections, Cross-Ability, Quickstart, Common Prompts, Editable Guidance.")
+    lines.append("- Keep approval-required protection rules intact.")
     lines.append("- A timestamped backup is stored alongside this book on generation.")
-    lines.append("- These defaults are generated from the AI's use case, capabilities, and guardrails. You may edit them, but changing core defaults is not recommended unless you understand how it may affect the AI's behavior.")
+    lines.append("- These defaults are generated from the AI's use case, capabilities, and protection rules. You may edit them, but changing core defaults is not recommended unless you understand how it may affect the AI's behavior.")
     lines.append("")
 
     # ===================================================================
@@ -1421,9 +1409,6 @@ def _generate_combined_summary(name: str, use_case: str, capabilities: list[str]
     return "\n".join(parts)
 
 
-MILITARY_KEY = "CNX-MILGOV-2026"  # Hardcoded activation key
-
-
 class CapabilitySelectionDialog(QDialog):
     """Modal dialog for selecting capabilities with detailed descriptions and hover tooltips."""
 
@@ -1737,8 +1722,19 @@ class CapabilitySelectionDialog(QDialog):
             chk.parent().setVisible(visible)
 
     def _select_all(self):
-        for chk in self._checkboxes.values():
-            chk.setChecked(True)
+        from ...core.membership_tiers import get_capability_limit, is_capability_unlocked
+        limit = get_capability_limit(self._membership_tier)
+        count = 0
+        for opt, chk in self._checkboxes.items():
+            if is_capability_unlocked(opt, self._membership_tier):
+                if limit < 0 or count < limit:
+                    chk.setChecked(True)
+                    count += 1
+                else:
+                    chk.setChecked(False)
+            else:
+                chk.setChecked(False)
+        self._update_count()
 
     def _clear_all(self):
         for chk in self._checkboxes.values():
@@ -1746,23 +1742,51 @@ class CapabilitySelectionDialog(QDialog):
 
     def _suggest_capabilities(self):
         """Auto-select recommended capabilities for this use case."""
+        from ...core.membership_tiers import get_capability_limit, is_capability_unlocked
         # Clear first
         self._clear_all()
         
+        limit = get_capability_limit(self._membership_tier)
+        count = 0
         # Select recommended ones based on use case
         recommendations = USE_CASE_RECOMMENDED.get(self._use_case, [])
         for cap in recommendations:
-            if cap in self._checkboxes:
-                self._checkboxes[cap].setChecked(True)
+            if cap in self._checkboxes and is_capability_unlocked(cap, self._membership_tier):
+                if limit < 0 or count < limit:
+                    self._checkboxes[cap].setChecked(True)
+                    count += 1
+        self._update_count()
 
     def _update_count(self):
+        from ...core.membership_tiers import get_capability_limit, get_capability_limit_label, get_upgrade_prompt_for_limit
         count = sum(1 for chk in self._checkboxes.values() if chk.isChecked())
-        self._count_label.setText(f"{count} capability{'ies' if count != 1 else 'y'} selected")
+        limit = get_capability_limit(self._membership_tier)
+        limit_label = get_capability_limit_label(self._membership_tier)
+        if limit < 0:
+            self._count_label.setText(f"{count} capability{'ies' if count != 1 else 'y'} selected (Unlimited)")
+            self._count_label.setStyleSheet("color: #3fb950; font-weight: bold;")
+        elif count >= limit:
+            self._count_label.setText(f"{count}/{limit} capabilities selected — limit reached")
+            self._count_label.setStyleSheet("color: #f0883e; font-weight: bold;")
+            self._count_label.setToolTip(get_upgrade_prompt_for_limit(self._membership_tier))
+        else:
+            self._count_label.setText(f"{count}/{limit} capabilities selected")
+            self._count_label.setStyleSheet("color: #58a6ff; font-weight: bold;")
+            self._count_label.setToolTip("")
 
     def _on_apply(self):
-        self._selected_capabilities = [
+        from ...core.membership_tiers import get_capability_limit, get_upgrade_prompt_for_limit
+        selected = [
             opt for opt, chk in self._checkboxes.items() if chk.isChecked()
         ]
+        limit = get_capability_limit(self._membership_tier)
+        if limit >= 0 and len(selected) > limit:
+            QMessageBox.warning(
+                self, "Capability Limit Reached",
+                get_upgrade_prompt_for_limit(self._membership_tier),
+            )
+            return
+        self._selected_capabilities = selected
         self.accept()
 
     def _on_cancel(self):
@@ -1899,21 +1923,6 @@ class CharacterSheetWidget(QWidget):
         uc_row.addWidget(self._uc_combo)
         layout.addLayout(uc_row)
 
-        # Military/Government unlock
-        self._mil_row = QHBoxLayout()
-        self._mil_row.addWidget(QLabel("Activation Key:"))
-        self._mil_key_input = QLineEdit()
-        self._mil_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._mil_key_input.setPlaceholderText("Enter key to unlock Military / Government...")
-        self._mil_unlock_btn = QPushButton("Unlock")
-        self._mil_unlock_btn.clicked.connect(self._try_unlock_military)
-        self._mil_row.addWidget(self._mil_key_input)
-        self._mil_row.addWidget(self._mil_unlock_btn)
-        self._mil_widget = QWidget()
-        self._mil_widget.setLayout(self._mil_row)
-        self._mil_widget.setVisible(False)
-        layout.addWidget(self._mil_widget)
-
         # Capability checkboxes
         self._caps_group = QGroupBox("Capabilities")
         self._caps_layout = QGridLayout(self._caps_group)
@@ -1982,8 +1991,8 @@ class CharacterSheetWidget(QWidget):
         layout.addWidget(QLabel("Notes:"))
         layout.addWidget(self._notes)
 
-        # Optional AI Guardrails
-        self._guardrails_group = QGroupBox("Optional AI Guardrails")
+        # Optional AI Protection Rules
+        self._guardrails_group = QGroupBox("Optional AI Protection Rules")
         self._guardrails_layout = QVBoxLayout(self._guardrails_group)
         self._guardrail_checks: list = []
         for gr in OPTIONAL_GUARDRAILS:
@@ -2004,10 +2013,7 @@ class CharacterSheetWidget(QWidget):
 
     def _populate_uc_combo(self):
         for uc in UseCaseClass:
-            if uc == UseCaseClass.MILITARY_GOVERNMENT:
-                self._uc_combo.addItem(f"{uc.value} [LOCKED — Requires Key]")
-            else:
-                self._uc_combo.addItem(uc.value)
+            self._uc_combo.addItem(uc.value)
 
     def _on_select_capabilities_clicked(self):
         """Handle click on Select Capabilities button."""
@@ -2097,13 +2103,6 @@ class CharacterSheetWidget(QWidget):
         QMessageBox.information(self, "Suggested Set", msg)
 
     def _on_uc_changed(self, text: str):
-        if "LOCKED" in text:
-            self._mil_widget.setVisible(True)
-            self._clear_capabilities()
-            self._update_ai_details_preview()
-            return
-        self._mil_widget.setVisible(False)
-        
         # Just clear capabilities when use case changes - user must click Select button
         self._clear_capabilities()
         self._update_ai_details_preview()
@@ -2253,12 +2252,12 @@ class CharacterSheetWidget(QWidget):
         lines.append("")
         guardrails = [chk.text() for chk in self._guardrail_checks if chk.isChecked()]
         if guardrails:
-            lines.append(f"Optional Guardrails ({len(guardrails)}):")
+            lines.append(f"Optional Protection Rules ({len(guardrails)}):")
             for gr in guardrails:
                 lines.append(f"  • {gr}")
             lines.append("")
         else:
-            lines.append("Optional Guardrails: (none selected — add optional upgrades above)")
+            lines.append("Optional Protection Rules: (none selected — add optional upgrades above)")
             lines.append("")
 
         # Optional warning if no core capability
@@ -2275,16 +2274,6 @@ class CharacterSheetWidget(QWidget):
             lines.append(f"  {notes}")
 
         self.preview_changed.emit("\n".join(lines))
-
-    def _try_unlock_military(self):
-        if self._mil_key_input.text().strip() == MILITARY_KEY:
-            idx = self._uc_combo.currentIndex()
-            self._uc_combo.setItemText(idx, UseCaseClass.MILITARY_GOVERNMENT.value)
-            self._mil_widget.setVisible(False)
-            self._refresh_capabilities(UseCaseClass.MILITARY_GOVERNMENT)
-            QMessageBox.information(self, "Unlocked", "Military / Government use-case activated.")
-        else:
-            QMessageBox.warning(self, "Invalid Key", "Activation key incorrect. Access denied.")
 
     def _save_ai(self):
         allowed, gate_msg = check_action_allowed("save_ai", MoiraiHealthReport())
@@ -3182,8 +3171,7 @@ class AIForgeWindow(QMainWindow):
         uc_layout.addWidget(QLabel("Select the use-case class for this dropped-in AI:"))
         uc_combo = QComboBox()
         for uc in UseCaseClass:
-            if uc != UseCaseClass.MILITARY_GOVERNMENT:
-                uc_combo.addItem(uc.value)
+            uc_combo.addItem(uc.value)
         uc_layout.addWidget(uc_combo)
         box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         box.accepted.connect(uc_dialog.accept)

@@ -25,10 +25,10 @@ except ImportError:
 class SubscriptionTier(Enum):
     TRIAL = "trial"          # $10 one-time, 15 days, 1 AI
     TRIAL_ENTERPRISE = "trial_enterprise"  # 15-day Enterprise Evaluation, full customer access
-    STARTER = "starter"      # $20/mo, 2 AIs
-    PRO = "pro"              # $30/mo ($324/yr), 4 AIs
-    BUSINESS = "business"    # $50/mo ($552/yr), 5 AIs
-    UNLIMITED = "unlimited"  # $80/mo ($900/yr), unlimited AIs
+    STARTER = "starter"      # $30/mo, 2 AIs (Basic tier in membership_tiers)
+    PRO = "pro"              # $50/mo ($552/yr), 4 AIs (Pro tier in membership_tiers)
+    BUSINESS = "business"    # $80/mo ($900/yr), 5 AIs (Business tier in membership_tiers)
+    UNLIMITED = "unlimited"  # $39.99, unlimited AIs (All-Rounder in membership_tiers)
     ENTERPRISE_PROPERTY = "enterprise_property"  # Negotiated pricing, property deployment
     ENTERPRISE_CORPORATE = "enterprise_corporate"  # Negotiated pricing, corporate deployment
     # Internal tiers — never exposed to public keygen

@@ -76,10 +76,10 @@ class WatcherEngine(QObject):
         if not trusted:
             alert = self._create_alert(
                 AlertSeverity.CRITICAL,
-                "tripwire",
-                f"Watcher trust changed to {trust.value}",
+                "mesh",
+                f"Protection trust changed to {trust.value}",
                 "system",
-                "Tripwire engaged if in release mode.",
+                "Mesh engaged if in release mode.",
             )
             self.alert_logged.emit(alert)
 
@@ -143,8 +143,9 @@ class WatcherEngine(QObject):
 class ReverseSandboxWidget(QFrame):
     """
     Visual representation of the reverse sandbox concept:
-    The Watcher can observe and control the entire system,
-    but the system cannot observe or modify The Watcher.
+    The system is protected behind multiple layers.
+    The protection layer observes and controls the entire system,
+    but the system cannot observe or modify it.
     """
 
     def __init__(self, parent=None):
@@ -162,20 +163,20 @@ class ReverseSandboxWidget(QFrame):
     def _audit_event(self, action: str, msg: str = ""):
         if self._audit:
             try:
-                self._audit.log(tool="Watcher", action=action, target=msg, status="info", approved=True)
+                self._audit.log(tool="System", action=action, target=msg, status="info", approved=True)
             except Exception:
                 pass
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        title = QLabel("<b>REVERSE SANDBOX</b>")
+        title = QLabel("<b>PROTECTION LAYER</b>")
         title.setStyleSheet("color: #58a6ff; font-size: 18px; border: none; background: transparent;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         desc = QLabel(
-            "The Watcher observes and controls the entire system.\n"
-            "Nothing in the system can observe or modify The Watcher.\n"
+            "The system is protected behind multiple layers.\n"
+            "Nothing in the system can observe or modify the protection layer.\n"
             "One-way visibility. One-way authority."
         )
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -183,8 +184,8 @@ class ReverseSandboxWidget(QFrame):
         layout.addWidget(desc)
 
         arrows = QLabel(
-            "Watcher  ➜  System  (active control)\n"
-            "System  ➜  Watcher  (blocked / invisible)"
+            "Protection  ➜  System  (active control)\n"
+            "System  ➜  Protection  (blocked / invisible)"
         )
         arrows.setAlignment(Qt.AlignmentFlag.AlignCenter)
         arrows.setStyleSheet("color: #4caf50; font-family: Consolas; border: none; background: transparent;")
@@ -219,11 +220,11 @@ class ReverseSandboxWidget(QFrame):
 
 
 class WatcherWindow(QMainWindow):
-    """Command Nexus Part 5 — The Watcher (Active Defensive AI)."""
+    """Command Nexus Part 5 — System Protection Layer."""
 
     def __init__(self, registry=None, audit=None, engine: WatcherEngine | None = None):
         super().__init__()
-        self.setWindowTitle("Command Nexus — The Watcher (Defensive AI)")
+        self.setWindowTitle("Command Nexus — System Protection")
         self.resize(1400, 900)
         self._registry = registry
         self._audit = audit
@@ -251,7 +252,7 @@ class WatcherWindow(QMainWindow):
         top_bar = QHBoxLayout()
 
         # Left: Status controls
-        status_group = QGroupBox("Watcher Status")
+        status_group = QGroupBox("Protection Status")
         status_layout = QFormLayout(status_group)
         self._status_label = QLabel("ACTIVE")
         self._status_label.setStyleSheet("color: #4caf50; font-weight: bold; font-size: 16px;")
@@ -417,7 +418,7 @@ class WatcherWindow(QMainWindow):
     def _audit_event(self, action: str, msg: str = ""):
         if self._audit:
             try:
-                self._audit.log(tool="Watcher", action=action, target=msg, status="info", approved=True)
+                self._audit.log(tool="System", action=action, target=msg, status="info", approved=True)
             except Exception:
                 pass
 
@@ -541,18 +542,18 @@ class WatcherWindow(QMainWindow):
             self._status_label.setStyleSheet("color: #ff9800; font-weight: bold; font-size: 16px;")
             btn.setText("Resume Monitoring")
             btn.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
-            self._log_alert(AlertSeverity.WARNING, "control", "Monitoring paused by user.", "watcher", "Awaiting resume")
+            self._log_alert(AlertSeverity.WARNING, "control", "Monitoring paused by user.", "system", "Awaiting resume")
         else:
             self._state.active = True
             self._status_label.setText("ACTIVE")
             self._status_label.setStyleSheet("color: #4caf50; font-weight: bold; font-size: 16px;")
             btn.setText("Pause Monitoring")
             btn.setStyleSheet("background-color: #fbc02d; color: black; font-weight: bold;")
-            self._log_alert(AlertSeverity.INFO, "control", "Monitoring resumed.", "watcher", "Scanning re-enabled")
+            self._log_alert(AlertSeverity.INFO, "control", "Monitoring resumed.", "system", "Scanning re-enabled")
 
     def _force_scan(self):
         self._scan_cycle()
-        self._log_alert(AlertSeverity.INFO, "control", "Manual integrity scan triggered.", "watcher", "Scan completed")
+        self._log_alert(AlertSeverity.INFO, "control", "Manual integrity scan triggered.", "system", "Scan completed")
 
     def _on_interval_change(self, text: str):
         mapping = {

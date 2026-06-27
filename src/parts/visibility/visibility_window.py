@@ -723,7 +723,7 @@ class VisibilityWindow(QMainWindow):
 
         left_layout.addWidget(mission_group, stretch=0)
 
-        # Governance + Watcher trust status indicator
+        # Governance + Protection trust status indicator
         trust_widget = QWidget()
         trust_layout = QHBoxLayout(trust_widget)
         trust_layout.setContentsMargins(0, 0, 0, 0)
@@ -740,8 +740,8 @@ class VisibilityWindow(QMainWindow):
             "padding: 2px 10px; background-color: #1b5e20; border-radius: 4px;"
         )
         self._watcher_trust_label.setToolTip(
-            "The Watcher monitors all source files for tampering, deletion,\n"
-            "infiltration, and governance bypass attempts. Green = all clear."
+            "System integrity is monitored continuously for tampering, deletion,\n"
+            "infiltration, and policy bypass attempts. Green = all clear."
         )
         trust_layout.addWidget(self._watcher_trust_label)
 
@@ -756,7 +756,7 @@ class VisibilityWindow(QMainWindow):
         presence_layout = QVBoxLayout(presence_group)
         presence_layout.setContentsMargins(8, 8, 8, 8)
         presence_layout.setSpacing(4)
-        self._presence_label = QLabel("Watcher: Passive / Stabilization Mode")
+        self._presence_label = QLabel("Protection: Passive / Stabilization Mode")
         self._presence_label.setStyleSheet("color: #ffee58; font-weight: bold;")
         self._presence_detail = QLabel("Desktop Presence is optional. In this build, it can show AI status and future avatar readiness. Full 2D/3D avatar embodiment is planned for a later upgrade.")
         self._presence_detail.setWordWrap(True)
@@ -1333,7 +1333,7 @@ class VisibilityWindow(QMainWindow):
         self._watcher_poll.start(2000)
         # Set passive label if in passive mode
         if hasattr(watcher, "get_mode") and watcher.get_mode() in {"STABILIZATION", "REPAIR", "CREATION", "DEMO"}:
-            self._watcher_trust_label.setText("Watcher: Passive (repair mode)")
+            self._watcher_trust_label.setText("Protection: Passive (repair mode)")
             self._watcher_trust_label.setStyleSheet(
                 "color: #ffee58; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #5d4037; border-radius: 4px;"
@@ -1352,7 +1352,7 @@ class VisibilityWindow(QMainWindow):
         if hasattr(self, "_watcher") and hasattr(self._watcher, "get_mode"):
             watcher_mode = self._watcher.get_mode()
         if watcher_mode in passive_modes:
-            self._watcher_trust_label.setText("Watcher: Passive (repair mode)")
+            self._watcher_trust_label.setText("Protection: Passive (repair mode)")
             self._watcher_trust_label.setStyleSheet(
                 "color: #ffee58; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #5d4037; border-radius: 4px;"
@@ -1365,22 +1365,22 @@ class VisibilityWindow(QMainWindow):
                 "color: #4caf50; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #1b5e20; border-radius: 4px;"
             )
-            self._thought_pane.append("[WATCHER] All files verified. Trust restored.")
+            self._thought_pane.append("[SYSTEM] All files verified. Trust restored.")
         else:
             self._watcher_trust_label.setText("⚠ BREACH DETECTED")
             self._watcher_trust_label.setStyleSheet(
                 "color: #ffffff; font-weight: bold; font-size: 13px; "
                 "padding: 2px 10px; background-color: #c62828; border-radius: 4px;"
             )
-            self._thought_pane.append("[WATCHER] SECURITY BREACH: Unauthorized file change detected!")
-            self._action_pane.append("[WATCHER] Review alerts immediately. System may be compromised.")
+            self._thought_pane.append("[SYSTEM] SECURITY BREACH: Unauthorized file change detected!")
+            self._action_pane.append("[SYSTEM] Review alerts immediately. System may be compromised.")
             self._speak("Security alert. Unauthorized file change detected. Please review immediately.")
 
     def _on_watcher_alert(self, alert):
         # Show critical/EMERGENCY alerts in audit panes
         if alert.severity.value in ("CRITICAL", "EMERGENCY"):
             self._trajectory_pane.append(
-                f"[WATCHER {alert.severity.value}] {alert.description}"
+                f"[SYSTEM {alert.severity.value}] {alert.description}"
             )
             self._speak(f"Critical alert. {alert.description}")
 
@@ -1468,9 +1468,9 @@ class VisibilityWindow(QMainWindow):
     def _show_backend_config(self):
         if self._watcher is not None and not self._watcher.check_action("backend_config_change", risk_level="risky"):
             if self._watcher.is_locked_down():
-                msg = "[SYSTEM] Backend configuration change blocked by security tripwire. Restore protected files or contact support."
+                msg = "[SYSTEM] Backend configuration change blocked by protection layer. Restore protected files or contact support."
             else:
-                msg = "[SYSTEM] Watcher detected a local test-build trust issue. Backend configuration changes are paused until trust is restored."
+                msg = "[SYSTEM] Protection layer detected a local trust issue. Backend configuration changes are paused until trust is restored."
             self._thought_pane.append(msg)
             self._audit_event("backend_config_blocked", msg=msg)
             return
@@ -1489,7 +1489,7 @@ class VisibilityWindow(QMainWindow):
             self._audit_event("backend_config_updated", msg="AI backend settings changed")
 
     def set_owner_console(self, console):
-        """Wire the owner-only Aegis Console (hidden access)."""
+        """Wire the owner-only maintenance console (hidden access)."""
         self._owner_console = console
 
     def keyPressEvent(self, event: QKeyEvent):

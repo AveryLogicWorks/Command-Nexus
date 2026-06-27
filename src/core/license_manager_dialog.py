@@ -105,11 +105,11 @@ class LicenseManagerDialog(QDialog):
             "You can upgrade at any time — even during a free trial or\n"
             "with an active membership. The new key replaces your current one.\n\n"
             "Available Tiers:\n"
-            "  • Trial — 15-day early access\n"
-            "  • Pro — 30 days, 2 AI agents\n"
-            "  • Business — 30 days, 4 AI agents\n"
-            "  • Enterprise — Negotiated scope and pricing\n"
-            "  • All-Rounder — Unlimited saved AIs\n\n"
+            "  • Trial — $10, 15-day early access\n"
+            "  • Basic — $30/mo, premium capabilities, 5 per AI\n"
+            "  • Pro — $50/mo, business capabilities, 8 per AI\n"
+            "  • Business — $80/mo, enterprise capabilities, unlimited per AI\n"
+            "  • All-Rounder — $39.99, everything unlocked, unlimited\n\n"
             "Questions? Contact support@averylogicworks.com"
         )
         upgrade_text.setStyleSheet("background-color: #161b22; color: #8b949e; border: 1px solid #30363d;")
@@ -139,14 +139,14 @@ class LicenseManagerDialog(QDialog):
                 f"<br>"
                 f"<i>To upgrade, enter a new key below.</i>"
             )
-        elif self._lm.is_demo_mode():
+        elif self._lm.is_demo_mode:
             self._status_label.setText(
                 f"<b>Status:</b> <span style='color: #d29922;'>Demo Mode</span><br>"
                 f"<b>Tier:</b> View-only access<br>"
                 f"<br>"
                 f"<i>Enter a license key to activate full functionality.</i>"
             )
-        elif self._lm.is_expired():
+        elif self._lm.is_expired:
             self._status_label.setText(
                 f"<b>Status:</b> <span style='color: #f85149;'>Expired</span><br>"
                 f"<br>"

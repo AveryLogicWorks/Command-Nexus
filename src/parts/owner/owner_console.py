@@ -53,7 +53,7 @@ class OwnerConsole(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Aegis Console — Owner Control")
+        self.setWindowTitle("Maintenance Console — Owner Control")
         self.setMinimumSize(900, 700)
         self._governance = governance
         self._approval = approval_gate
@@ -94,7 +94,7 @@ class OwnerConsole(QDialog):
         bypass_group = QGroupBox("Owner Bypass")
         bypass_layout = QVBoxLayout(bypass_group)
 
-        self._bypass_governance_cb = QCheckBox("Bypass Governance / Guardrails")
+        self._bypass_governance_cb = QCheckBox("Bypass Governance / Protection Layers")
         self._bypass_governance_cb.setToolTip(
             "When checked, governance screen_content and screen_action always return PASS. "
             "Audit trail still records what would have been blocked."
@@ -116,13 +116,13 @@ class OwnerConsole(QDialog):
         ))
         left_layout.addWidget(bypass_group)
 
-        # -- Watcher Controls --
-        watcher_group = QGroupBox("Watcher Maintenance")
+        # -- Protection Controls --
+        watcher_group = QGroupBox("Protection Maintenance")
         watcher_layout = QVBoxLayout(watcher_group)
 
-        self._watcher_pause_cb = QCheckBox("Pause Watcher Alerts")
+        self._watcher_pause_cb = QCheckBox("Pause Protection Alerts")
         self._watcher_pause_cb.setToolTip(
-            "When checked, the watcher continues scanning but suppresses breach alerts "
+            "When checked, protection continues scanning but suppresses breach alerts "
             "and keeps trust status true. Use during intentional upgrades or repairs."
         )
         self._watcher_pause_cb.stateChanged.connect(self._on_toggle_watcher_pause)
@@ -161,14 +161,14 @@ class OwnerConsole(QDialog):
         ))
         left_layout.addWidget(obf_group)
 
-        # -- Guardrail Status Table --
-        guardrail_group = QGroupBox("Active Guardrails")
+        # -- Protection Layer Status Table --
+        guardrail_group = QGroupBox("Active Protection Layers")
         guardrail_layout = QVBoxLayout(guardrail_group)
 
         self._guardrail_table = QTableWidget()
         self._guardrail_table.setColumnCount(4)
         self._guardrail_table.setHorizontalHeaderLabels(
-            ["Guardrail", "Purpose", "Status", "Last Event"]
+            ["Layer", "Purpose", "Status", "Last Event"]
         )
         self._guardrail_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch

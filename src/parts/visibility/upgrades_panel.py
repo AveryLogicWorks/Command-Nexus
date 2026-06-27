@@ -78,30 +78,52 @@ class UpgradeFeature:
 UPGRADE_FEATURES = [
     # === MEMBERSHIP TIERS ===
     UpgradeFeature(
-        id="membership_pro",
-        name="Pro Membership",
-        description="Unlock most capabilities for Individual, Educational, and Task-Ready use cases.",
+        id="membership_trial",
+        name="Trial Membership",
+        description="15-day trial with a few premium capabilities to try out.",
         detailed_description="""
-Pro Membership unlocks the full power of Command Nexus for personal users and students:
+Trial Membership gives you 15 days to explore Command Nexus:
 
-• All Individual capabilities unlocked: Coding Assistant, Creative Writer, Learning Tutor, Research Assistant
-• All Educational capabilities unlocked: Assignment Grader, Academic Researcher, Language Coach, Accessibility Aide
-• All Task-Ready capabilities unlocked: Data Entry Agent, Workflow Automator, Content Moderator
-• Premium upgrades: Memory Bridge, Visual Canvas, Voice Interface, Calendar Manager, Email Automation
-• Premium educational: Learning Path Creator, Knowledge Base Builder, Presentation Builder, Translation Expert
-• Premium task-ready: Meeting Facilitator, Spreadsheet Wizard, Document Generator, Smart Search
-• Fact Checker and Accessibility Assistant included
+• All common capabilities unlocked
+• Select up to 3 capabilities per AI agent
+• Premium trial capabilities: Memory Bridge, Visual Canvas, Voice Interface
+• Full Visibility Window & AI Creation Engine
+
+After the trial, upgrade to Basic or higher to keep premium access.
+        """,
+        category=UpgradeCategory.MEMBERSHIP,
+        price="$10",
+        icon="⏱️",
+        benefits=[
+            "15-day full access trial",
+            "Try premium capabilities before committing",
+            "All common capabilities unlocked",
+            "Up to 3 capabilities per AI agent"
+        ],
+    ),
+
+    UpgradeFeature(
+        id="membership_pro",
+        name="Basic Membership",
+        description="Unlock premium capabilities for Individual, Educational, and Task-Ready use cases.",
+        detailed_description="""
+Basic Membership unlocks the full power of Command Nexus for personal users and students:
+
+• All common capabilities unlocked
+• Premium upgrades: Memory Bridge, Visual Canvas, Voice Interface, Email Automation
+• Advanced Memory System, Custom Model Connector, Workflow Automator
+• Select up to 5 capabilities per AI agent
 • Priority email support
 
 Perfect for: Students, freelancers, personal productivity, and small projects.
         """,
         category=UpgradeCategory.MEMBERSHIP,
-        price="$14.99",
+        price="$30/mo",
         icon="⭐",
         benefits=[
-            "Unlock 30+ capabilities across 3 use cases",
+            "Unlock premium capabilities across all use cases",
             "Best value for personal users and students",
-            "All premium upgrades for Individual, Educational, and Task-Ready",
+            "Select up to 5 capabilities per AI agent",
             "Priority email support included"
         ],
         popular=True
@@ -109,12 +131,12 @@ Perfect for: Students, freelancers, personal productivity, and small projects.
 
     UpgradeFeature(
         id="membership_business",
-        name="Business Membership",
+        name="Pro Membership",
         description="Full business capabilities including team orchestration, data analysis, and automation.",
         detailed_description="""
-Business Membership gives your team the tools to work smarter:
+Pro Membership gives your team the tools to work smarter:
 
-• Everything in Pro Membership, plus:
+• Everything in Basic Membership, plus:
 • Team Orchestrator: Coordinate multiple AIs working together
 • Data Analyst Pro: Advanced spreadsheet and dataset analysis
 • API Integrator: Connect AI to external apps and services
@@ -122,35 +144,35 @@ Business Membership gives your team the tools to work smarter:
 • Business Intelligence Analyst unlocked
 • Legal Document Reviewer unlocked
 • Multi-Department Orchestrator unlocked
-• Supply Chain Coordinator unlocked
-• IT Operations Agent unlocked
+• Select up to 8 capabilities per AI agent
 
 Perfect for: Small to mid-size businesses, startups, agencies, and growing teams.
         """,
         category=UpgradeCategory.MEMBERSHIP,
-        price="$49.99",
+        price="$50/mo",
         icon="🏢",
         benefits=[
-            "Everything in Pro, plus business-tier capabilities",
+            "Everything in Basic, plus business-tier capabilities",
             "Team orchestration and multi-department coordination",
             "Advanced data analysis and API integrations",
-            "Legal and compliance document review"
+            "Select up to 8 capabilities per AI agent"
         ],
         requires=["membership_pro"]
     ),
 
     UpgradeFeature(
         id="membership_enterprise",
-        name="Enterprise Membership",
+        name="Business Membership",
         description="All enterprise features including security auditing, compliance, medical research, and legal tools.",
         detailed_description="""
-Enterprise Membership provides the highest level of capability and security:
+Business Membership provides the highest level of capability and security:
 
-• Everything in Business Membership, plus:
+• Everything in Pro Membership, plus:
 • Security Auditor: Scan code and configs for vulnerabilities
 • Code Reviewer: Automated code review with best practices
 • Medical Researcher: Search medical literature and check drug interactions
 • Legal Assistant: Review contracts and legal documents with AI
+• Unlimited capabilities per AI agent
 • Full audit trail and compliance reporting
 • Enterprise-grade security features
 • Dedicated support channel
@@ -158,13 +180,13 @@ Enterprise Membership provides the highest level of capability and security:
 Perfect for: Large organizations, healthcare, legal firms, and enterprises with strict compliance needs.
         """,
         category=UpgradeCategory.MEMBERSHIP,
-        price="$99.99",
+        price="$80/mo",
         icon="🏛️",
         benefits=[
-            "Everything in Business, plus enterprise-tier capabilities",
+            "Everything in Pro, plus enterprise-tier capabilities",
             "Security auditing and code review",
             "Medical research and legal assistant tools",
-            "Dedicated support channel"
+            "Unlimited capabilities per AI agent"
         ],
         requires=["membership_business"]
     ),
@@ -180,6 +202,7 @@ All-Rounder Membership is the ultimate Command Nexus experience:
 • All use cases fully accessible: Individual, Educational, Task-Ready, Business, Enterprise
 • All premium upgrades included
 • All future capabilities automatically unlocked
+• Unlimited capabilities per AI agent
 • Priority processing for all AI operations
 • Early access to new features
 • Direct line to the development team
@@ -187,13 +210,13 @@ All-Rounder Membership is the ultimate Command Nexus experience:
 Perfect for: Power users, multitaskers, consultants, and anyone who wants it all without limits.
         """,
         category=UpgradeCategory.MEMBERSHIP,
-        price="$49.99",
+        price="$39.99",
         icon="💎",
         benefits=[
             "Every capability unlocked — zero restrictions",
             "All use cases, all premium upgrades, all features",
             "Future capabilities automatically included",
-            "Best value for multitaskers — replaces Pro + Business"
+            "Best value for multitaskers — replaces Basic + Pro"
         ],
         popular=True,
         new=True
@@ -1065,10 +1088,11 @@ class UpgradesDialog(QDialog):
     def _apply_membership_if_needed(self, upgrade: UpgradeFeature):
         """If the purchased upgrade is a membership tier, update settings."""
         membership_map = {
-            "membership_pro": 1,
-            "membership_business": 2,
-            "membership_enterprise": 3,
-            "membership_all_rounder": 4,
+            "membership_trial": 1,
+            "membership_pro": 2,
+            "membership_business": 3,
+            "membership_enterprise": 4,
+            "membership_all_rounder": 5,
         }
         if upgrade.id in membership_map:
             try:

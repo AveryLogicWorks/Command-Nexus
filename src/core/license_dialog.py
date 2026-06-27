@@ -41,7 +41,7 @@ class LicenseActivationDialog(QDialog):
         # Header
         header = QLabel(
             "<b>Welcome to Command Nexus</b><br>"
-            "Build, govern, and operate fully custom AI agents — no coding required."
+            "Build, govern, and operate fully custom AI units — no coding required."
         )
         header.setStyleSheet("font-size: 14px; color: #c9d1d9;")
         header.setWordWrap(True)
@@ -64,7 +64,7 @@ class LicenseActivationDialog(QDialog):
             status_text = (
                 "<b>Status:</b> <span style='color: #f44336;'>Not Activated</span><br>"
                 "<b>Tier:</b> Demo Mode (view-only)<br>"
-                "<b>Limitations:</b> You can explore the interface but cannot create or deploy AI agents."
+                "<b>Limitations:</b> You can explore the interface but cannot create or deploy AI units."
             )
 
         self._status_label = QLabel(status_text)
@@ -109,7 +109,7 @@ class LicenseActivationDialog(QDialog):
             "  • Browse the Forge, Book, and Constraints windows\n"
             "  • See how capability modules and governance work\n"
             "  • View the audit trail and approval gate systems\n\n"
-            "  ✗ Cannot create or deploy AI agents\n"
+            "  ✗ Cannot create or deploy AI units\n"
             "  ✗ Cannot activate advanced capabilities\n"
             "  ✗ Cannot save or export configurations\n\n"
             "Purchase a license at any time to unlock full functionality."
@@ -128,11 +128,11 @@ class LicenseActivationDialog(QDialog):
         # Pricing info
         pricing = QLabel(
             "<b>Available Tiers:</b><br>"
-            "  15-Day Trial / Early Access  |  "
-            "  Basic — 30 days, 2 AI  |  "
-            "  4-AI Plan  |  "
-            "  Unlimited — saved AIs unlocked, runtime depends on hardware  |  "
-            "  Enterprise — Negotiated Pricing"
+            "  Trial — $10, 15-day early access  |  "
+            "  Basic — $30/mo, premium capabilities  |  "
+            "  Pro — $50/mo, business capabilities  |  "
+            "  Business — $80/mo, enterprise capabilities  |  "
+            "  All-Rounder — $39.99, everything unlocked"
         )
         pricing.setWordWrap(True)
         pricing.setStyleSheet("font-size: 11px; color: #8b949e; padding: 8px;")
@@ -156,16 +156,6 @@ class LicenseActivationDialog(QDialog):
         enterprise_info.setStyleSheet("font-size: 10px; color: #d29922; padding: 4px;")
         layout.addWidget(enterprise_info)
 
-        # Owner/Aegis boundary
-        boundary_info = QLabel(
-            "<b>Important:</b> Enterprise unlocks the full customer-facing product layer. "
-            "Enterprise does not unlock Aegis Console, owner tools, guardrail bypass, "
-            "hidden repair tools, protected internals, or private maintenance authority. "
-            "Owner/Aegis access is private maintenance authority and is not sold as a license tier."
-        )
-        boundary_info.setWordWrap(True)
-        boundary_info.setStyleSheet("font-size: 10px; color: #f44336; padding: 4px;")
-        layout.addWidget(boundary_info)
 
         # Close button (only if already activated)
         if self._lm.is_activated:
@@ -187,9 +177,9 @@ class LicenseActivationDialog(QDialog):
     def _on_activate(self):
         if self._watcher is not None and not self._watcher.check_action("license_activation", risk_level="risky"):
             if self._watcher.is_locked_down():
-                msg = "<span style='color: #f44336;'>License activation blocked by security tripwire. Restore protected files or contact support.</span>"
+                msg = "<span style='color: #f44336;'>License activation blocked by protection layer. Restore protected files or contact support.</span>"
             else:
-                msg = "<span style='color: #f44336;'>Watcher detected a local test-build trust issue. License activation is paused until trust is restored.</span>"
+                msg = "<span style='color: #f44336;'>Protection layer detected a local trust issue. License activation is paused until trust is restored.</span>"
             self._result_label.setText(msg)
             return
 

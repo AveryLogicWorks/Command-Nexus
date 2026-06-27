@@ -655,12 +655,12 @@ class DemoTourController(QWidget):
         return None
 
     def _find_forge_guardrails_group(self) -> Optional[QWidget]:
-        """Find the Optional AI Guardrails group box in the Forge."""
+        """Find the Optional AI Protection Rules group box in the Forge."""
         forge = self._find_forge_window()
         if forge is None:
             return None
         for gb in forge.findChildren(QGroupBox):
-            if "Guardrails" in gb.title():
+            if "Protection Rules" in gb.title():
                 return gb
         return None
     
@@ -701,13 +701,13 @@ class DemoTourController(QWidget):
                     <li>Choose a <b>Use Case</b> (Individual, Business, Educational, Enterprise)</li>
                     <li>Select <b>Capabilities</b> \u2014 what your AI can do</li>
                     <li>Adjust <b>Personality</b> \u2014 creativity, caution, verbosity</li>
-                    <li>Add <b>Guardrails</b> \u2014 safety boundaries</li>
+                    <li>Add <b>Protection Rules</b> \u2014 safety boundaries</li>
                 </ul>
                 <p>Click the <b>AI Forge</b> button (purple) in the navigation bar.</p>""",
                 target_widget_name="nav_forge",
                 action_prompt="\U0001f449 CLICK 'AI Forge'",
                 wait_for_click=True,
-                narration="Step 1. Open the AI Forge. The AI Forge is your workshop where you create and customize AI assistants. In the Forge, you can choose a use case like Individual, Business, Educational, or Enterprise. You can select capabilities, which are what your AI can do. You can adjust personality traits like creativity, caution, and formality. And you can add guardrails, which are safety boundaries for your AI. Click the purple AI Forge button in the navigation bar at the top of the window.",
+                narration="Step 1. Open the AI Forge. The AI Forge is your workshop where you create and customize AI assistants. In the Forge, you can choose a use case like Individual, Business, Educational, or Enterprise. You can select capabilities, which are what your AI can do. You can adjust personality traits like creativity, caution, and formality. And you can add protection rules, which are safety boundaries for your AI. Click the purple AI Forge button in the navigation bar at the top of the window.",
             ),
 
             # === STEP 2: Use Case Class ===

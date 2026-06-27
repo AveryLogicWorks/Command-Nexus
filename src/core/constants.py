@@ -14,7 +14,6 @@ class UseCaseClass(Enum):
     BUSINESS = "Business"
     ENTERPRISE = "Enterprise"
     ALL_ROUNDER = "All-Rounder"
-    MILITARY_GOVERNMENT = "Military / Government"
 
 
 class PresenceState(Enum):

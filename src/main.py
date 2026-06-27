@@ -118,7 +118,7 @@ class CommandNexusApp:
                         pass
                     sys.exit(1)
         except Exception as e:
-            QMessageBox.critical(None, "Security Error", f"Watcher/tripwire initialization failed: {e}")
+            QMessageBox.critical(None, "Security Error", f"Protection system initialization failed: {e}")
             sys.exit(1)
         # ──────────────────────────────────────────────────────────────────
 
@@ -193,11 +193,11 @@ class CommandNexusApp:
             self._visibility.connect_watcher(self._watcher)
             self._on_watcher_mode_changed(self._watcher.get_mode())
         except Exception as e:
-            QMessageBox.critical(None, "Watcher Error", f"Failed to wire watcher engine: {e}")
+            QMessageBox.critical(None, "System Error", f"Failed to initialize protection engine: {e}")
             self._cleanup()
             sys.exit(1)
 
-        # Owner-only local control console (Aegis Console)
+        # Owner-only local control console (Maintenance Console)
         try:
             self._owner_console = OwnerConsole(
                 governance=self._governance,
@@ -326,7 +326,7 @@ class CommandNexusApp:
 
     def _on_watcher_mode_changed(self, mode: str):
         """Log and reflect watcher mode changes. Modes are now canonical (dev/stabilization/release/lockdown)."""
-        self._audit.log(tool="CommandNexusApp", action="WATCHER_MODE_CHANGED", target=f"Watcher mode is now {mode}", approved=True, status="info")
+        self._audit.log(tool="CommandNexusApp", action="WATCHER_MODE_CHANGED", target=f"Protection mode is now {mode}", approved=True, status="info")
 
     def _open_book(self):
         if self._book is None:
@@ -409,7 +409,7 @@ class CommandNexusApp:
             pass
 
     def show_console(self):
-        """Show the Aegis Console (owner-only control)."""
+        """Show the Maintenance Console (owner-only control)."""
         if hasattr(self, "_owner_console") and self._owner_console is not None:
             self._owner_console.show()
             self._owner_console.raise_()
@@ -549,7 +549,7 @@ def _run_safe_owner_mode():
     """
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create("Fusion"))
-    app.setApplicationName("Command Nexus — Aegis Recovery")
+    app.setApplicationName("Command Nexus — Recovery Mode")
     app.setApplicationVersion("0.1.0-prototype")
 
     governance = GovernanceEngine()
