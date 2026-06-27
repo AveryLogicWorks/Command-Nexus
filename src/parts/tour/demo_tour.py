@@ -892,12 +892,12 @@ class DemoTourController(QWidget):
                     <li><b>Enterprise Options</b> \u2014 Security suite, white label license</li>
                 </ul>
                 <p>Some capabilities work with <b>local intelligence</b> right away.</p>
-                <p>Others need a <b>model backend</b> (Ollama or OpenAI) for full AI power.</p>
+                <p>The <b>built-in local model</b> provides AI power right away — no external server needed.</p>
                 <p><i>You can browse the store anytime after the tour by clicking Upgrades.</i></p>""",
                 target_widget_name="nav_constraints",
                 action_prompt="Click 'Next' to continue",
                 wait_for_click=False,
-                narration="Step 9. Explore Upgrades. The orange Upgrades button opens the store where you can unlock more capabilities. Upgrades include Premium Features like visual themes, export pack, and advanced memory. Productivity Tools like workflow automation and analytics dashboard. And Enterprise Options like security suite and white label license. Some capabilities work with local intelligence right away. Others need a model backend, like Ollama or OpenAI, for full AI power. You can browse the store anytime after the tour by clicking Upgrades.",
+                narration="Step 9. Explore Upgrades. The orange Upgrades button opens the store where you can unlock more capabilities. Upgrades include Premium Features like visual themes, export pack, and advanced memory. Productivity Tools like workflow automation and analytics dashboard. And Enterprise Options like security suite and white label license. The built-in local model provides AI power right away with no external server needed. You can browse the store anytime after the tour by clicking Upgrades.",
             ),
 
             # === STEP 10: Customer Support ===
@@ -909,7 +909,7 @@ class DemoTourController(QWidget):
                 <ul>
                     <li>How to use Command Nexus features</li>
                     <li>License activation and pricing</li>
-                    <li>Connecting a model backend (Ollama/OpenAI)</li>
+                    <li>Using the built-in local model (no external server needed)</li>
                     <li>Troubleshooting issues</li>
                     <li>Understanding capabilities and guardrails</li>
                 </ul>
@@ -925,7 +925,7 @@ class DemoTourController(QWidget):
                 target_widget_name="nav_customer_ai",
                 action_prompt="Click 'Next' to continue",
                 wait_for_click=False,
-                narration="Step 10. Customer Support. The green Support button opens a help window with a built-in AI assistant. Use it if you need help with how to use Command Nexus features, license activation and pricing, connecting a model backend like Ollama or OpenAI, troubleshooting issues, or understanding capabilities and guardrails. To interact with the Support AI, type your question in the chat box, press Enter or click Send, and the AI will respond with helpful guidance. If the AI can't help, it can escalate to human review. The Support AI is always available to guide you. It never sleeps. Try it anytime after the tour by clicking Support.",
+                narration="Step 10. Customer Support. The green Support button opens a help window with a built-in AI assistant. Use it if you need help with how to use Command Nexus features, license activation and pricing, using the built-in local model, troubleshooting issues, or understanding capabilities and protection rules. To interact with the Support AI, type your question in the chat box, press Enter or click Send, and the AI will respond with helpful guidance. If the AI can't help, it can escalate to human review. The Support AI is always available to guide you. It never sleeps. Try it anytime after the tour by clicking Support.",
             ),
 
             # === STEP 11: Governance ===

@@ -46,7 +46,7 @@ class NexusSettings:
     obfuscation_mode: bool = False  # Anti-inference layer — hides internal structures
 
     # AI backend configuration (local-first defaults)
-    ai_backend: str = "ollama"  # ollama | openai
+    ai_backend: str = "builtin"  # builtin | ollama | openai
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "llama3.1"
     openai_api_key: str = ""
@@ -55,7 +55,7 @@ class NexusSettings:
 
     # Backend trust boundary / policy layer
     advanced_mode: bool = False  # Required for custom cloud providers
-    active_provider: str = "ollama"
+    active_provider: str = "builtin"
     backend_providers: str = ""  # JSON list of ModelProvider dicts
     custom_api_endpoint: str = ""
     custom_api_key: str = ""

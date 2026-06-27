@@ -30,10 +30,12 @@ from .settings_manager import SettingsManager
 class ProviderKind(str, Enum):
     LOCAL = "local"
     CLOUD = "cloud"
+    BUILTIN = "builtin"  # Direct GGUF inference, no external server needed
 
 
 class TrustLevel(str, Enum):
     LOCAL_TRUSTED = "local_trusted"      # Default localhost-only providers (Ollama, LM Studio)
+    BUILTIN_TRUSTED = "builtin_trusted"   # Direct GGUF inference via llama-cpp-python
     LOCAL_UNKNOWN = "local_unknown"        # A local endpoint the user configured manually
     APPROVED_CLOUD = "approved_cloud"      # Known approved cloud API (OpenAI)
     CUSTOM_CLOUD = "custom_cloud"          # Arbitrary remote endpoint; needs advanced mode
@@ -100,14 +102,29 @@ class ModelProvider:
         )
 
     def is_local(self) -> bool:
-        return self.kind == ProviderKind.LOCAL
+        return self.kind in (ProviderKind.LOCAL, ProviderKind.BUILTIN)
 
     def is_cloud(self) -> bool:
         return self.kind == ProviderKind.CLOUD
 
+    def is_builtin(self) -> bool:
+        return self.kind == ProviderKind.BUILTIN
 
-# Default providers shipped with Command Nexus. Local-first.
+
+# Default providers shipped with Command Nexus. Local-first — builtin is default.
 DEFAULT_PROVIDERS: tuple[ModelProvider, ...] = (
+    ModelProvider(
+        provider_id="builtin",
+        display_name="Built-in Local Model (GGUF)",
+        kind=ProviderKind.BUILTIN,
+        trust_level=TrustLevel.BUILTIN_TRUSTED,
+        endpoint="",
+        model="Qwen2.5-0.5B-Instruct",
+        capabilities=ProviderCapabilities(
+            chat=True, code=True, planning=True, embeddings=False, vision=False, streaming=False, tool_json=False, max_context=2048
+        ),
+        timeout=120.0,
+    ),
     ModelProvider(
         provider_id="ollama",
         display_name="Ollama (local)",
@@ -199,7 +216,9 @@ class BackendManager:
     def __init__(self, settings: SettingsManager | None = None):
         self._settings = settings or SettingsManager()
         self._providers: dict[str, ModelProvider] = {}
-        self._active_id: str = "ollama"
+        self._active_id: str = "builtin"
+        self._builtin_llm = None  # Lazy-loaded llama_cpp Llama instance
+        self._builtin_model_path: str = ""
         self._load_from_settings()
 
     # ------------------------------------------------------------------
@@ -235,9 +254,9 @@ class BackendManager:
             for p in self._providers.values():
                 p.timeout = float(s.backend_timeout)
 
-        self._active_id = (s.active_provider or "ollama") if hasattr(s, "active_provider") else "ollama"
+        self._active_id = (s.active_provider or "builtin") if hasattr(s, "active_provider") else "builtin"
         if self._active_id not in self._providers:
-            self._active_id = "ollama"
+            self._active_id = "builtin"
 
     def save_to_settings(self) -> None:
         """Persist providers and active provider to settings."""
@@ -259,7 +278,7 @@ class BackendManager:
         return dict(self._providers)
 
     def get_active_provider(self) -> ModelProvider:
-        return self._providers.get(self._active_id, self._providers["ollama"])
+        return self._providers.get(self._active_id, self._providers["builtin"])
 
     def set_active_provider(self, provider_id: str) -> None:
         if provider_id not in self._providers:
@@ -397,7 +416,9 @@ class BackendManager:
         prompt = self._sanitize_prompt(prompt)
 
         try:
-            if provider.provider_id == "openai" or provider.trust_level == TrustLevel.APPROVED_CLOUD:
+            if provider.is_builtin():
+                text = self._call_builtin(provider, prompt, model)
+            elif provider.provider_id == "openai" or provider.trust_level == TrustLevel.APPROVED_CLOUD:
                 text = self._call_openai(provider, prompt, model)
             elif provider.endpoint.startswith("https://api.openai.com"):
                 text = self._call_openai(provider, prompt, model)
@@ -415,6 +436,104 @@ class BackendManager:
             provider_id=provider.provider_id,
             display_name=provider.display_name,
         )
+
+    def _find_gguf_model(self, model_name: str) -> str:
+        """Find a .gguf file in b:\\local_models matching the model name."""
+        search_dirs = [
+            Path("b:/local_models"),
+            Path.home() / "local_models",
+        ]
+        for base in search_dirs:
+            if not base.exists():
+                continue
+            # Direct match: b:/local_models/{ModelName}/{ModelName}.gguf
+            model_dir = base / model_name
+            if model_dir.exists():
+                for f in model_dir.glob("*.gguf"):
+                    return str(f)
+            # Recursive search for any .gguf containing the model name
+            for f in base.rglob("*.gguf"):
+                if model_name.lower() in f.stem.lower():
+                    return str(f)
+        # Fallback: first .gguf found
+        for base in search_dirs:
+            if not base.exists():
+                continue
+            for f in base.rglob("*.gguf"):
+                return str(f)
+        return ""
+
+    def _call_builtin(self, provider: ModelProvider, prompt: str, model: str | None = None) -> str:
+        """Run inference using a local GGUF model via llama_cpp_python.
+
+        No external server, no API key, no license required.
+        The model is loaded lazily on first call and reused.
+        """
+        target_model = model or provider.model or "Qwen2.5-0.5B-Instruct"
+
+        # Find the GGUF file if not already loaded
+        if self._builtin_llm is None or self._builtin_model_path == "":
+            gguf_path = self._find_gguf_model(target_model)
+            if not gguf_path:
+                raise RuntimeError(
+                    f"No .gguf model file found for '{target_model}'. "
+                    f"Place GGUF files in b:\\local_models\\"
+                )
+
+            try:
+                from llama_cpp import Llama
+            except ImportError:
+                raise RuntimeError(
+                    "llama-cpp-python is not installed. "
+                    "Run: pip install llama-cpp-python"
+                )
+
+            # Determine context size and threads based on model capabilities
+            n_ctx = provider.capabilities.max_context or 2048
+            import multiprocessing
+            n_threads = min(multiprocessing.cpu_count(), 4)
+
+            self._builtin_llm = Llama(
+                model_path=gguf_path,
+                n_ctx=n_ctx,
+                n_threads=n_threads,
+                n_gpu_layers=0,
+                verbose=False,
+                use_mlock=False,
+                use_mmap=True,
+            )
+            self._builtin_model_path = gguf_path
+
+        # Build chat messages from the prompt
+        # The prompt from ChatCapabilityDialog is a single string with context
+        # Split it into system + user if it contains "User message:"
+        system_content = (
+            "You are a Command Nexus governed AI assistant. "
+            "Be helpful, concise, and honest about what you can and cannot do. "
+            "Do not claim external actions were performed unless they actually were. "
+            "You operate locally with full privacy — no data leaves the machine."
+        )
+        user_content = prompt
+
+        # Try to extract a cleaner user message from the formatted prompt
+        if "User message:" in prompt:
+            parts = prompt.split("User message:", 1)
+            if len(parts) == 2:
+                user_content = parts[1].strip()
+
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content},
+        ]
+
+        response = self._builtin_llm.create_chat_completion(
+            messages=messages,
+            max_tokens=512,
+            temperature=0.7,
+            top_p=0.9,
+            stop=[],
+        )
+        return (response["choices"][0]["message"]["content"] or "").strip()
 
     def _call_ollama_compatible(self, provider: ModelProvider, prompt: str, model: str | None = None) -> str:
         payload = {
@@ -467,7 +586,23 @@ class BackendManager:
             "selected_model": provider.model,
         }
         try:
-            if provider.provider_id == "openai" or provider.trust_level == TrustLevel.APPROVED_CLOUD:
+            if provider.is_builtin():
+                # Builtin: check for GGUF files on disk
+                gguf_path = self._find_gguf_model(provider.model)
+                if gguf_path:
+                    result["reachable"] = True
+                    result["models"] = [provider.model]
+                    result["message"] = f"Local model ready: {gguf_path}"
+                    # Also list all available GGUF models
+                    all_ggufs = []
+                    for base in [Path("b:/local_models"), Path.home() / "local_models"]:
+                        if base.exists():
+                            for f in base.rglob("*.gguf"):
+                                all_ggufs.append(f.stem)
+                    result["models"] = sorted(set(all_ggufs))[:20]
+                else:
+                    result["message"] = f"No .gguf model found for '{provider.model}'. Place GGUF files in b:\\local_models\\"
+            elif provider.provider_id == "openai" or provider.trust_level == TrustLevel.APPROVED_CLOUD:
                 if not provider.api_key:
                     result["message"] = "Cloud backend selected but no API key configured."
                     return result

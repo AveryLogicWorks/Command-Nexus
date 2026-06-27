@@ -173,6 +173,12 @@ class CommandNexusApp:
             self._cleanup()
             sys.exit(1)
 
+        # Auto-load stored AIs into the Mission Control session selector
+        try:
+            self._auto_load_ais()
+        except Exception as e:
+            print(f"Warning: Could not auto-load AIs: {e}")
+
         # Show governance disclaimer on first run (before tour)
         try:
             from src.parts.tour.governance_disclaimer import GovernanceDisclaimerDialog
@@ -297,6 +303,37 @@ class CommandNexusApp:
             self._forge.book_requested.connect(self._on_book_requested)
         self._forge.show()
         self._forge.raise_()
+
+    def _auto_load_ais(self):
+        """Load stored AI units from the Forge's store and register them in Mission Control."""
+        import json
+        from pathlib import Path
+        store_dir = Path.home() / ".command_nexus" / "ai_store"
+        if not store_dir.exists():
+            return
+        for path in sorted(store_dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                uuid = data.get("uuid", "")
+                name = data.get("name", "Unknown")
+                if not uuid:
+                    continue
+                # Register in the visibility window's session selector
+                self._visibility.add_ai_session(uuid, name)
+                # Also register in the tool registry so the runtime can access metadata
+                if self._registry:
+                    self._registry.ensure_enabled(
+                        uuid,
+                        name=name,
+                        use_case=data.get("use_case", "Chat Companion"),
+                        abilities=data.get("abilities", ["Chat Companion"]),
+                        ability_book_path=data.get("ability_book_path", ""),
+                        archive_path=data.get("archive_path", ""),
+                        ability_surfaces=data.get("ability_surfaces", []),
+                        guardrails=data.get("guardrails", []),
+                    )
+            except Exception:
+                continue
 
     def _on_book_requested(self, uuid: str, name: str):
         if self._book is None:

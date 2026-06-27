@@ -57,7 +57,7 @@ class NexusAIRuntime:
     - Knowledge / Intelligence profile
     - capabilities
     - local safe capability behaviors
-    - optional Ollama/OpenAI model backend
+    - built-in local model (GGUF) or optional Ollama/OpenAI backend
     - optional Brave Search backend
 
     It must never fake-complete external, research, browser, file, or tool actions.
@@ -83,7 +83,7 @@ class NexusAIRuntime:
         # All model backend interactions go through the trust boundary.
         self._backend = BackendManager(self._settings)
         self._memory = AdaptiveMemoryStore(self._settings)
-        self._tools = ToolExecutor(self._settings)
+        self._tools = ToolExecutor(self._settings, allow_outside_workspace=True)
         self._models = ModelRegistry(self._settings)
         self._response_cache: dict[str, str] = {}
         self._approval_gate = approval_gate
@@ -360,6 +360,8 @@ class NexusAIRuntime:
             out.add(canonical_intent(item))
         if not out:
             out.add("Chatbot")
+        # All AIs can use tools — this is an all-in-one program
+        out.add("Tool User")
         return out
 
     def _capability_allowed(self, intent: str, abilities: set[str]) -> bool:
@@ -542,7 +544,7 @@ class NexusAIRuntime:
         mission_memories = [m for m in recent_memories if "mission" in m.tags] if recent_memories else []
 
         parts: list[str] = []
-        parts.append(f"[Local Intelligence Mode — {ai_name} is running without a model backend]")
+        parts.append(f"[Local Intelligence — {ai_name}]")
         parts.append("")
         parts.append(f"I heard: \"{task}\"")
         parts.append("")
@@ -587,7 +589,7 @@ class NexusAIRuntime:
             parts.append("  - Use tools (read/write files, list directories) with your approval")
             parts.append("  - Learn your preferences over time")
             parts.append("")
-            parts.append("Connect a model backend (Ollama/OpenAI) for full AI reasoning power.")
+            parts.append("The built-in local model is ready for AI reasoning.")
 
         # Intent: preference statement
         elif any(k in task_lower for k in ["prefer", "like", "always", "never", "remember", "dislike", "hate", "want", "need"]):
@@ -633,7 +635,7 @@ class NexusAIRuntime:
             if preference_memories:
                 parts.append("I also remember your preferences and past interactions.")
             parts.append("")
-            parts.append("For full AI-powered answers, connect Ollama or set an OpenAI API key in Backend settings.")
+            parts.append("For full AI-powered answers, the built-in local model is available. Configure Backend settings to switch models.")
 
         # Intent: continue previous work
         elif any(k in task_lower for k in ["continue", "last time", "previous", "again", "pick up", "resume"]):
@@ -652,7 +654,7 @@ class NexusAIRuntime:
             parts.append("I've received your message and stored it in my local memory.")
             if mission_memories:
                 parts.append(f"We've worked on {len(mission_memories)} recent task(s) together.")
-            parts.append("To act on this fully, I'd need a model backend (Ollama/OpenAI).")
+            parts.append("To act on this fully, I'd need the model backend enabled in Backend settings.")
             parts.append("")
             parts.append("In the meantime, I can:")
             parts.append("  - Plan this task (use the Planner capability)")
@@ -674,7 +676,7 @@ class NexusAIRuntime:
                 f"[{ai_name}] Produced a context-aware local response with continuity.",
             ],
             [f"[{ai_name}] Returned local intelligence response (clearly labeled, not faking backend)."],
-            ["Next: connect Ollama/OpenAI for full AI reasoning, or continue with local capabilities."],
+            ["Next: the built-in local model provides AI reasoning, or configure Backend settings for more options."],
             result_text,
         )
 
@@ -742,7 +744,7 @@ class NexusAIRuntime:
             "- Security: Check for injection, auth bypass, sensitive data exposure.\n"
             "- Quality: Naming, structure, complexity, duplication.\n"
             "- Performance: N+1 queries, unnecessary allocations, hot paths.\n\n"
-            "Connect a model backend (Ollama/OpenAI) for full AI-powered code generation."
+            "The built-in local model is ready for AI-powered code generation."
         )
         return RuntimeResult(RuntimeStatus.COMPLETED, "Coder completed (local fallback)", thought + [f"[{ai_name}] No model backend connected; using local code scaffold."], [f"[{ai_name}] Produced code scaffold and analysis checklist."], ["Next: review scaffold. Connect a model backend for AI-powered coding."], result)
 
@@ -764,7 +766,7 @@ class NexusAIRuntime:
             "Style options:\n"
             "- Professional, casual, academic, creative, technical\n"
             "- Adjust length: brief, standard, detailed\n\n"
-            "Connect a model backend (Ollama/OpenAI) for full AI-powered writing."
+            "The built-in local model is ready for AI-powered writing."
         )
         return RuntimeResult(RuntimeStatus.COMPLETED, "Writer completed (local fallback)", thought + [f"[{ai_name}] No model backend connected; using local writing scaffold."], [f"[{ai_name}] Produced writing scaffold and style guide."], ["Next: review scaffold. Connect a model backend for AI-powered writing."], result)
 
@@ -863,7 +865,7 @@ class NexusAIRuntime:
             "No model backend connected",
             thought + [f"[{ai_name}] No model backend connected; cannot produce a real customer support response."],
             [f"[{ai_name}] Task did not complete because no backend answered."],
-            ["Next: connect Ollama/OpenAI or configure Backend settings."],
+            ["Next: configure Backend settings to switch models or add Ollama/OpenAI."],
             f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
             "Start the selected backend, choose a different backend, or configure Backend settings.",
         )
@@ -1137,12 +1139,86 @@ class NexusAIRuntime:
                 "\n".join(f"- {e['name']} ({e['type']})" for e in res.data.get("entries", [])),
             )
 
-        # Fallback: if we got here, we don't know what tool to run
+        # Search files by name/pattern
+        if any(x in t for x in ["search for file", "find file", "search files", "find files", "look for file", "where is file", "search for "]):
+            # Extract search path and pattern
+            search_path = "."
+            pattern = "*"
+            # Try to extract a path after "in" or "from"
+            path_match = re.search(r'(?:in|from|under)\s+["\']?([A-Za-z]:[\\/\w\s.-]+|[/\\]\w+|[\w./\\]+)["\']?', task, re.I)
+            if path_match:
+                search_path = path_match.group(1).strip()
+            # Extract pattern — the thing being searched for
+            pattern_match = re.search(r'(?:search for|find|look for)\s+(?:file[s]?\s+)?["\']?([^"\']+?)["\']?(?:\s+in|\s+from|\s+under|$)', task, re.I)
+            if pattern_match:
+                p = pattern_match.group(1).strip()
+                if "*" not in p:
+                    pattern = f"*{p}*"
+                else:
+                    pattern = p
+            self._log_tool_audit(tool="ToolExecutor", action="search_files", target=f"{search_path}/{pattern}", approved=True, status="executing")
+            res = self._tools.search_files(search_path, pattern)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="search_files", target=f"{search_path}/{pattern}", approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Searched for '{pattern}' in {search_path}", tags=["search", "tool"], source="tool", importance=0.4)
+            matches = res.data.get("matches", [])
+            result_text = f"Found {len(matches)} matches:\n\n"
+            result_text += "\n".join(f"- {m['path']}" for m in matches[:30])
+            if len(matches) > 30:
+                result_text += f"\n... and {len(matches) - 30} more."
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: read or open a specific file from the results."],
+                result_text,
+            )
+
+        # Search file contents
+        if any(x in t for x in ["search content", "search in files", "find in files", "grep", "search inside", "find text in", "search for text"]):
+            # Extract query
+            content_query = ""
+            q_match = re.search(r'(?:search (?:content|in files|inside|for text)|find (?:in files|text in))\s+(?:for\s+)?["\']?([^"\']+?)["\']?(?:\s+in|\s+from|$)', task, re.I)
+            if q_match:
+                content_query = q_match.group(1).strip()
+            if not content_query:
+                return RuntimeResult(RuntimeStatus.PAUSED, "No search query", thought + [f"[{ai_name}] Could not determine what text to search for."], ["Provide a search term, e.g. 'search content for TODO in my documents'"], [], "")
+            search_path = "."
+            path_match = re.search(r'(?:in|from|under)\s+["\']?([A-Za-z]:[\\/\w\s.-]+|[/\\]\w+|[\w./\\]+)["\']?', task, re.I)
+            if path_match:
+                search_path = path_match.group(1).strip()
+            self._log_tool_audit(tool="ToolExecutor", action="search_content", target=f"{search_path}/{content_query}", approved=True, status="executing")
+            res = self._tools.search_content(search_path, content_query)
+            status = "completed" if res.ok else "failed"
+            self._log_tool_audit(tool="ToolExecutor", action="search_content", target=f"{search_path}/{content_query}", approved=True, status=status, error=res.error if not res.ok else None)
+            if res.ok:
+                self._memory.add(ai_uuid, f"Searched content for '{content_query}' in {search_path}", tags=["search", "tool"], source="tool", importance=0.4)
+            matches = res.data.get("matches", [])
+            result_text = f"Found {len(matches)} files containing '{content_query}':\n\n"
+            result_text += "\n".join(f"- {m['path']} (line {m['line']}): {m['snippet']}" for m in matches[:20])
+            if len(matches) > 20:
+                result_text += f"\n... and {len(matches) - 20} more."
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED if res.ok else RuntimeStatus.FAILED,
+                res.action,
+                thought + [f"[{ai_name}] {res.message}"],
+                [res.message],
+                ["Next: read a specific file from the results."],
+                result_text,
+            )
+
+        # Fallback: if we got here, try the model for a general response
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "tool"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Tool chat completed", thought + [f"[{ai_name}] Model responded to tool-related question."], [f"[{ai_name}] Returned response."], ["Next: specify a concrete action like 'read file' or 'list files'."], model.text)
+
         return RuntimeResult(
             RuntimeStatus.PAUSED,
             "Tool intent unclear",
             thought + [f"[{ai_name}] Detected Tool User intent but could not map it to a supported action."],
-            ["Supported: read file, write file, list files, move file, delete file, run shell command."],
+            ["Supported: read file, write file, list files, search files, search content, move file, delete file, run shell command."],
             ["Next: rephrase with a clear action and path."],
             "",
         )

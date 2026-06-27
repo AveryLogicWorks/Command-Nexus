@@ -29,7 +29,6 @@ Includes:
 - Enhanced support level
 - Multiple integrations
 - Custom setup assistance
-
 Final pricing depends on seats, deployment scope, support, integrations, customization, number of workflows, number of locations, and evaluation results.
 
 ---

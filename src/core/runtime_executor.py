@@ -142,15 +142,15 @@ class LocalRuntimeExecutor:
             RuntimeStatus.FAILED,
             "No model backend connected",
             base_thought + [
-                f"[{ai_name}] No Ollama/OpenAI model backend answered.",
+                f"[{ai_name}] No model backend answered.",
                 f"[{ai_name}] Stopping here so the app does not fake completion.",
             ],
             [
                 f"[{ai_name}] Task was routed, but not executed by a real AI backend.",
-                "[SYSTEM] Start Ollama locally or set OPENAI_API_KEY to enable real model execution.",
+                "[SYSTEM] The built-in local model or configured backend did not respond. Check Backend settings.",
             ],
             [
-                "Next: connect Ollama or OpenAI.",
+                "Next: check Backend settings or select a different model.",
                 "Then retry the mission.",
             ],
             f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"

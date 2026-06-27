@@ -137,6 +137,15 @@ def build_main_app(release: bool = False) -> None:
         "--add-data", f"src{os.pathsep}src",
         "--add-data", f"assets{os.pathsep}assets",
         "--add-data", f"release_manifest.json{os.pathsep}.",
+        "--hidden-import", "llama_cpp",
+        "--hidden-import", "llama_cpp.llama",
+        "--collect-all", "llama_cpp",
+        "--exclude-module", "matplotlib",
+        "--exclude-module", "scipy",
+        "--exclude-module", "pandas",
+        "--exclude-module", "PIL",
+        "--exclude-module", "test",
+        "--exclude-module", "unittest",
         str(main_script),
     ]
     if icon.exists():

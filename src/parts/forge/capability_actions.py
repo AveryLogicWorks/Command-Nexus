@@ -1082,55 +1082,55 @@ class ChatCapabilityDialog(BaseCapabilityDialog):
             return
         self._append_user(msg)
         self._approval_banner.setVisible(False)
-        msg_l = msg.lower()
-        canonicals = {_canonical_ability(c) for c in self._abilities}
 
-        # Build a context-aware prompt and call the model backend.
-        book_ctx = (
-            f"You are {self._ai_name}, a Command Nexus governed AI.\n"
-            f"Use case: {self._use_case}\n"
-            f"Abilities: {', '.join(self._abilities) or 'general assistance'}\n"
-            f"Libraries: {', '.join(self._libraries) if self._libraries else 'None'}\n"
-            f"Guardrails: {', '.join(self._guardrails) if self._guardrails else 'None'}\n\n"
-            f"Quickstart: {self._book_context.get('quickstart', 'Ask me anything.')}\n\n"
-            f"User message: {msg}\n\n"
-            "Respond helpfully based on your capabilities. "
-            "Do not claim external actions were performed unless a tool actually performed them. "
-            "If a capability is not active, you can mention you know about it but cannot use it."
-        )
-
+        # Route through NexusAIRuntime for full capability execution:
+        # - Intent classification (chat, code, research, tool use, etc.)
+        # - ToolExecutor (read/write files, list dirs, run shell)
+        # - AdaptiveMemoryStore (learns from every interaction)
+        # - Model backend for AI reasoning
         try:
+            from ...core.nexus_ai_runtime import NexusAIRuntime
             settings = SettingsManager()
             settings.initialize()
-            backend = BackendManager(settings)
-            response = backend.call_model(book_ctx)
-        except Exception as e:
-            response = BackendResponse(error=f"Backend unavailable: {e}")
-
-        if response.error:
-            self._append_ai(
-                f"I'm here, but my model backend is offline or unavailable.\n\n"
-                f"Provider: {response.display_name or response.provider_id or 'selected backend'}\n"
-                f"Error: {response.error}\n\n"
-                "Start the selected backend, choose a different backend, or configure Backend settings."
+            runtime = NexusAIRuntime(settings=settings)
+            result = runtime.run(
+                task=msg,
+                ai_name=self._ai_name,
+                ai_uuid=self._ai_uuid,
+                ai_metadata={
+                    "abilities": self._abilities,
+                    "use_case": self._use_case,
+                    "guardrails": self._guardrails,
+                    "libraries": self._libraries,
+                },
             )
-            # Still provide capability routing hints so the user knows what's available.
-            reply_parts: list[str] = []
-            if "Research" in canonicals and any(k in msg_l for k in ["research", "find", "search", "compare", "source", "cite"]):
-                reply_parts.append("[Research capability is attached but backend is offline. Use the Research workflow for local briefs.]")
-            if "Coder" in canonicals and any(k in msg_l for k in ["code", "function", "bug", "fix", "test", "diff", "patch"]):
-                reply_parts.append("[Coding capability is attached but backend is offline. Use the Coding workflow for local scaffolding.]")
-            if "Creative Writing" in canonicals and any(k in msg_l for k in ["write", "draft", "story", "scene", "outline", "tone", "polish"]):
-                reply_parts.append("[Writing capability is attached but backend is offline. Use the Writing workflow for local drafts.]")
-            if reply_parts:
-                self._append_ai(" ".join(reply_parts))
-            self._input.clear()
-            return
-
-        if response.text:
-            self._append_ai(response.text)
-        else:
-            self._append_ai("I received your message but the model returned an empty response. Please try rephrasing.")
+            if result.result_text:
+                self._append_ai(result.result_text)
+            else:
+                self._append_ai("I processed your request but didn't produce output. Try rephrasing.")
+        except Exception as e:
+            # Fallback to direct model call if runtime fails
+            try:
+                settings = SettingsManager()
+                settings.initialize()
+                backend = BackendManager(settings)
+                book_ctx = (
+                    f"You are {self._ai_name}, a Command Nexus governed AI.\n"
+                    f"Use case: {self._use_case}\n"
+                    f"Abilities: {', '.join(self._abilities) or 'general assistance'}\n"
+                    f"Guardrails: {', '.join(self._guardrails) if self._guardrails else 'None'}\n\n"
+                    f"User message: {msg}\n\n"
+                    "Respond helpfully. You can read/write files, list directories, and run commands locally."
+                )
+                response = backend.call_model(book_ctx)
+                if response.error:
+                    self._append_ai(f"I encountered an issue: {response.error}")
+                elif response.text:
+                    self._append_ai(response.text)
+                else:
+                    self._append_ai("I received your message but couldn't generate a response. Please try again.")
+            except Exception as e2:
+                self._append_ai(f"I'm having trouble connecting to my local model: {e2}")
 
         self._input.clear()
 

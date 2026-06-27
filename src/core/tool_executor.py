@@ -146,3 +146,62 @@ class ToolExecutor:
             )
         except Exception as e:
             return ToolResult(False, "run_shell", f"Failed to run shell command: {e}", error=str(e))
+
+    def search_files(self, path: str | Path = ".", pattern: str = "*", max_results: int = 50) -> ToolResult:
+        """Search for files matching a pattern in the given directory tree."""
+        try:
+            base = Path(path).expanduser().resolve()
+            if not base.exists():
+                return ToolResult(False, "search_files", f"Directory not found: {base}")
+            matches = []
+            for item in base.rglob(pattern):
+                if len(matches) >= max_results:
+                    break
+                try:
+                    matches.append({
+                        "name": item.name,
+                        "path": str(item),
+                        "type": "file" if item.is_file() else "dir",
+                        "size": item.stat().st_size if item.is_file() else None,
+                    })
+                except (PermissionError, OSError):
+                    continue
+            return ToolResult(True, "search_files", f"Found {len(matches)} matches for '{pattern}' in {base}", {"path": str(base), "pattern": pattern, "matches": matches})
+        except Exception as e:
+            return ToolResult(False, "search_files", f"Failed to search {path}: {e}", error=str(e))
+
+    def search_content(self, path: str | Path = ".", query: str = "", max_results: int = 20) -> ToolResult:
+        """Search file contents for a text query in the given directory tree."""
+        try:
+            base = Path(path).expanduser().resolve()
+            if not base.exists():
+                return ToolResult(False, "search_content", f"Directory not found: {base}")
+            query_l = query.lower()
+            matches = []
+            for item in base.rglob("*"):
+                if len(matches) >= max_results:
+                    break
+                if not item.is_file():
+                    continue
+                if item.suffix.lower() in {".exe", ".dll", ".so", ".dylib", ".bin", ".pyc", ".zip", ".7z", ".rar", ".gz"}:
+                    continue
+                try:
+                    if item.stat().st_size > 1_000_000:
+                        continue
+                    text = item.read_text(encoding="utf-8", errors="replace")
+                    if query_l in text.lower():
+                        # Find the line with the match
+                        for i, line in enumerate(text.splitlines(), 1):
+                            if query_l in line.lower():
+                                matches.append({
+                                    "name": item.name,
+                                    "path": str(item),
+                                    "line": i,
+                                    "snippet": line.strip()[:200],
+                                })
+                                break
+                except (PermissionError, OSError, UnicodeDecodeError):
+                    continue
+            return ToolResult(True, "search_content", f"Found {len(matches)} files containing '{query}' in {base}", {"path": str(base), "query": query, "matches": matches})
+        except Exception as e:
+            return ToolResult(False, "search_content", f"Failed to search content in {path}: {e}", error=str(e))

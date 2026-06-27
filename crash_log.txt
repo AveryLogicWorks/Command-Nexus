@@ -1,0 +1,24 @@
+=== Command Nexus crash log started ===
+App created successfully. Starting event loop...
+QT MESSAGE [QtMsgType.QtWarningMsg]: QWindowsWindow::setGeometry: Unable to set geometry 1366x776+8+31 (frame: 1382x815+0+0) on QWidgetWindow/"VisibilityWindowClassWindow" on "TOSHIBA-TV". Resulting geometry: 1364x776+8+31 (frame: 1380x815+0+0) margins: 8, 31, 8, 8 minimum size: 1237x776 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=1253, y=815)))
+UNHANDLED EXCEPTION:
+Traceback (most recent call last):
+  File "B:\Documents\GitHub\Command Nexus\src\parts\book\book_window.py", line 1529, in _open_book_ai_dialog
+    dialog.book_content_ready.connect(self._on_book_ai_content_ready)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'KnowledgeAIDialog' object has no attribute 'book_content_ready'
+
+UNHANDLED EXCEPTION:
+Traceback (most recent call last):
+  File "B:\Documents\GitHub\Command Nexus\src\parts\book\book_window.py", line 1529, in _open_book_ai_dialog
+    dialog.book_content_ready.connect(self._on_book_ai_content_ready)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'KnowledgeAIDialog' object has no attribute 'book_content_ready'
+
+UNHANDLED EXCEPTION:
+Traceback (most recent call last):
+  File "B:\Documents\GitHub\Command Nexus\src\parts\book\book_window.py", line 1529, in _open_book_ai_dialog
+    dialog.book_content_ready.connect(self._on_book_ai_content_ready)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'KnowledgeAIDialog' object has no attribute 'book_content_ready'
+

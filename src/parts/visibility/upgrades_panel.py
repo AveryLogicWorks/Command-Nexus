@@ -17,6 +17,7 @@ Usage: Import into visibility_window.py or create a dedicated upgrades dialog.
 
 import json
 import threading
+import urllib.parse
 from pathlib import Path
 
 from dataclasses import dataclass, field
@@ -131,10 +132,10 @@ Perfect for: Students, freelancers, personal productivity, and small projects.
 
     UpgradeFeature(
         id="membership_business",
-        name="Pro Membership",
+        name="Business Membership",
         description="Full business capabilities including team orchestration, data analysis, and automation.",
         detailed_description="""
-Pro Membership gives your team the tools to work smarter:
+Business Membership gives your team the tools to work smarter:
 
 • Everything in Basic Membership, plus:
 • Team Orchestrator: Coordinate multiple AIs working together
@@ -149,7 +150,7 @@ Pro Membership gives your team the tools to work smarter:
 Perfect for: Small to mid-size businesses, startups, agencies, and growing teams.
         """,
         category=UpgradeCategory.MEMBERSHIP,
-        price="$50/mo",
+        price="$80/mo",
         icon="🏢",
         benefits=[
             "Everything in Basic, plus business-tier capabilities",
@@ -162,12 +163,12 @@ Perfect for: Small to mid-size businesses, startups, agencies, and growing teams
 
     UpgradeFeature(
         id="membership_enterprise",
-        name="Business Membership",
-        description="All enterprise features including security auditing, compliance, medical research, and legal tools.",
+        name="Enterprise Membership",
+        description="All enterprise features including security auditing, compliance, medical research, and legal tools. Pricing is negotiable based on organization size and needs.",
         detailed_description="""
-Business Membership provides the highest level of capability and security:
+Enterprise Membership provides the highest level of capability and security:
 
-• Everything in Pro Membership, plus:
+• Everything in Business Membership, plus:
 • Security Auditor: Scan code and configs for vulnerabilities
 • Code Reviewer: Automated code review with best practices
 • Medical Researcher: Search medical literature and check drug interactions
@@ -176,17 +177,24 @@ Business Membership provides the highest level of capability and security:
 • Full audit trail and compliance reporting
 • Enterprise-grade security features
 • Dedicated support channel
+• Custom integrations and deployment support
+
+Pricing is negotiable — typically ranges from $2,500 to $25,000+ depending on
+organization size, number of seats, and custom requirements.
+
+Contact sales@averylogicworks.com for a custom quote.
 
 Perfect for: Large organizations, healthcare, legal firms, and enterprises with strict compliance needs.
         """,
         category=UpgradeCategory.MEMBERSHIP,
-        price="$80/mo",
+        price="Contact for Pricing",
         icon="🏛️",
         benefits=[
-            "Everything in Pro, plus enterprise-tier capabilities",
+            "Everything in Business, plus enterprise-tier capabilities",
             "Security auditing and code review",
             "Medical research and legal assistant tools",
-            "Unlimited capabilities per AI agent"
+            "Unlimited capabilities per AI agent",
+            "Custom integrations and deployment support"
         ],
         requires=["membership_business"]
     ),
@@ -564,38 +572,53 @@ def get_upgrade_by_id(upgrade_id: str) -> Optional[UpgradeFeature]:
 
 
 def calculate_bundle_price(upgrade_ids: List[str]) -> Dict:
-    """Calculate bundle pricing with discounts."""
+    """Calculate bundle pricing with discounts.
+
+    Discount applies ONLY to the cheapest item(s) in the bundle,
+    not the entire total. This prevents someone from getting a huge
+    discount on a high-priced enterprise item by bundling it with cheap ones.
+    """
     upgrades = [get_upgrade_by_id(uid) for uid in upgrade_ids if get_upgrade_by_id(uid)]
-    
-    # Extract numeric prices
-    total = 0.0
+
+    # Extract numeric prices and sort ascending (cheapest first)
+    priced = []
     for upgrade in upgrades:
         price_str = upgrade.price.replace("$", "").replace("/user", "")
         try:
-            total += float(price_str)
+            priced.append((upgrade, float(price_str)))
         except ValueError:
             pass
-    
-    # Apply bundle discounts
-    num_upgrades = len(upgrades)
+
+    priced.sort(key=lambda x: x[1])
+    total = sum(p for _, p in priced)
+
+    # Apply bundle discounts to cheapest items only
+    num_upgrades = len(priced)
     discount_percent = 0
+    num_discounted_items = 0
     if num_upgrades >= 3:
         discount_percent = 10
+        num_discounted_items = 1  # 10% off the cheapest 1 item
     if num_upgrades >= 5:
         discount_percent = 15
+        num_discounted_items = 2  # 15% off the cheapest 2 items
     if num_upgrades >= 10:
         discount_percent = 25
-    
-    discount_amount = total * (discount_percent / 100)
+        num_discounted_items = 3  # 25% off the cheapest 3 items
+
+    # Calculate discount only on the cheapest N items
+    discount_base = sum(p for _, p in priced[:num_discounted_items])
+    discount_amount = discount_base * (discount_percent / 100)
     final_price = total - discount_amount
-    
+
     return {
         "subtotal": round(total, 2),
         "discount_percent": discount_percent,
         "discount_amount": round(discount_amount, 2),
         "final_price": round(final_price, 2),
         "savings": round(discount_amount, 2),
-        "num_upgrades": num_upgrades
+        "num_upgrades": num_upgrades,
+        "discounted_items": num_discounted_items,
     }
 
 
@@ -748,7 +771,8 @@ class UpgradesDialog(QDialog):
 
         # Footer with bundle info
         footer = QLabel(
-            f"Bundle discounts: 3+ upgrades = 10% off, 5+ = 15% off, 10+ = 25% off"
+            "Bundle discounts apply to cheapest items only: "
+            "3+ = 10% off cheapest, 5+ = 15% off cheapest 2, 10+ = 25% off cheapest 3"
         )
         footer.setStyleSheet("font-size: 12px; color: #8b949e; padding: 4px;")
         layout.addWidget(footer)
@@ -773,8 +797,8 @@ class UpgradesDialog(QDialog):
 
         # Top row: icon + name + price
         top = QHBoxLayout()
-        icon_label = QLabel(upgrade.icon)
-        icon_label.setStyleSheet("font-size: 24px;")
+        icon_label = QLabel(f"[{upgrade.category.name[:3]}]")
+        icon_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #58a6ff; padding: 2px 6px; background-color: #21262d; border-radius: 3px;")
         top.addWidget(icon_label)
 
         name_label = QLabel(upgrade.name)
@@ -839,12 +863,20 @@ class UpgradesDialog(QDialog):
                 bottom.addStretch(1)
             else:
                 bottom.addStretch(1)
-                btn_buy = QPushButton("Purchase")
-                btn_buy.setStyleSheet(
-                    "background-color: #238636; color: white; font-weight: bold; "
-                    "padding: 6px 20px; border-radius: 4px;"
-                )
-                btn_buy.clicked.connect(lambda checked, uid=upgrade.id: self._purchase(uid))
+                if upgrade.price == "Contact for Pricing":
+                    btn_buy = QPushButton("Contact Sales")
+                    btn_buy.setStyleSheet(
+                        "background-color: #1a73e8; color: white; font-weight: bold; "
+                        "padding: 6px 20px; border-radius: 4px;"
+                    )
+                    btn_buy.clicked.connect(lambda checked, uid=upgrade.id: self._contact_sales(uid))
+                else:
+                    btn_buy = QPushButton("Purchase")
+                    btn_buy.setStyleSheet(
+                        "background-color: #238636; color: white; font-weight: bold; "
+                        "padding: 6px 20px; border-radius: 4px;"
+                    )
+                    btn_buy.clicked.connect(lambda checked, uid=upgrade.id: self._purchase(uid))
                 bottom.addWidget(btn_buy)
 
         card_layout.addLayout(bottom)
@@ -855,6 +887,28 @@ class UpgradesDialog(QDialog):
             mode = "Sandbox" if self._settings.get().paypal_sandbox else "Live"
             return f"PayPal: Connected ({mode} mode)"
         return "PayPal: Not configured — click 'Configure PayPal' to enable real purchases"
+
+    def _contact_sales(self, upgrade_id: str):
+        """Open email client for Enterprise sales inquiries."""
+        import webbrowser
+        upgrade = get_upgrade_by_id(upgrade_id)
+        name = upgrade.name if upgrade else upgrade_id
+        subject = f"Enterprise Inquiry: {name}"
+        body = (
+            f"I'm interested in {name} for my organization.\n\n"
+            f"Organization name: \n"
+            f"Number of seats needed: \n"
+            f"Intended use case: \n"
+            f"Any custom requirements: \n"
+        )
+        url = f"mailto:sales@averylogicworks.com?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+        webbrowser.open(url)
+        QMessageBox.information(
+            self,
+            "Contact Sales",
+            f"Your email client should open with a pre-filled message to sales@averylogicworks.com.\n\n"
+            f"If it didn't, email us directly at sales@averylogicworks.com with your organization details.",
+        )
 
     def _open_paypal_config(self):
         """Open a small dialog to configure PayPal Client ID."""

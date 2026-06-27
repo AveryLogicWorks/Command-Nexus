@@ -693,6 +693,15 @@ class VisibilityWindow(QMainWindow):
         sel_row.addWidget(self._ai_status_label)
         mission_layout.addLayout(sel_row)
 
+        # Quick action buttons row
+        quick_row = QHBoxLayout()
+        self._btn_chat = QPushButton("Chat")
+        self._btn_chat.setObjectName("quick_chat_button")
+        self._btn_chat.setStyleSheet("background-color: #1a73e8; color: white; font-weight: bold; min-width: 60px;")
+        self._btn_chat.clicked.connect(self._on_quick_chat)
+        quick_row.addWidget(self._btn_chat)
+        mission_layout.addLayout(quick_row)
+
         # Task assignment row
         task_row = QHBoxLayout()
         self._task_input = QLineEdit()
@@ -1060,6 +1069,44 @@ class VisibilityWindow(QMainWindow):
 
     def _get_selected_uuid(self) -> str | None:
         return self._session_selector.currentData()
+
+    def _on_quick_chat(self):
+        """Open a chat dialog directly with the selected AI — no need to go through Forge."""
+        uuid = self._get_selected_uuid()
+        if not uuid or uuid not in self._sessions:
+            QMessageBox.warning(self, "No AI Selected", "Select an active AI from the dropdown first.")
+            return
+
+        session = self._sessions[uuid]
+        # Get AI metadata from the registry
+        meta = {}
+        if self._registry:
+            try:
+                meta = self._registry.get(uuid) or {}
+            except Exception:
+                pass
+
+        abilities = meta.get("abilities") or ["Chat Companion"]
+        book_path = meta.get("book_path") or ""
+        guardrails = meta.get("guardrails") or []
+        libraries = meta.get("libraries") or []
+        use_case = meta.get("use_case") or "Chat Companion"
+
+        try:
+            from src.parts.forge.capability_actions import ChatCapabilityDialog
+            dlg = ChatCapabilityDialog(
+                ai_name=session.name,
+                ai_uuid=uuid,
+                abilities=abilities,
+                book_path=book_path,
+                guardrails=guardrails,
+                libraries=libraries,
+                use_case=use_case,
+                parent=self,
+            )
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Chat Error", f"Could not open chat: {e}")
 
     def _on_start_mission(self):
         if self._watcher is not None and not self._watcher.check_action("mission_start", risk_level="safe"):
