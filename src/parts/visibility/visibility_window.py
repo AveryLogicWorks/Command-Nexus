@@ -500,6 +500,7 @@ class NavigationBar(QWidget):
     open_governance = pyqtSignal()
     open_customer_ai = pyqtSignal()
     open_upgrades = pyqtSignal()
+    open_license = pyqtSignal()
     voice_toggled = pyqtSignal(bool)
     mic_clicked = pyqtSignal()
 
@@ -523,6 +524,9 @@ class NavigationBar(QWidget):
         
         btn_tour = QPushButton("🎓 Tour")
         btn_tour.setObjectName("nav_tour")
+        
+        btn_license = QPushButton("🔑 License")
+        btn_license.setObjectName("nav_license")
 
         btn_forge.setStyleSheet("background-color: #5e35b1; color: white; font-weight: bold; min-width: 90px;")
         btn_book.setStyleSheet("background-color: #00897b; color: white; font-weight: bold; min-width: 90px;")
@@ -530,6 +534,7 @@ class NavigationBar(QWidget):
         btn_governance.setStyleSheet("background-color: #455a64; color: white; font-weight: bold; min-width: 90px;")
         btn_customer_ai.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold; min-width: 90px;")
         btn_tour.setStyleSheet("background-color: #1f6feb; color: white; font-weight: bold; min-width: 80px;")
+        btn_license.setStyleSheet("background-color: #6a4c93; color: white; font-weight: bold; min-width: 80px;")
 
         btn_forge.clicked.connect(self.open_forge.emit)
         btn_book.clicked.connect(self.open_book.emit)
@@ -537,6 +542,7 @@ class NavigationBar(QWidget):
         btn_governance.clicked.connect(self.open_governance.emit)
         btn_customer_ai.clicked.connect(self.open_customer_ai.emit)
         btn_tour.clicked.connect(self._on_tour_clicked)
+        btn_license.clicked.connect(self.open_license.emit)
 
         self._btn_voice = QPushButton("Voice: OFF")
         self._btn_voice.setCheckable(True)
@@ -555,6 +561,7 @@ class NavigationBar(QWidget):
         layout.addWidget(btn_governance)
         layout.addWidget(btn_customer_ai)
         layout.addWidget(btn_tour)
+        layout.addWidget(btn_license)
         layout.addSpacing(20)
         layout.addWidget(self._btn_voice)
         layout.addWidget(self._btn_mic)

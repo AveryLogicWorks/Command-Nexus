@@ -69,24 +69,29 @@ class DemoTourOverlay(QWidget):
     
     def _update_highlight_rect(self):
         """Recompute highlight rect from target widget's current global position."""
-        if not self._target_widget or not self._target_widget.isVisible():
+        if not self._target_widget:
             return
-        # mapToGlobal(QPoint(0,0)) gives the global screen position of the widget's top-left corner.
-        # Do NOT use geometry().topLeft() — that's the position within the parent, which would
-        # double-count the offset when passed to mapToGlobal.
-        top_left = self._target_widget.mapToGlobal(QPoint(0, 0))
-        w = self._target_widget.width()
-        h = self._target_widget.height()
-        # Map from global screen coords to overlay's local coords
-        origin = self.geometry().topLeft()
-        x = top_left.x() - origin.x()
-        y = top_left.y() - origin.y()
-        self._highlight_rect = QRect(
-            x - self._padding,
-            y - self._padding,
-            w + self._padding * 2,
-            h + self._padding * 2,
-        )
+        try:
+            if not self._target_widget or not self._target_widget.isVisible():
+                return
+            # mapToGlobal(QPoint(0,0)) gives the global screen position of the widget's top-left corner.
+            top_left = self._target_widget.mapToGlobal(QPoint(0, 0))
+            w = self._target_widget.width()
+            h = self._target_widget.height()
+            # Map from global screen coords to overlay's local coords
+            origin = self.geometry().topLeft()
+            x = top_left.x() - origin.x()
+            y = top_left.y() - origin.y()
+            self._highlight_rect = QRect(
+                x - self._padding,
+                y - self._padding,
+                w + self._padding * 2,
+                h + self._padding * 2,
+            )
+        except RuntimeError:
+            # Widget was deleted by Qt C++ side — clear highlight safely
+            self._highlight_rect = None
+            self._target_widget = None
     
     def flash_click(self):
         """Flash green to indicate a click was detected."""
@@ -107,7 +112,10 @@ class DemoTourOverlay(QWidget):
             self._click_flash -= 1
         if self._target_widget:
             self._update_highlight_rect()
-        self.update()
+        try:
+            self.update()
+        except RuntimeError:
+            pass
     
     def paintEvent(self, event):
         """Paint dimmed overlay with animated highlight border."""
@@ -553,19 +561,20 @@ class DemoTourController(QWidget):
 
     def eventFilter(self, obj, event):
         """Watch for click events anywhere AND Escape key globally."""
-        if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
-            if self._tour_active:
-                self._on_skip()
-                return True
-        if (self._pending_click_target and
-            event.type() == QEvent.Type.MouseButtonPress and
-            isinstance(obj, QWidget)):
+        try:
+            if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+                if self._tour_active:
+                    self._on_skip()
+                    return True
+            if (self._pending_click_target and
+                event.type() == QEvent.Type.MouseButtonPress and
+                isinstance(obj, QWidget)):
 
-            target = self._pending_click_target
-            # Check if the clicked object is the target or a child of the target
-            if obj is target or self._is_descendant(obj, target):
-                if self._current_step < len(self._steps):
-                    step = self._steps[self._current_step]
+                target = self._pending_click_target
+                # Check if the clicked object is the target or a child of the target
+                if obj is target or self._is_descendant(obj, target):
+                    if self._current_step < len(self._steps):
+                        step = self._steps[self._current_step]
                     if step.on_target_clicked:
                         step.on_target_clicked()
 
@@ -599,6 +608,10 @@ class DemoTourController(QWidget):
                                       approved=True, status="info")
 
                 return False  # Let the click reach the widget
+
+        except RuntimeError:
+            # Widget was deleted by Qt C++ side — pass through safely
+            pass
 
         return super().eventFilter(obj, event)
     

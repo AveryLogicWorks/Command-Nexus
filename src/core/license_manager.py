@@ -653,6 +653,19 @@ class LicenseManager:
         if self._license_file.exists():
             self._license_file.unlink()
 
+    def deactivate(self, reason: str = ""):
+        """Deactivate the current license due to ethical/tripwire violations.
+
+        Unlike clear_license(), this marks the license as expired with a reason,
+        preventing re-activation with the same key.
+        """
+        if self._license_data:
+            self._license_data["status"] = "deactivated"
+            self._license_data["deactivation_reason"] = reason or "Ethical guardrail violation"
+            self._license_data["deactivated_at"] = datetime.now().isoformat()
+            self._save_license()
+        self._status = LicenseStatus.EXPIRED
+
 
 # Singleton accessor
 def get_license_manager() -> LicenseManager:

@@ -66,6 +66,9 @@ class NexusSettings:
     paypal_sandbox: bool = True       # Use sandbox for testing, live for production
     paypal_callback_port: int = 8755  # Local port for PayPal redirect callback
 
+    # Membership tier (0=Free, 1=Pro, 2=Business, 3=Enterprise, 4=All-Rounder)
+    membership_tier: int = 0
+
     def to_dict(self) -> dict:
         return asdict(self)
 

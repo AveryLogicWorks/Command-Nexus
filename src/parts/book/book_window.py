@@ -1405,44 +1405,108 @@ class BookWindow(QMainWindow):
             QMessageBox.warning(self, "No Knowledge", "Create or load knowledge first.")
             return
 
+        from ...core.ethical_guardrail_watchers import GuardrailScanner, get_warning_message
+
         # Run screening on ALL nodes
         all_nodes = self._current_book.get_all_nodes()
         total = len(all_nodes)
-        progress = QProgressDialog("Screening Knowledge...", "Cancel", 0, total, self)
-        progress.setWindowTitle("Save Gate")
+        progress = QProgressDialog("Screening Knowledge — The Compendium of Truth...", "Cancel", 0, total, self)
+        progress.setWindowTitle("Save Gate — Ethical Standards Check")
         progress.setModal(True)
 
         any_blocked = False
         messages = []
+        total_yellow_added = 0
+        latest_warning = ""
         for i, node in enumerate(all_nodes):
             progress.setValue(i)
             if progress.wasCanceled():
                 progress.close()
                 return
 
+            # Run legacy ScreeningPipeline first (spell check + basic patterns)
             can_save, cleaned, msgs = ScreeningPipeline.run(node.content)
             messages.extend(msgs)
             if not can_save:
                 any_blocked = True
+
+            # Run the new GuardrailScanner (Watchers A/B/C + flag system)
+            guardrail_result = GuardrailScanner.screen(cleaned)
+            if not guardrail_result.can_save:
+                any_blocked = True
+                messages.extend(guardrail_result.messages)
+                cleaned = guardrail_result.cleaned_text
+                total_yellow_added += guardrail_result.yellow_flags_added
+                if guardrail_result.warning_message:
+                    latest_warning = guardrail_result.warning_message
+
+            # Also run legacy watcher_service for backward compatibility
             watcher_result = run_watchers(cleaned)
             if not watcher_result.clean:
                 any_blocked = True
                 messages.append(BLOCK_MESSAGE)
                 cleaned = watcher_result.sanitized_text
+
             node.content = cleaned
 
         progress.setValue(total)
         progress.close()
 
         if any_blocked:
-            QMessageBox.warning(
-                self, "Ethical Violation Detected",
-                "This program is for ethical use only.\n"
-                "Any dangerous commands will be erased and not allowed to be used.\n"
-                "Please remember to use this program safely.\n\n"
-                "Screening log:\n" + "\n".join(messages[:15])
+            # Build the evolving warning message
+            warning_text = latest_warning or (
+                "Command Nexus is not here to be used for illegal, malicious, sexual, "
+                "or harmful practices. Please remember any attempts to save these types "
+                "of inputs will be reverted back. Please remember the rules and this "
+                "program is for ethical uses only. Thank you."
             )
+
+            # Add screening log
+            full_message = warning_text + "\n\n" + "=" * 50 + "\n"
+            full_message += "Screening log:\n" + "\n".join(messages[:15])
+
+            # Check if license should be tripped
+            if GuardrailScanner.should_trip_license():
+                # Generate owner notification
+                try:
+                    GuardrailScanner.generate_owner_notification()
+                except Exception:
+                    pass
+
+                full_message += "\n\n" + "=" * 50 + "\n"
+                full_message += (
+                    "LICENSE TRIPWIRE ENGAGED — Your license is being deactivated "
+                    "due to repeated ethical standards violations.\n\n"
+                    "Your access to Command Nexus has been restricted. To request "
+                    "a review and potential restoration of access, please contact "
+                    "support@averylogicworks.com.\n\n"
+                    "Malicious attempts to bypass the system can result in a "
+                    "permanent ban from Command Nexus and, depending on severity, "
+                    "all future Avery Logic Works product releases."
+                )
+                QMessageBox.critical(
+                    self, "License Tripwire — Ethical Violations",
+                    full_message
+                )
+                # Trigger license deactivation
+                try:
+                    from ...core.license_manager import get_license_manager
+                    lm = get_license_manager()
+                    lm.deactivate("Repeated ethical guardrail violations")
+                except Exception:
+                    pass
+            else:
+                QMessageBox.warning(
+                    self, "Ethical Standards Violation",
+                    full_message
+                )
+
+            # Revert content — switch back to ethical standards
+            self._screen_status.setText("Screening: VIOLATION DETECTED — Content reverted")
+            self._screen_status.setStyleSheet("color: #f0883e; font-weight: bold;")
         else:
+            self._screen_status.setText("Screening: Passed")
+            self._screen_status.setStyleSheet("color: #3fb950;")
             QMessageBox.information(
                 self, "Saved",
                 "Knowledge saved successfully.\n\n" +

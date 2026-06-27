@@ -1073,6 +1073,7 @@ USE_CASE_OPTIONS: dict = {
         # Premium upgrades
         "Memory Bridge", "Visual Canvas", "Voice Interface",
         "Calendar Manager", "Email Automation", "Document Generator",
+        "Budget Tracker", "Social Media Manager",
     ],
     UseCaseClass.EDUCATIONAL: [
         "Classroom Tutor", "Assignment Grader", "Lesson Planner",
@@ -1081,6 +1082,7 @@ USE_CASE_OPTIONS: dict = {
         # Premium upgrades
         "Learning Path Creator", "Knowledge Base Builder", "Presentation Builder",
         "Translation Expert", "Fact Checker", "Smart Search",
+        "Study Coach", "Plagiarism Checker",
     ],
     UseCaseClass.TASK_READY: [
         "Document Processor", "Meeting Scribe", "Data Entry Agent",
@@ -1089,6 +1091,7 @@ USE_CASE_OPTIONS: dict = {
         # Premium upgrades
         "Meeting Facilitator", "Calendar Manager", "Email Automation",
         "Spreadsheet Wizard", "Document Generator", "Smart Search",
+        "Form Builder", "Survey Analyzer",
     ],
     UseCaseClass.BUSINESS: [
         "Email Sifter & Responder", "Task / Project Manager",
@@ -1100,6 +1103,7 @@ USE_CASE_OPTIONS: dict = {
         "Calendar Manager", "Document Generator", "Presentation Builder",
         "Knowledge Base Builder", "API Integrator", "Workflow Automator",
         "Competitive Analyst", "Smart Search", "Email Automation",
+        "Social Media Manager", "Budget Tracker",
     ],
     UseCaseClass.ENTERPRISE: [
         "Business Intelligence Analyst", "Compliance Auditor",
@@ -1134,6 +1138,8 @@ USE_CASE_OPTIONS: dict = {
         "Accessibility Assistant", "Fact Checker", "Voice Interface",
         "Workflow Automator", "Security Auditor", "Competitive Analyst",
         "Learning Path Creator", "Smart Search",
+        "Budget Tracker", "Social Media Manager", "Study Coach",
+        "Plagiarism Checker", "Form Builder", "Survey Analyzer",
     ],
 }
 
@@ -1195,6 +1201,38 @@ CAPABILITY_DESCRIPTIONS: dict[str, str] = {
     "Command Support": "Assists with command-level coordination, status tracking, and decision-ready briefings.",
     "Logistics Coordinator": "Plans routes, schedules deliveries, and balances resources to meet deadlines.",
     "Tactical Advisor": "Analyzes scenarios, suggests options, and outlines pros and cons for tactical decisions.",
+    # Premium upgrade capabilities — beginner-friendly descriptions
+    "Team Orchestrator": "Coordinates multiple AIs working together on the same project. Assigns roles, tracks progress, and helps AIs hand off work to each other smoothly.",
+    "Memory Bridge": "Lets your AI remember things from past conversations. It recalls your preferences, previous topics, and project context so you don't have to repeat yourself.",
+    "Visual Canvas": "Creates images, diagrams, and visual concepts from your descriptions. Useful for presentations, illustrations, and visual brainstorming.",
+    "Data Analyst Pro": "Analyzes spreadsheets and datasets to find trends, create charts, and highlight insights. Helps you understand your numbers without needing a statistics degree.",
+    "Code Reviewer": "Automatically reviews code for bugs, security issues, and best practices. Suggests improvements and flags problems before they cause trouble.",
+    "API Integrator": "Connects your AI to external apps and services like CRMs, databases, or web tools. Sets up secure data flows between systems.",
+    "Knowledge Base Builder": "Creates organized, searchable collections of information. Great for building help centers, documentation, or team wikis.",
+    "Meeting Facilitator": "Manages meetings from agenda to action items. Takes live notes, tracks decisions, and sends follow-ups so nothing gets lost.",
+    "Email Automation": "Drafts email replies, sorts incoming messages by priority, and creates templates. You approve everything before it sends.",
+    "Calendar Manager": "Finds the best meeting times across time zones, detects scheduling conflicts, and suggests focus blocks in your schedule.",
+    "Document Generator": "Creates professionally formatted documents from templates — proposals, reports, letters — with your branding and style.",
+    "Translation Expert": "Translates text between languages while keeping the meaning, tone, and cultural context intact. Includes glossary support for consistent terminology.",
+    "Presentation Builder": "Creates slide decks with AI-generated content, design suggestions, and speaker notes. Helps you build presentations without staring at a blank slide.",
+    "Spreadsheet Wizard": "Builds formulas, creates pivot tables, and automates spreadsheet tasks. Explains complex calculations in plain language.",
+    "Legal Assistant": "Reviews contracts and legal documents to highlight key clauses, risks, and unusual terms. Not a replacement for a real lawyer, but saves time on first reviews.",
+    "Medical Researcher": "Searches medical literature, checks drug interactions, and summarizes clinical evidence. For research purposes only — not medical advice.",
+    "Accessibility Assistant": "Adapts content for different needs — reads text aloud, adjusts display settings, and provides alternative input methods for users with disabilities.",
+    "Fact Checker": "Verifies claims against multiple sources, scores credibility, and detects bias. Helps separate facts from misinformation.",
+    "Voice Interface": "Lets you talk to your AI using your voice instead of typing. Includes speech recognition and text-to-speech for hands-free interaction.",
+    "Workflow Automator": "Builds automated multi-step workflows with triggers and conditions — no coding needed. Set up 'when this happens, do that' chains for repetitive tasks.",
+    "Security Auditor": "Scans code, configurations, and documents for security weaknesses. Prioritizes vulnerabilities and suggests fixes to keep your systems safe.",
+    "Competitive Analyst": "Researches competitors, tracks market trends, and generates SWOT analyses. Helps you understand your market position and find opportunities.",
+    "Learning Path Creator": "Designs structured learning courses with lessons, quizzes, and progress tracking. Great for teachers, trainers, and self-learners.",
+    "Smart Search": "Searches across all your documents, knowledge bases, and the web at once. Understands natural language questions and ranks results by relevance.",
+    # New capabilities
+    "Budget Tracker": "Tracks income and expenses, categorizes spending, and creates visual budget reports. Helps you understand where your money goes and plan ahead.",
+    "Social Media Manager": "Drafts posts for multiple platforms, suggests content calendars, and tracks engagement trends. You approve everything before posting.",
+    "Study Coach": "Creates personalized study plans, tracks progress, and adapts to your learning pace. Includes flashcards, practice quizzes, and exam prep strategies.",
+    "Plagiarism Checker": "Compares text against web sources and academic databases to detect potential plagiarism. Provides similarity scores and source links.",
+    "Form Builder": "Creates custom forms, surveys, and questionnaires from your descriptions. Includes templates for common use cases like feedback, registration, and intake.",
+    "Survey Analyzer": "Processes survey responses, identifies trends and patterns, and generates clear summary reports with charts and key insights.",
 }
 
 
@@ -1399,6 +1437,15 @@ class CapabilitySelectionDialog(QDialog):
         self._selected_capabilities: list = []
         self._checkboxes: dict = {}
         
+        # Get current membership tier from settings
+        from ...core.settings_manager import SettingsManager
+        from ...core.membership_tiers import MembershipTier
+        try:
+            mgr = SettingsManager()
+            self._membership_tier = MembershipTier(mgr.get().membership_tier)
+        except Exception:
+            self._membership_tier = MembershipTier.FREE
+        
         self._setup_ui()
         self._load_capabilities()
         self._apply_dark_theme()
@@ -1407,6 +1454,22 @@ class CapabilitySelectionDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
+
+        # Membership tier banner
+        from ...core.membership_tiers import TIER_NAMES, TIER_PRICES, MembershipTier
+        tier_name = TIER_NAMES.get(self._membership_tier, "Free")
+        tier_price = TIER_PRICES.get(self._membership_tier, "$0")
+        banner_text = f"Membership: {tier_name} ({tier_price})"
+        if self._membership_tier == MembershipTier.FREE:
+            banner_text += " — Upgrade to unlock more capabilities!"
+        self._tier_banner = QLabel(banner_text)
+        self._tier_banner.setStyleSheet(
+            "background-color: #1f2937; color: #58a6ff; font-size: 12px; "
+            "font-weight: bold; padding: 8px 12px; border-radius: 4px; "
+            "border: 1px solid #30363d;"
+        )
+        self._tier_banner.setWordWrap(True)
+        layout.addWidget(self._tier_banner)
 
         # Header with use case info
         header = QLabel(f"<h2>Choose Capabilities for {self._use_case.value}</h2>")
@@ -1481,6 +1544,7 @@ class CapabilitySelectionDialog(QDialog):
 
     def _load_capabilities(self):
         """Load all capabilities for this use case with descriptions and hover tooltips."""
+        from ...core.membership_tiers import is_capability_unlocked, get_upgrade_prompt_for_capability, TIER_NAMES, TIER_PRICES
         options = USE_CASE_OPTIONS.get(self._use_case, [])
         
         for opt in options:
@@ -1490,15 +1554,23 @@ class CapabilitySelectionDialog(QDialog):
             cap_layout.setContentsMargins(4, 4, 4, 4)
             cap_layout.setSpacing(8)
             
+            # Check if locked by membership
+            unlocked = is_capability_unlocked(opt, self._membership_tier)
+            lock_prompt = get_upgrade_prompt_for_capability(opt) if not unlocked else ""
+            
             # Checkbox
-            chk = QCheckBox(opt)
-            chk.setChecked(opt in self._current_selections)
+            display_name = opt if unlocked else f"🔒 {opt}"
+            chk = QCheckBox(display_name)
+            chk.setChecked(opt in self._current_selections and unlocked)
             chk.stateChanged.connect(self._update_count)
+            if not unlocked:
+                chk.setEnabled(False)
+                chk.setStyleSheet("QCheckBox { color: #6e7681; } QCheckBox::indicator { border: 1px solid #30363d; }")
             self._checkboxes[opt] = chk
             cap_layout.addWidget(chk)
             
             # Info button with tooltip
-            info_btn = QPushButton("?")
+            info_btn = QPushButton("?" if unlocked else "🔒")
             info_btn.setFixedSize(20, 20)
             info_btn.setStyleSheet("""
                 QPushButton {
@@ -1516,6 +1588,20 @@ class CapabilitySelectionDialog(QDialog):
             # Get description and tooltip
             desc = CAPABILITY_DESCRIPTIONS.get(opt, "No description available.")
             tooltip = self._build_tooltip(opt, desc)
+            if lock_prompt:
+                tooltip = f"{lock_prompt}<br><br>{tooltip}"
+                info_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #f0883e;
+                        color: white;
+                        border-radius: 10px;
+                        font-size: 10px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #f0883e;
+                    }
+                """)
             info_btn.setToolTip(tooltip)
             chk.setToolTip(tooltip)
             
@@ -1524,17 +1610,33 @@ class CapabilitySelectionDialog(QDialog):
             
             # Description label (truncated)
             desc_lbl = QLabel(desc[:80] + "..." if len(desc) > 80 else desc)
-            desc_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+            if not unlocked:
+                desc_lbl.setStyleSheet("color: #6e7681; font-size: 11px; font-style: italic;")
+            else:
+                desc_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
             desc_lbl.setWordWrap(True)
             cap_layout.addWidget(desc_lbl, stretch=1)
             
-            # Compatible with indicator
-            compatible = self._get_compatible_caps(opt)
-            if compatible:
-                compat_lbl = QLabel(f"↔ {len(compatible)} compatible")
-                compat_lbl.setStyleSheet("color: #3fb950; font-size: 10px;")
-                compat_lbl.setToolTip(f"Works well with: {', '.join(compatible[:5])}")
-                cap_layout.addWidget(compat_lbl)
+            # Locked badge
+            if not unlocked:
+                from ...core.membership_tiers import get_min_tier
+                min_tier = get_min_tier(opt)
+                tier_name = TIER_NAMES.get(min_tier, "Paid")
+                tier_price = TIER_PRICES.get(min_tier, "")
+                lock_lbl = QLabel(f"🔒 {tier_name} {tier_price}")
+                lock_lbl.setStyleSheet(
+                    "background-color: #f0883e; color: white; font-size: 10px; "
+                    "font-weight: bold; padding: 2px 6px; border-radius: 3px;"
+                )
+                cap_layout.addWidget(lock_lbl)
+            else:
+                # Compatible with indicator
+                compatible = self._get_compatible_caps(opt)
+                if compatible:
+                    compat_lbl = QLabel(f"↔ {len(compatible)} compatible")
+                    compat_lbl.setStyleSheet("color: #3fb950; font-size: 10px;")
+                    compat_lbl.setToolTip(f"Works well with: {', '.join(compatible[:5])}")
+                    cap_layout.addWidget(compat_lbl)
             
             self._caps_layout.addWidget(cap_widget)
         
@@ -1582,46 +1684,49 @@ class CapabilitySelectionDialog(QDialog):
 
     def _show_capability_details(self, capability: str):
         """Show detailed info dialog for a capability."""
-        from .capability_actions import CAPABILITY_REGISTRY, CAPABILITY_ALIASES
-        
-        canonical = CAPABILITY_ALIASES.get(capability, capability)
-        cap_data = CAPABILITY_REGISTRY.get(canonical)
-        
-        if not cap_data:
-            QMessageBox.information(self, capability, "No detailed information available.")
-            return
-        
-        # Build detailed description
-        lines = [
-            f"<h2>{capability}</h2>",
-            "",
-            f"<b>Description:</b> {cap_data.description}",
-            "",
-            f"<b>Approval Level:</b> {cap_data.required_approval_level}",
-            "",
-            f"<b>Best for Use Cases:</b> {', '.join(cap_data.allowed_use_cases[:5])}",
-            "",
-            "<b>Compatible Capabilities:</b>",
-        ]
-        
-        if cap_data.compatible_capabilities:
-            for cap in cap_data.compatible_capabilities[:10]:
-                lines.append(f"  • {cap}")
-        
-        lines.extend([
-            "",
-            "<b>Starter Prompts:</b>",
-        ])
-        
-        if cap_data.starter_prompt_guidance:
-            for prompt in cap_data.starter_prompt_guidance[:5]:
-                lines.append(f"  💡 \"{prompt}\"")
-        
-        msg = QMessageBox(self)
-        msg.setWindowTitle(f"About {capability}")
-        msg.setText("\n".join(lines))
-        msg.setTextFormat(Qt.TextFormat.RichText)
-        msg.exec()
+        try:
+            from .capability_actions import CAPABILITY_REGISTRY, CAPABILITY_ALIASES
+            
+            canonical = CAPABILITY_ALIASES.get(capability, capability)
+            cap_data = CAPABILITY_REGISTRY.get(canonical)
+            
+            if not cap_data:
+                QMessageBox.information(self, capability, "No detailed information available.")
+                return
+            
+            # Build detailed description
+            lines = [
+                f"<h2>{capability}</h2>",
+                "",
+                f"<b>Description:</b> {cap_data.description}",
+                "",
+                f"<b>Approval Level:</b> {cap_data.required_approval_level}",
+                "",
+                f"<b>Best for Use Cases:</b> {', '.join(cap_data.allowed_use_cases[:5])}",
+                "",
+                "<b>Compatible Capabilities:</b>",
+            ]
+            
+            if cap_data.compatible_capabilities:
+                for cap in cap_data.compatible_capabilities[:10]:
+                    lines.append(f"  • {cap}")
+            
+            lines.extend([
+                "",
+                "<b>Starter Prompts:</b>",
+            ])
+            
+            if cap_data.starter_prompt_guidance:
+                for prompt in cap_data.starter_prompt_guidance[:5]:
+                    lines.append(f"  💡 \"{prompt}\"")
+            
+            msg = QMessageBox(self)
+            msg.setWindowTitle(f"About {capability}")
+            msg.setText("\n".join(lines))
+            msg.setTextFormat(Qt.TextFormat.RichText)
+            msg.exec()
+        except Exception:
+            QMessageBox.information(self, capability, f"{capability}: description available in tooltip.")
 
     def _filter_capabilities(self, text: str):
         """Filter capabilities based on search text."""
@@ -1929,6 +2034,15 @@ class CharacterSheetWidget(QWidget):
     
     def _on_suggest_capabilities(self):
         """Auto-select recommended capabilities for current use case."""
+        from ...core.membership_tiers import is_capability_unlocked
+        from ...core.settings_manager import SettingsManager
+        from ...core.membership_tiers import MembershipTier
+        try:
+            mgr = SettingsManager()
+            tier = MembershipTier(mgr.get().membership_tier)
+        except Exception:
+            tier = MembershipTier.FREE
+
         # Get current use case
         uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
         current_uc = None
@@ -1953,11 +2067,16 @@ class CharacterSheetWidget(QWidget):
         # Get all available options for this use case
         options = USE_CASE_OPTIONS.get(current_uc, [])
         
-        # Add checkboxes with recommended ones checked
+        # Add checkboxes with recommended ones checked (only if unlocked)
         for i, opt in enumerate(options):
-            chk = QCheckBox(opt)
-            chk.setChecked(opt in recommendations)
+            unlocked = is_capability_unlocked(opt, tier)
+            display_name = opt if unlocked else f"\U0001f512 {opt}"
+            chk = QCheckBox(display_name)
+            chk.setChecked(opt in recommendations and unlocked)
             chk.stateChanged.connect(self._update_ai_details_preview)
+            if not unlocked:
+                chk.setEnabled(False)
+                chk.setStyleSheet("QCheckBox { color: #6e7681; } QCheckBox::indicator { border: 1px solid #30363d; }")
             
             # Add hover tooltip with description
             desc = CAPABILITY_DESCRIPTIONS.get(opt, "")
@@ -1969,8 +2088,13 @@ class CharacterSheetWidget(QWidget):
         
         self._update_ai_details_preview()
         
-        count = len(recommendations)
-        QMessageBox.information(self, "Suggested Set", f"Selected {count} recommended capabilities for {current_uc.value}.")
+        # Count only unlocked recommendations
+        unlocked_recs = [r for r in recommendations if is_capability_unlocked(r, tier)]
+        locked_count = len(recommendations) - len(unlocked_recs)
+        msg = f"Selected {len(unlocked_recs)} recommended capabilities for {current_uc.value}."
+        if locked_count > 0:
+            msg += f"\n\n{locked_count} capabilities are locked for your membership tier. Upgrade to unlock them!"
+        QMessageBox.information(self, "Suggested Set", msg)
 
     def _on_uc_changed(self, text: str):
         if "LOCKED" in text:
@@ -2002,6 +2126,15 @@ class CharacterSheetWidget(QWidget):
 
     def _set_capabilities(self, capabilities: list):
         """Set the selected capabilities in the UI."""
+        from ...core.membership_tiers import is_capability_unlocked
+        from ...core.settings_manager import SettingsManager
+        from ...core.membership_tiers import MembershipTier
+        try:
+            mgr = SettingsManager()
+            tier = MembershipTier(mgr.get().membership_tier)
+        except Exception:
+            tier = MembershipTier.FREE
+
         # Clear current
         self._clear_capabilities()
         
@@ -2022,9 +2155,14 @@ class CharacterSheetWidget(QWidget):
         # Add all options with proper selection state
         options = USE_CASE_OPTIONS.get(current_uc, [])
         for i, opt in enumerate(options):
-            chk = QCheckBox(opt)
-            chk.setChecked(opt in capabilities)
+            unlocked = is_capability_unlocked(opt, tier)
+            display_name = opt if unlocked else f"\U0001f512 {opt}"
+            chk = QCheckBox(display_name)
+            chk.setChecked(opt in capabilities and unlocked)
             chk.stateChanged.connect(self._update_ai_details_preview)
+            if not unlocked:
+                chk.setEnabled(False)
+                chk.setStyleSheet("QCheckBox { color: #6e7681; } QCheckBox::indicator { border: 1px solid #30363d; }")
             
             # Add hover tooltip with description
             desc = CAPABILITY_DESCRIPTIONS.get(opt, "")

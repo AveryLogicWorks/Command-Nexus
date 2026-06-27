@@ -167,9 +167,21 @@ class CommandNexusApp:
             nav.open_governance.connect(self._open_governance)
             nav.open_customer_ai.connect(self._open_customer_ai)
             nav.open_upgrades.connect(self._open_upgrades)
+            nav.open_license.connect(self._open_license_manager)
         except Exception as e:
             QMessageBox.critical(None, "Navigation Error", f"Failed to wire navigation signals: {e}")
             self._cleanup()
+            sys.exit(1)
+
+        # Show governance disclaimer on first run (before tour)
+        try:
+            from src.parts.tour.governance_disclaimer import GovernanceDisclaimerDialog
+            if not GovernanceDisclaimerDialog.show_if_needed(self._visibility):
+                # User declined terms — exit
+                self._cleanup()
+                sys.exit(0)
+        except Exception as e:
+            QMessageBox.critical(None, "Initialization Error", f"Failed to show governance disclaimer: {e}")
             sys.exit(1)
 
         # Show guided tour on first run (after signals are wired so buttons work)
@@ -336,6 +348,12 @@ class CommandNexusApp:
         """Open the Upgrades Store dialog."""
         from .parts.visibility.upgrades_panel import UpgradesDialog
         dlg = UpgradesDialog(self._visibility)
+        dlg.exec()
+
+    def _open_license_manager(self):
+        """Open the License Manager dialog for upgrading or changing license."""
+        from .core.license_manager_dialog import LicenseManagerDialog
+        dlg = LicenseManagerDialog(self._visibility)
         dlg.exec()
 
     def _open_governance(self):

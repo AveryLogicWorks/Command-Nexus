@@ -37,6 +37,7 @@ from ...core.settings_manager import SettingsManager
 
 class UpgradeCategory(Enum):
     """Categories for organizing upgrades."""
+    MEMBERSHIP = auto()
     APPEARANCE = auto()
     FUNCTIONALITY = auto()
     ANALYTICS = auto()
@@ -75,6 +76,129 @@ class UpgradeFeature:
 # Only features that can be implemented in this desktop application
 
 UPGRADE_FEATURES = [
+    # === MEMBERSHIP TIERS ===
+    UpgradeFeature(
+        id="membership_pro",
+        name="Pro Membership",
+        description="Unlock most capabilities for Individual, Educational, and Task-Ready use cases.",
+        detailed_description="""
+Pro Membership unlocks the full power of Command Nexus for personal users and students:
+
+• All Individual capabilities unlocked: Coding Assistant, Creative Writer, Learning Tutor, Research Assistant
+• All Educational capabilities unlocked: Assignment Grader, Academic Researcher, Language Coach, Accessibility Aide
+• All Task-Ready capabilities unlocked: Data Entry Agent, Workflow Automator, Content Moderator
+• Premium upgrades: Memory Bridge, Visual Canvas, Voice Interface, Calendar Manager, Email Automation
+• Premium educational: Learning Path Creator, Knowledge Base Builder, Presentation Builder, Translation Expert
+• Premium task-ready: Meeting Facilitator, Spreadsheet Wizard, Document Generator, Smart Search
+• Fact Checker and Accessibility Assistant included
+• Priority email support
+
+Perfect for: Students, freelancers, personal productivity, and small projects.
+        """,
+        category=UpgradeCategory.MEMBERSHIP,
+        price="$14.99",
+        icon="⭐",
+        benefits=[
+            "Unlock 30+ capabilities across 3 use cases",
+            "Best value for personal users and students",
+            "All premium upgrades for Individual, Educational, and Task-Ready",
+            "Priority email support included"
+        ],
+        popular=True
+    ),
+
+    UpgradeFeature(
+        id="membership_business",
+        name="Business Membership",
+        description="Full business capabilities including team orchestration, data analysis, and automation.",
+        detailed_description="""
+Business Membership gives your team the tools to work smarter:
+
+• Everything in Pro Membership, plus:
+• Team Orchestrator: Coordinate multiple AIs working together
+• Data Analyst Pro: Advanced spreadsheet and dataset analysis
+• API Integrator: Connect AI to external apps and services
+• Competitive Analyst: Research competitors and market trends
+• Business Intelligence Analyst unlocked
+• Legal Document Reviewer unlocked
+• Multi-Department Orchestrator unlocked
+• Supply Chain Coordinator unlocked
+• IT Operations Agent unlocked
+
+Perfect for: Small to mid-size businesses, startups, agencies, and growing teams.
+        """,
+        category=UpgradeCategory.MEMBERSHIP,
+        price="$49.99",
+        icon="🏢",
+        benefits=[
+            "Everything in Pro, plus business-tier capabilities",
+            "Team orchestration and multi-department coordination",
+            "Advanced data analysis and API integrations",
+            "Legal and compliance document review"
+        ],
+        requires=["membership_pro"]
+    ),
+
+    UpgradeFeature(
+        id="membership_enterprise",
+        name="Enterprise Membership",
+        description="All enterprise features including security auditing, compliance, medical research, and legal tools.",
+        detailed_description="""
+Enterprise Membership provides the highest level of capability and security:
+
+• Everything in Business Membership, plus:
+• Security Auditor: Scan code and configs for vulnerabilities
+• Code Reviewer: Automated code review with best practices
+• Medical Researcher: Search medical literature and check drug interactions
+• Legal Assistant: Review contracts and legal documents with AI
+• Full audit trail and compliance reporting
+• Enterprise-grade security features
+• Dedicated support channel
+
+Perfect for: Large organizations, healthcare, legal firms, and enterprises with strict compliance needs.
+        """,
+        category=UpgradeCategory.MEMBERSHIP,
+        price="$99.99",
+        icon="🏛️",
+        benefits=[
+            "Everything in Business, plus enterprise-tier capabilities",
+            "Security auditing and code review",
+            "Medical research and legal assistant tools",
+            "Dedicated support channel"
+        ],
+        requires=["membership_business"]
+    ),
+
+    UpgradeFeature(
+        id="membership_all_rounder",
+        name="All-Rounder Membership",
+        description="Everything unlocked across all use cases. Best value for power users and multitaskers.",
+        detailed_description="""
+All-Rounder Membership is the ultimate Command Nexus experience:
+
+• Every single capability unlocked — no restrictions
+• All use cases fully accessible: Individual, Educational, Task-Ready, Business, Enterprise
+• All premium upgrades included
+• All future capabilities automatically unlocked
+• Priority processing for all AI operations
+• Early access to new features
+• Direct line to the development team
+
+Perfect for: Power users, multitaskers, consultants, and anyone who wants it all without limits.
+        """,
+        category=UpgradeCategory.MEMBERSHIP,
+        price="$49.99",
+        icon="💎",
+        benefits=[
+            "Every capability unlocked — zero restrictions",
+            "All use cases, all premium upgrades, all features",
+            "Future capabilities automatically included",
+            "Best value for multitaskers — replaces Pro + Business"
+        ],
+        popular=True,
+        new=True
+    ),
+
     # === APPEARANCE ===
     UpgradeFeature(
         id="visual_themes_pack",
@@ -584,7 +708,7 @@ class UpgradesDialog(QDialog):
             if not cat_upgrades:
                 continue
 
-            cat_label = QLabel(f"  {category.name.replace('_', ' ')}")
+            cat_label = QLabel(f"  {category.name.replace('_', ' ').title()}")
             cat_label.setStyleSheet(
                 "font-size: 16px; font-weight: bold; color: #f0883e; "
                 "padding: 8px 4px 4px 4px; border-bottom: 1px solid #30363d;"
@@ -886,6 +1010,7 @@ class UpgradesDialog(QDialog):
         if result.success:
             self._purchased.append(upgrade.id)
             save_purchased_upgrades(self._purchased)
+            self._apply_membership_if_needed(upgrade)
             QMessageBox.information(
                 self, "Purchase Complete",
                 f"'{upgrade.name}' has been unlocked!\n\n"
@@ -929,11 +1054,28 @@ class UpgradesDialog(QDialog):
             return
         self._purchased.append(upgrade.id)
         save_purchased_upgrades(self._purchased)
+        self._apply_membership_if_needed(upgrade)
         QMessageBox.information(
             self, "Purchase Complete",
             f"'{upgrade.name}' has been unlocked!\n\n"
             "Restart Command Nexus for the upgrade to take full effect."
         )
         self.accept()
-        dlg = UpgradesDialog(self.parent())
-        dlg.exec()
+
+    def _apply_membership_if_needed(self, upgrade: UpgradeFeature):
+        """If the purchased upgrade is a membership tier, update settings."""
+        membership_map = {
+            "membership_pro": 1,
+            "membership_business": 2,
+            "membership_enterprise": 3,
+            "membership_all_rounder": 4,
+        }
+        if upgrade.id in membership_map:
+            try:
+                mgr = SettingsManager()
+                new_tier = membership_map[upgrade.id]
+                current_tier = mgr.get().membership_tier
+                if current_tier < new_tier:
+                    mgr.update(membership_tier=new_tier)
+            except Exception:
+                pass

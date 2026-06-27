@@ -95,6 +95,8 @@ class TripwireManager:
         "src/core/settings_manager.py",
         "src/core/watcher_service.py",
         "src/core/watcher_engine.py",
+        "src/core/ethical_guardrail_watchers.py",
+        "src/parts/tour/governance_disclaimer.py",
         "src/parts/visibility/visibility_window.py",
         "src/parts/owner/owner_console.py",
         "src/parts/watcher/watcher_window.py",
