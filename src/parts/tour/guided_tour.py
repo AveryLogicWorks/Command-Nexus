@@ -205,19 +205,19 @@ class GuidedTourDialog(QDialog):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             QDialog {
-                background-color: #0d1117;
+                
                 color: #c9d1d9;
             }
             QLabel {
                 color: #c9d1d9;
             }
             QFrame {
-                background-color: #161b22;
+                
                 border: 1px solid #30363d;
                 border-radius: 8px;
             }
             QPushButton {
-                background-color: #21262d;
+                
                 border: 1px solid #30363d;
                 color: #c9d1d9;
                 padding: 10px 20px;

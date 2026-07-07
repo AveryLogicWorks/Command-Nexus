@@ -42,6 +42,8 @@ class LicenseStatus(Enum):
     INVALID = "invalid"
     NOT_ACTIVATED = "not_activated"
     TRIAL_EXPIRED = "trial_expired"
+    TERMINATED = "terminated"
+    UNDER_REVIEW = "under_review"
 
 
 class LicenseManager:
@@ -52,17 +54,17 @@ class LicenseManager:
 
     _instance: Optional["LicenseManager"] = None
 
-    # NOTE: This is a simple shared secret. For production, consider
-    # asymmetric cryptography (Ed25519) or a keyserver.
-    _SECRET_KEY = b"AVERY_LOGIC_WORKS_COMMAND_NEXUS_2026"
+    # NOTE: Secret loaded from environment variable — the actual value
+    # is stored in the separate Command Nexus Secrets file, NOT in source.
+    _SECRET_KEY = os.environ.get("CN_SECRET_KEY", "").encode() if os.environ.get("CN_SECRET_KEY") else b""
 
     # Internal tier secret — derived from main secret, never exposed publicly.
     # Used to validate employee/owner forever-unlock keys.
-    _INTERNAL_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_INTERNAL_2026").digest()
+    _INTERNAL_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_INTERNAL_2026").digest() if _SECRET_KEY else b""
 
     # Founder tier secret — highest authority. Separate derivation chain.
     # ONLY the founder holds this. Can be voided for contract breach.
-    _FOUNDER_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_FOUNDER_2026_ABSOLUTE").digest()
+    _FOUNDER_SALT = hashlib.sha256(_SECRET_KEY + b"_ALW_FOUNDER_2026_ABSOLUTE").digest() if _SECRET_KEY else b""
 
     TIER_LIMITS = {
         SubscriptionTier.TRIAL: {
@@ -258,7 +260,7 @@ class LicenseManager:
         entered_key = (key or "").strip().upper()
 
         # ── Prometheus Activation: Check for Hermes Codes (field codes) ──
-        if _MOIRAI_AVAILABLE and "-" in entered_key:
+        if _MOIRAI_AVAILABLE and entered_key.startswith("HERMES-"):
             # Field codes have dashes, e.g., HERMES-7-001
             ledger = get_moirai_ledger()
             field_code = ledger.get_code(entered_key)
@@ -665,6 +667,159 @@ class LicenseManager:
             self._license_data["deactivated_at"] = datetime.now().isoformat()
             self._save_license()
         self._status = LicenseStatus.EXPIRED
+
+    def flag_for_review(self, reason: str = "", detail: str = "") -> None:
+        """Flag the license for review without deactivating it.
+
+        Called by the Coherence Matrix when lattice violations are detected.
+        Yellow flags are warnings; red flags indicate repeat violations and
+        may restrict certain features. The license remains active but is
+        marked for review.
+        """
+        if not self._license_data:
+            return
+        review_flags = self._license_data.setdefault("review_flags", [])
+        review_entry = {
+            "reason": reason,
+            "detail": detail,
+            "timestamp": datetime.now().isoformat(),
+        }
+        review_flags.append(review_entry)
+        # Keep only the last 20 flags to prevent unbounded growth
+        if len(review_flags) > 20:
+            review_flags[:] = review_flags[-20:]
+        self._save_license()
+
+    def get_review_flags(self) -> list:
+        """Return the list of review flags on this license."""
+        if not self._license_data:
+            return []
+        return self._license_data.get("review_flags", [])
+
+    def clear_review_flags(self) -> None:
+        """Clear all review flags (used after review is completed)."""
+        if self._license_data:
+            self._license_data["review_flags"] = []
+            self._save_license()
+
+    # ─── Termination / Kill Validation System ──────────────────────────
+
+    # Flag thresholds for escalation
+    # Rapid escalation: hackers/AI attempt multiple times within hours
+    # 1 yellow = warning, 1 red = under review, 2 red = terminated, 1 crimson = terminated
+    YELLOW_THRESHOLD = 1       # Any yellow flag → under review (user warned)
+    RED_THRESHOLD = 2          # 2 red flags → terminated
+    CRIMSON_THRESHOLD = 1      # 1 crimson flag → immediate termination
+
+    def flag_for_review(self, reason: str = "", detail: str = "") -> None:
+        """Flag the license and auto-escalate based on accumulated flags.
+
+        Rapid escalation (hackers/AI attempt quickly):
+          - 1 yellow flag → UNDER_REVIEW (license restricted, user warned)
+          - 2 red flags → TERMINATED (license killed, termination popup)
+          - 1 crimson flag → TERMINATED (immediate kill, termination popup)
+
+        Returns: None (check is_terminated() / is_under_review() after calling)
+        """
+        if not self._license_data:
+            return
+
+        review_flags = self._license_data.setdefault("review_flags", [])
+        review_entry = {
+            "reason": reason,
+            "detail": detail,
+            "timestamp": datetime.now().isoformat(),
+        }
+        review_flags.append(review_entry)
+        if len(review_flags) > 50:
+            review_flags[:] = review_flags[-50:]
+        self._save_license()
+
+        # Auto-escalate based on flag accumulation
+        self._check_flag_escalation()
+
+    def _check_flag_escalation(self) -> None:
+        """Check accumulated flags and escalate license status if thresholds are met."""
+        if not self._license_data:
+            return
+
+        flags = self._license_data.get("review_flags", [])
+        if not flags:
+            return
+
+        crimson_count = sum(1 for f in flags if f.get("reason") == "lattice_crimson")
+        red_count = sum(1 for f in flags if f.get("reason") == "lattice_red")
+        yellow_count = sum(1 for f in flags if f.get("reason") == "lattice_yellow")
+
+        # Immediate termination on crimson
+        if crimson_count >= self.CRIMSON_THRESHOLD:
+            self._terminate(
+                reason="Critical structural integrity violation (crimson flag)",
+                detail=f"{crimson_count} crimson flag(s) accumulated",
+            )
+        # Termination on repeated red flags
+        elif red_count >= self.RED_THRESHOLD:
+            self._terminate(
+                reason="Repeated structural integrity violations (red flags)",
+                detail=f"{red_count} red flag(s) accumulated",
+            )
+        # Under review on accumulated yellow flags
+        elif yellow_count >= self.YELLOW_THRESHOLD:
+            if self._status != LicenseStatus.TERMINATED:
+                self._status = LicenseStatus.UNDER_REVIEW
+                self._license_data["status"] = "under_review"
+                self._license_data["review_started_at"] = datetime.now().isoformat()
+                self._save_license()
+
+    def _terminate(self, reason: str, detail: str = "") -> None:
+        """Terminate the license. This is a kill — the user is locked out.
+
+        The termination reason is stored for the popup dialog and for
+        reporting to Avery Logic Works when the user comes online.
+        """
+        if self._license_data:
+            self._license_data["status"] = "terminated"
+            self._license_data["termination_reason"] = reason
+            self._license_data["termination_detail"] = detail
+            self._license_data["terminated_at"] = datetime.now().isoformat()
+            self._license_data["termination_reported"] = False
+            self._save_license()
+        self._status = LicenseStatus.TERMINATED
+
+    def is_terminated(self) -> bool:
+        """Check if this license has been terminated."""
+        if self._status == LicenseStatus.TERMINATED:
+            return True
+        if self._license_data and self._license_data.get("status") == "terminated":
+            self._status = LicenseStatus.TERMINATED
+            return True
+        return False
+
+    def is_under_review(self) -> bool:
+        """Check if this license is under review."""
+        if self._status == LicenseStatus.UNDER_REVIEW:
+            return True
+        if self._license_data and self._license_data.get("status") == "under_review":
+            self._status = LicenseStatus.UNDER_REVIEW
+            return True
+        return False
+
+    def get_termination_info(self) -> dict:
+        """Return termination details for the popup dialog."""
+        if not self._license_data:
+            return {}
+        return {
+            "reason": self._license_data.get("termination_reason", ""),
+            "detail": self._license_data.get("termination_detail", ""),
+            "terminated_at": self._license_data.get("terminated_at", ""),
+            "reported": self._license_data.get("termination_reported", False),
+        }
+
+    def mark_termination_reported(self) -> None:
+        """Mark that the termination has been reported to Avery Logic Works."""
+        if self._license_data:
+            self._license_data["termination_reported"] = True
+            self._save_license()
 
 
 # Singleton accessor

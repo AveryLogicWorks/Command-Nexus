@@ -96,6 +96,9 @@ class TripwireManager:
         "src/core/watcher_service.py",
         "src/core/watcher_engine.py",
         "src/core/ethical_guardrail_watchers.py",
+        "src/core/capability_guardrails.py",
+        "src/core/baseline_guardrails.py",
+        "src/core/governance.py",
         "src/parts/tour/governance_disclaimer.py",
         "src/parts/visibility/visibility_window.py",
         "src/parts/owner/owner_console.py",
@@ -402,12 +405,34 @@ class TripwireManager:
         self._state.trust = WatcherTrust.BREACH.value
         self._audit_log("tripwire_lockdown_entered", reason)
         self._record_event("lockdown_entered", "system", "critical")
+        # Phone home: launch background beacon to report the tampering event
+        try:
+            from src.core.termination_beacon import launch_security_beacon, is_beacon_running
+            if not is_beacon_running():
+                launch_security_beacon(
+                    event_type="tripwire_lockdown",
+                    reason="File tampering detected in release mode",
+                    detail=reason,
+                )
+        except Exception:
+            pass
+        # Flag license for review instead of deactivating.
+        # Deactivation kills the app — flagging restricts features while
+        # keeping the app alive. The license manager can escalate to
+        # termination independently if review flags accumulate.
         if self._lm is not None and self._mode != WatcherMode.STABILIZATION:
             try:
-                self._lm.deactivate()
-                self._audit_log("tripwire_license_deactivated", "License deactivated due to tampering")
+                if hasattr(self._lm, "flag_for_review"):
+                    self._lm.flag_for_review(
+                        reason="tripwire_lockdown",
+                        detail=reason,
+                    )
+                    self._audit_log("tripwire_license_flagged", "License flagged for review due to tampering")
+                else:
+                    self._lm.deactivate()
+                    self._audit_log("tripwire_license_deactivated", "License deactivated due to tampering (no flag_for_review method)")
             except Exception as e:
-                self._audit_log("tripwire_license_deactivate_error", str(e))
+                self._audit_log("tripwire_license_flag_error", str(e))
 
     def check_action(self, action_name: str, target: str = "", risk_level: str = "risky") -> bool:
         """

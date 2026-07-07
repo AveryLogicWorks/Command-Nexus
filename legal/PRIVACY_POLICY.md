@@ -2,13 +2,13 @@
 
 **Effective Date:** June 15, 2026  
 **Last Updated:** June 15, 2026  
-**Company:** Pantheon Forge LLC ("Company," "we," "us," or "our")
+**Company:** Avery Logic Works ("Company," "we," "us," or "our")
 
 ---
 
 ## 1. INTRODUCTION AND OUR COMMITMENT
 
-At Pantheon Forge LLC, we are committed to protecting your privacy and maintaining the confidentiality of your information. This Privacy Policy explains how we collect, use, store, and protect information when you use Command Nexus™ ("the Software").
+At Avery Logic Works, we are committed to protecting your privacy and maintaining the confidentiality of your information. This Privacy Policy explains how we collect, use, store, and protect information when you use Command Nexus™ ("the Software").
 
 **Our Core Privacy Principles:**
 - **Local-First Architecture:** Your data stays primarily on your local machine
@@ -164,7 +164,7 @@ You have the right to:
 
 ### 6.2 How to Exercise Your Rights
 To exercise your privacy rights, contact us at:
-**Privacy Officer:** privacy@pantheonforge.io
+**Privacy Officer:** privacy@averylogicworks.com
 
 We will respond to requests within 30 days, or as required by applicable law.
 
@@ -200,7 +200,7 @@ When you request deletion of your data:
 ## 8. INTERNATIONAL DATA TRANSFERS
 
 ### 8.1 Data Processing Location
-Pantheon Forge LLC is based in the United States. Our servers and primary operations are located in the United States.
+Avery Logic Works is based in the United States. Our servers and primary operations are located in the United States.
 
 ### 8.2 Transfers from Other Countries
 If you access the Software from outside the United States:
@@ -220,7 +220,7 @@ For users in the European Economic Area (EEA) and United Kingdom:
 
 We do not knowingly collect personal information from children under 16. If we become aware that we have collected personal information from a child under 16, we will take steps to delete such information promptly.
 
-If you are a parent or guardian and believe your child has provided us with personal information, please contact us at privacy@pantheonforge.io.
+If you are a parent or guardian and believe your child has provided us with personal information, please contact us at privacy@averylogicworks.com.
 
 ## 10. CHANGES TO THIS PRIVACY POLICY
 
@@ -241,10 +241,10 @@ Your continued use of the Software after the effective date of changes constitut
 
 If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:
 
-**Privacy Officer:** privacy@pantheonforge.io  
-**General Support:** support@pantheonforge.io  
-**Legal Inquiries:** legal@pantheonforge.io  
-**Mailing Address:** Pantheon Forge LLC, Delaware, USA
+**Privacy Officer:** privacy@averylogicworks.com  
+**General Support:** support@averylogicworks.com  
+**Legal Inquiries:** legal@averylogicworks.com  
+**Mailing Address:** Avery Logic Works, USA
 
 ## 12. CALIFORNIA PRIVACY RIGHTS (CCPA/CPRA)
 
@@ -263,7 +263,7 @@ California residents have specific rights under the California Consumer Privacy 
 - Geolocation data (general location from IP address for fraud prevention)
 
 **How to Exercise Your Rights:**
-Contact us at privacy@pantheonforge.io to exercise your California privacy rights.
+Contact us at privacy@averylogicworks.com to exercise your California privacy rights.
 
 ## 13. EUROPEAN UNION PRIVACY RIGHTS (GDPR)
 
@@ -287,11 +287,11 @@ We process your personal data based on:
 - **Legal obligation:** To comply with applicable laws and regulations
 
 **Data Protection Officer:**
-For GDPR-related inquiries, contact our Privacy Officer at privacy@pantheonforge.io.
+For GDPR-related inquiries, contact our Privacy Officer at privacy@averylogicworks.com.
 
 ---
 
 **BY USING COMMAND NEXUS, YOU ACKNOWLEDGE THAT YOU HAVE READ AND UNDERSTOOD THIS PRIVACY POLICY AND AGREE TO ITS TERMS.**
 
-© 2026 Pantheon Forge LLC. All rights reserved.
+© 2026 Avery Logic Works. All rights reserved.
 

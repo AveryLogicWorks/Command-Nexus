@@ -52,6 +52,7 @@ from ...core.constants import (
     SpeedLevel, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
     AUDIT_PANE_MAX_LINES, PresenceState
 )
+from ..forge.easy_mode import get_quick_start, SimpleCapabilityLauncher
 
 # ---------------------------------------------------------------------------
 # Book Encryption helpers (mirrored from forge_window for local access)
@@ -189,7 +190,7 @@ class ViewportWidget(QFrame):
         elif mode == "MISSION":
             label = "AI Vision Stream — Live mission (screen capture)"
         self._label.setText(label)
-        self._label.setStyleSheet("background-color: #0d1117; color: #c9d1d9; font-size: 14px;")
+        self._label.setStyleSheet(" color: #c9d1d9; font-size: 14px;")
 
     def stop_stream(self, standby_text: str = "AI Vision Stream — standby. No active AI mission."):
         self._running = False
@@ -251,7 +252,7 @@ class AuditPane(QGroupBox):
         self._text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         font = QFont("Consolas", 10)
         self._text.setFont(font)
-        self._text.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._text.setStyleSheet(" color: #c9d1d9;")
 
         btn_copy = QPushButton("Copy")
         btn_print = QPushButton("Print")
@@ -501,6 +502,11 @@ class NavigationBar(QWidget):
     open_customer_ai = pyqtSignal()
     open_upgrades = pyqtSignal()
     open_license = pyqtSignal()
+    open_themes = pyqtSignal()
+    open_models = pyqtSignal()
+    open_knowledge = pyqtSignal()
+    open_voice = pyqtSignal()
+    open_scheduler = pyqtSignal()
     voice_toggled = pyqtSignal(bool)
     mic_clicked = pyqtSignal()
 
@@ -519,14 +525,29 @@ class NavigationBar(QWidget):
         btn_governance = QPushButton("Governance")
         btn_governance.setObjectName("nav_governance")
         
-        btn_customer_ai = QPushButton("🤖 Support")
+        btn_customer_ai = QPushButton("Support")
         btn_customer_ai.setObjectName("nav_customer_ai")
-        
-        btn_tour = QPushButton("🎓 Tour")
+
+        btn_tour = QPushButton("Tour")
         btn_tour.setObjectName("nav_tour")
-        
-        btn_license = QPushButton("🔑 License")
+
+        btn_license = QPushButton("License")
         btn_license.setObjectName("nav_license")
+
+        btn_themes = QPushButton("Themes")
+        btn_themes.setObjectName("nav_themes")
+
+        btn_models = QPushButton("Models")
+        btn_models.setObjectName("nav_models")
+
+        btn_knowledge = QPushButton("Knowledge")
+        btn_knowledge.setObjectName("nav_knowledge")
+
+        btn_voice_panel = QPushButton("Voice")
+        btn_voice_panel.setObjectName("nav_voice_panel")
+
+        btn_scheduler = QPushButton("Schedule")
+        btn_scheduler.setObjectName("nav_scheduler")
 
         btn_forge.setStyleSheet("background-color: #5e35b1; color: white; font-weight: bold; min-width: 90px;")
         btn_book.setStyleSheet("background-color: #00897b; color: white; font-weight: bold; min-width: 90px;")
@@ -535,6 +556,11 @@ class NavigationBar(QWidget):
         btn_customer_ai.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold; min-width: 90px;")
         btn_tour.setStyleSheet("background-color: #1f6feb; color: white; font-weight: bold; min-width: 80px;")
         btn_license.setStyleSheet("background-color: #6a4c93; color: white; font-weight: bold; min-width: 80px;")
+        btn_themes.setStyleSheet("background-color: #e91e63; color: white; font-weight: bold; min-width: 70px;")
+        btn_models.setStyleSheet("background-color: #0064a8; color: white; font-weight: bold; min-width: 70px;")
+        btn_knowledge.setStyleSheet("background-color: #8b5cf6; color: white; font-weight: bold; min-width: 80px;")
+        btn_voice_panel.setStyleSheet("background-color: #f0883e; color: white; font-weight: bold; min-width: 60px;")
+        btn_scheduler.setStyleSheet("background-color: #6a4c93; color: white; font-weight: bold; min-width: 70px;")
 
         btn_forge.clicked.connect(self.open_forge.emit)
         btn_book.clicked.connect(self.open_book.emit)
@@ -543,6 +569,11 @@ class NavigationBar(QWidget):
         btn_customer_ai.clicked.connect(self.open_customer_ai.emit)
         btn_tour.clicked.connect(self._on_tour_clicked)
         btn_license.clicked.connect(self.open_license.emit)
+        btn_themes.clicked.connect(self.open_themes.emit)
+        btn_models.clicked.connect(self.open_models.emit)
+        btn_knowledge.clicked.connect(self.open_knowledge.emit)
+        btn_voice_panel.clicked.connect(self.open_voice.emit)
+        btn_scheduler.clicked.connect(self.open_scheduler.emit)
 
         self._btn_voice = QPushButton("Voice: OFF")
         self._btn_voice.setCheckable(True)
@@ -562,6 +593,11 @@ class NavigationBar(QWidget):
         layout.addWidget(btn_customer_ai)
         layout.addWidget(btn_tour)
         layout.addWidget(btn_license)
+        layout.addWidget(btn_themes)
+        layout.addWidget(btn_models)
+        layout.addWidget(btn_knowledge)
+        layout.addWidget(btn_voice_panel)
+        layout.addWidget(btn_scheduler)
         layout.addSpacing(20)
         layout.addWidget(self._btn_voice)
         layout.addWidget(self._btn_mic)
@@ -589,6 +625,114 @@ class NavigationBar(QWidget):
             self._btn_voice.setText("Voice: OFF")
             self._btn_voice.setStyleSheet("background-color: #30363d; color: #8b949e; font-weight: bold; min-width: 90px;")
         self.voice_toggled.emit(on)
+
+
+class QuickActionsGrid(QWidget):
+    """Easy Mode grid of colorful one-click capability buttons.
+
+    Shows one button per capability the selected AI has.
+    Clicking a button opens SimpleCapabilityLauncher — a child-friendly
+    one-input-one-button dialog for that capability.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._parent_window = parent
+        self._ai_uuid = ""
+        self._ai_name = ""
+        self._book_path = ""
+        self._guardrails: list = []
+        self._libraries: list = []
+        self._use_case = ""
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setMaximumHeight(140)
+        self._scroll.setStyleSheet("QScrollArea { border: 1px solid #30363d; border-radius: 6px;  }")
+        self._grid_container = QWidget()
+        self._grid_layout = QGridLayout(self._grid_container)
+        self._grid_layout.setSpacing(6)
+        self._grid_layout.setContentsMargins(8, 8, 8, 8)
+        self._scroll.setWidget(self._grid_container)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(2)
+        header = QLabel("\u26a1 Quick Actions (click one to start!)")
+        header.setStyleSheet("color: #58a6ff; font-size: 11px; font-weight: bold; padding: 2px 0;")
+        outer.addWidget(header)
+        outer.addWidget(self._scroll)
+        self._placeholder = QLabel("Select an AI above to see quick action buttons.")
+        self._placeholder.setStyleSheet("color: #8b949e; font-size: 11px; padding: 8px;")
+        self._grid_layout.addWidget(self._placeholder, 0, 0)
+
+    def set_capabilities(self, capabilities: list[str], parent_window, ai_uuid: str, ai_name: str,
+                         book_path: str = "", guardrails=None, libraries=None, use_case: str = ""):
+        """Rebuild the button grid for the given capabilities."""
+        self._parent_window = parent_window
+        self._ai_uuid = ai_uuid
+        self._ai_name = ai_name
+        self._book_path = book_path
+        self._guardrails = guardrails or []
+        self._libraries = libraries or []
+        self._use_case = use_case
+
+        # Clear existing
+        while self._grid_layout.count():
+            item = self._grid_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if not capabilities:
+            lbl = QLabel("Select an AI above to see quick action buttons.")
+            lbl.setStyleSheet("color: #8b949e; font-size: 11px; padding: 8px;")
+            self._grid_layout.addWidget(lbl, 0, 0)
+            return
+
+        # Build buttons in a grid (4 columns)
+        cols = 4
+        for i, cap in enumerate(capabilities):
+            qs = get_quick_start(cap)
+            row = i // cols
+            col = i % cols
+            btn = QPushButton(f"{qs['emoji']}  {qs['title']}")
+            btn.setToolTip(cap)
+            btn.setStyleSheet(
+                f"QPushButton {{ background-color: {qs['color']}33; color: {qs['color']}; "
+                f"border: 1px solid {qs['color']}88; border-radius: 6px; "
+                f"padding: 6px 8px; font-size: 11px; font-weight: bold; text-align: center; }} "
+                f"QPushButton:hover {{ background-color: {qs['color']}66; color: white; }}"
+            )
+            btn.clicked.connect(lambda checked, c=cap: self._on_button_click(c))
+            self._grid_layout.addWidget(btn, row, col)
+
+        # Add stretch to fill remaining space
+        self._grid_layout.setRowStretch((len(capabilities) - 1) // cols + 1, 1)
+
+    def _on_button_click(self, capability_name: str):
+        """Open the SimpleCapabilityLauncher for the clicked capability."""
+        if not self._ai_uuid:
+            QMessageBox.warning(self, "No AI Selected", "Select an AI from the dropdown first.")
+            return
+
+        # Show disclaimer for guarded capabilities
+        try:
+            from ...core.capability_disclaimers import show_capability_disclaimer
+            if not show_capability_disclaimer(capability_name, parent=self):
+                return
+        except ImportError:
+            pass
+
+        dlg = SimpleCapabilityLauncher(
+            capability_name=capability_name,
+            ai_name=self._ai_name,
+            ai_uuid=self._ai_uuid,
+            abilities=[capability_name],
+            book_path=self._book_path,
+            guardrails=self._guardrails,
+            libraries=self._libraries,
+            use_case=self._use_case,
+            parent=self._parent_window,
+        )
+        dlg.exec()
 
 
 class VisibilityWindow(QMainWindow):
@@ -689,24 +833,28 @@ class VisibilityWindow(QMainWindow):
         sel_row.addWidget(self._session_selector, stretch=1)
 
         self._ai_status_label = QLabel("IDLE")
-        self._ai_status_label.setStyleSheet("color: #888888; font-weight: bold; padding: 2px 8px; background-color: #21262d; border-radius: 4px;")
+        self._ai_status_label.setStyleSheet("color: #888888; font-weight: bold; padding: 2px 8px;  border-radius: 4px;")
         sel_row.addWidget(self._ai_status_label)
         mission_layout.addLayout(sel_row)
 
         # Quick action buttons row
         quick_row = QHBoxLayout()
-        self._btn_chat = QPushButton("Chat")
+        self._btn_chat = QPushButton("\U0001F4AC Chat")
         self._btn_chat.setObjectName("quick_chat_button")
-        self._btn_chat.setStyleSheet("background-color: #1a73e8; color: white; font-weight: bold; min-width: 60px;")
+        self._btn_chat.setStyleSheet("background-color: #1a73e8; color: white; font-weight: bold; min-width: 60px; padding: 6px 12px; border-radius: 4px;")
         self._btn_chat.clicked.connect(self._on_quick_chat)
         quick_row.addWidget(self._btn_chat)
         mission_layout.addLayout(quick_row)
+
+        # Easy Mode — Quick Actions Grid (colorful one-click buttons)
+        self._quick_actions = QuickActionsGrid(self)
+        mission_layout.addWidget(self._quick_actions)
 
         # Task assignment row
         task_row = QHBoxLayout()
         self._task_input = QLineEdit()
         self._task_input.setObjectName("mission_input")
-        self._task_input.setPlaceholderText("Enter mission / task description...")
+        self._task_input.setPlaceholderText("\U0001F4AD Type what you want your AI to do... (or click a button above!)")
         self._task_input.setStyleSheet("background-color: #0f172a; color: #e2e8f0; border: 1px solid #334155; padding: 6px; border-radius: 4px;")
         task_row.addWidget(self._task_input, stretch=1)
 
@@ -727,7 +875,7 @@ class VisibilityWindow(QMainWindow):
         mission_layout.addWidget(QLabel("Task Queue:"))
         self._task_queue = QListWidget()
         self._task_queue.setMaximumHeight(100)
-        self._task_queue.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._task_queue.setStyleSheet(" color: #c9d1d9;")
         mission_layout.addWidget(self._task_queue)
 
         left_layout.addWidget(mission_group, stretch=0)
@@ -761,13 +909,13 @@ class VisibilityWindow(QMainWindow):
         trust_layout.addStretch()
         left_layout.addWidget(trust_widget, stretch=0)
 
-        presence_group = QGroupBox("Desktop Presence (Scaffold)")
+        presence_group = QGroupBox("Desktop Presence")
         presence_layout = QVBoxLayout(presence_group)
         presence_layout.setContentsMargins(8, 8, 8, 8)
         presence_layout.setSpacing(4)
         self._presence_label = QLabel("Protection: Passive / Stabilization Mode")
         self._presence_label.setStyleSheet("color: #ffee58; font-weight: bold;")
-        self._presence_detail = QLabel("Desktop Presence is optional. In this build, it can show AI status and future avatar readiness. Full 2D/3D avatar embodiment is planned for a later upgrade.")
+        self._presence_detail = QLabel("Shows real-time AI status. Active AIs display their current state here — idle, running missions, paused, or awaiting approval.")
         self._presence_detail.setWordWrap(True)
         self._presence_detail.setStyleSheet("color: #8b949e;")
         presence_layout.addWidget(self._presence_label)
@@ -793,12 +941,12 @@ class VisibilityWindow(QMainWindow):
         suggestions_layout.setContentsMargins(6, 6, 6, 6)
 
         self._suggestions_list = QListWidget()
-        self._suggestions_list.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._suggestions_list.setStyleSheet(" color: #c9d1d9;")
         self._suggestions_list.setMaximumHeight(120)
         suggestions_layout.addWidget(self._suggestions_list)
 
         self._btn_refresh_suggestions = QPushButton("Refresh")
-        self._btn_refresh_suggestions.setStyleSheet("background-color: #21262d; color: #c9d1d9;")
+        self._btn_refresh_suggestions.setStyleSheet(" color: #c9d1d9;")
         self._btn_refresh_suggestions.clicked.connect(self._update_suggestions)
         suggestions_layout.addWidget(self._btn_refresh_suggestions)
 
@@ -840,6 +988,14 @@ class VisibilityWindow(QMainWindow):
         help_menu = menu.addMenu("Help")
         act_about = help_menu.addAction("About Command Nexus\u2122")
         act_about.triggered.connect(self._show_about)
+        help_menu.addSeparator()
+        act_terms = help_menu.addAction("Terms of Use")
+        act_terms.triggered.connect(self._show_terms)
+        act_privacy = help_menu.addAction("Privacy Policy")
+        act_privacy.triggered.connect(self._show_privacy)
+        help_menu.addSeparator()
+        act_update = help_menu.addAction("Check for Updates")
+        act_update.triggered.connect(self._check_for_updates)
 
     def _show_about(self):
         try:
@@ -849,6 +1005,114 @@ class VisibilityWindow(QMainWindow):
         except Exception:
             info = "Command Nexus\u2122\nCopyright (c) 2026 Avery Logic Works — All Rights Reserved"
         QMessageBox.about(self, "About Command Nexus\u2122", info)
+
+    def _check_for_updates(self):
+        try:
+            from ...core.update_checker import check_for_updates
+            check_for_updates(parent=self, silent=False)
+        except Exception as e:
+            QMessageBox.warning(self, "Update Check", f"Could not check for updates: {e}")
+
+    def _show_terms(self):
+        from ..tour.governance_disclaimer import GovernanceDisclaimerDialog, TERMS_OF_USE_TEXT
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QScrollArea, QWidget, QLabel, QPushButton
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Command Nexus\u2122 — Terms of Use")
+        dlg.setMinimumSize(700, 600)
+        layout = QVBoxLayout(dlg)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        cl = QVBoxLayout(content)
+        label = QLabel(TERMS_OF_USE_TEXT)
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        label.setStyleSheet("color: #c9d1d9; font-size: 13px; padding: 20px; font-family: 'Consolas', monospace;")
+        cl.addWidget(label)
+        scroll.setWidget(content)
+        layout.addWidget(scroll, stretch=1)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dlg.accept)
+        layout.addWidget(close_btn)
+        dlg.exec()
+
+    def _show_privacy(self):
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QScrollArea, QWidget, QLabel, QPushButton
+        privacy_text = """COMMAND NEXUS(TM) -- PRIVACY POLICY
+==================================================
+
+Effective Date: June 15, 2026
+Company: Avery Logic Works
+
+CORE PRIVACY PRINCIPLES:
+- Local-First Architecture: Your data stays primarily on your local machine
+- Minimal Data Collection: We collect only what is necessary for Software operation
+- No AI Training on Your Data: We do not use your prompts or content to train AI models
+- No Data Selling: We do not sell, rent, or trade your personal information
+
+INFORMATION WE COLLECT:
+- Email address (when provided for support or license recovery)
+- License key and activation status
+- Subscription tier and payment information (processed by third-party payment processors)
+- Application version and build number
+- Operating system type and version
+- Anonymous crash logs (only if you opt in)
+
+INFORMATION WE DO NOT COLLECT:
+- Your AI prompts, conversations, or interactions with AI Agents
+- Content of files processed by the Software
+- Output generated by AI Agents
+- Your Book configurations, AI settings, or personal preferences
+- Browsing history, keystrokes, or screen recordings
+
+DATA STORAGE:
+- All AI configurations, Books, audit logs, and settings are stored LOCALLY on your device
+- License validation requests send only the key (no personal data attached)
+- No security system is impenetrable. While we strive to protect your information, we cannot guarantee absolute security.
+
+YOUR RIGHTS:
+- Access: Request information about what data we hold about you
+- Correction: Request correction of inaccurate information
+- Deletion: Request deletion of your account data we hold
+- Portability: Export your local data for transfer to other systems
+- Opt-Out: Disable anonymous telemetry at any time in Software Settings
+
+THIRD-PARTY AI PROVIDERS:
+If you connect Command Nexus to external AI providers (OpenAI, Anthropic, etc.):
+- Your prompts are sent directly to those providers
+- Those providers process your data under their own privacy policies
+- We are not responsible for third-party providers' data handling practices
+
+CHILDREN'S PRIVACY:
+Command Nexus is not intended for use by children under 16 years of age.
+
+CONTACT:
+Privacy Officer: privacy@averylogicworks.com
+General Support: support@averylogicworks.com
+Legal Inquiries: legal@averylogicworks.com
+
+==================================================
+(c) 2026 Avery Logic Works. All rights reserved.
+"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Command Nexus\u2122 — Privacy Policy")
+        dlg.setMinimumSize(700, 600)
+        layout = QVBoxLayout(dlg)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        cl = QVBoxLayout(content)
+        label = QLabel(privacy_text)
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        label.setStyleSheet("color: #c9d1d9; font-size: 13px; padding: 20px; font-family: 'Consolas', monospace;")
+        cl.addWidget(label)
+        scroll.setWidget(content)
+        layout.addWidget(scroll, stretch=1)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dlg.accept)
+        layout.addWidget(close_btn)
+        dlg.exec()
 
     def _setup_simulator(self):
         self._sim = AuditSimulator()
@@ -920,20 +1184,17 @@ class VisibilityWindow(QMainWindow):
         self._set_presence(PresenceState.IDLE, "Idle / ready")
 
     def _apply_dark_theme(self):
-        self.setStyleSheet("""
-            QMainWindow { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
-            QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
-            QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
-            QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }
-            QPushButton:hover { border-color: #58a6ff; }
-            QComboBox { border: 1px solid #30363d; padding: 4px; }
-            QTextEdit { border: 1px solid #30363d; }
-            QLabel { color: #c9d1d9; }
-            QMenu { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; }
-            QMenu::item { padding: 4px 20px; }
-            QMenu::item:selected { background-color: #1f6feb; color: white; }
-        """)
+        """Apply the current theme from theme_manager instead of hardcoded colors."""
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.setStyleSheet(generate_qss(t))
+                return
+        except Exception:
+            pass
+        # Fallback to basic dark if theme manager fails
+        self.setStyleSheet("")
 
     def _on_stop(self):
         uuid = self._get_selected_uuid()
@@ -1022,6 +1283,7 @@ class VisibilityWindow(QMainWindow):
         self._action_pane.append(f"[SYSTEM] '{name}' is now selectable in the runtime pool.")
         if self._registry:
             self._registry.ensure_enabled(uuid, name=name)
+        self._update_quick_actions()
 
     def _on_session_changed(self, text: str):
         uuid = self._session_selector.currentData()
@@ -1030,6 +1292,7 @@ class VisibilityWindow(QMainWindow):
         else:
             self._update_status_display(AIStatus.IDLE)
         self._update_suggestions()
+        self._update_quick_actions()
 
     def _update_suggestions(self):
         """Refresh the Adaptive Suggestions list from the local memory store."""
@@ -1069,6 +1332,30 @@ class VisibilityWindow(QMainWindow):
 
     def _get_selected_uuid(self) -> str | None:
         return self._session_selector.currentData()
+
+    def _update_quick_actions(self):
+        """Refresh the Easy Mode quick-action buttons for the currently selected AI."""
+        uuid = self._get_selected_uuid()
+        if not uuid or uuid not in self._sessions:
+            self._quick_actions.set_capabilities([], self, "", "")
+            return
+        session = self._sessions[uuid]
+        meta = {}
+        if self._registry:
+            try:
+                meta = self._registry.get(uuid) or {}
+            except Exception:
+                pass
+        abilities = meta.get("abilities") or ["Chat Companion"]
+        book_path = meta.get("book_path") or ""
+        guardrails = meta.get("guardrails") or []
+        libraries = meta.get("libraries") or []
+        use_case = meta.get("use_case") or "Chat Companion"
+        self._quick_actions.set_capabilities(
+            abilities, self, uuid, session.name,
+            book_path=book_path, guardrails=guardrails,
+            libraries=libraries, use_case=use_case,
+        )
 
     def _on_quick_chat(self):
         """Open a chat dialog directly with the selected AI — no need to go through Forge."""
@@ -1136,6 +1423,66 @@ class VisibilityWindow(QMainWindow):
         if not task_name:
             QMessageBox.warning(self, "No Task", "Enter a mission / task description.")
             return
+
+        # ── Usage Policy Pre-Screen (unified parental + enterprise) ──
+        # Screen mission input through the usage policy engine before anything else.
+        try:
+            from ...core.usage_policy import screen_input as _policy_screen, load_policy_settings as _load_policy
+            policy_settings = _load_policy()
+            if policy_settings.get("mode", "disabled") != "disabled":
+                policy_result = _policy_screen(task_name, policy_settings)
+                if not policy_result.allowed:
+                    QMessageBox.critical(
+                        self,
+                        "Usage Policy — Content Blocked",
+                        policy_result.block_message,
+                    )
+                    self._thought_pane.append(f"[SYSTEM] Mission input blocked by Usage Policy: {policy_result.blocked_reason.value}")
+                    self._task_input.clear()
+                    self._audit_event("mission_input_blocked_policy", msg=f"reason={policy_result.blocked_reason.value}")
+                    return
+        except ImportError:
+            pass
+
+        # ── Parental Controls Pre-Screen (legacy) ──
+        # Screen mission input through parental controls BEFORE governance sanitizer.
+        # When parental controls are enabled, kid safety filters are the first line of defense.
+        try:
+            from ...core.parental_controls_enforcer import screen_input, load_parental_settings
+            parental_settings = load_parental_settings()
+            if parental_settings.get("enabled", False):
+                parental_result = screen_input(task_name, parental_settings)
+                if not parental_result.allowed:
+                    QMessageBox.critical(
+                        self,
+                        "Parental Controls — Content Blocked",
+                        parental_result.block_message,
+                    )
+                    self._thought_pane.append(f"[SYSTEM] Mission input blocked by Parental Controls: {parental_result.blocked_reason.value}")
+                    self._task_input.clear()
+                    self._audit_event("mission_input_blocked_parental", msg=f"reason={parental_result.blocked_reason.value}")
+                    return
+        except ImportError:
+            pass
+
+        # ── Governance Sanitizer Pre-Screen ──
+        # Screen mission input for explicit/illegal/harmful/malicious content.
+        # Blocked content is never sent to the AI and the ethical-use banner is shown.
+        try:
+            from ...core.governance_sanitizer import sanitize_input, ETHICAL_USE_BANNER
+            san_result = sanitize_input(task_name)
+            if not san_result.is_clean:
+                QMessageBox.critical(
+                    self,
+                    "Content Blocked — Ethical Use Required",
+                    f"{san_result.violation_detail}\n\n{ETHICAL_USE_BANNER}",
+                )
+                self._thought_pane.append(f"[SYSTEM] Mission input blocked by governance sanitizer: {san_result.violation_type.value}")
+                self._task_input.clear()
+                self._audit_event("mission_input_blocked", msg=f"violation={san_result.violation_type.value}")
+                return
+        except ImportError:
+            pass
 
         session = self._sessions[uuid]
         if session.status == AIStatus.RUNNING:
@@ -1508,7 +1855,7 @@ class VisibilityWindow(QMainWindow):
         self._thought_pane.append(f"[SYSTEM] Backend check: {msg}")
         self._audit_event("backend_health_check", msg=msg)
         if not status.get("reachable"):
-            self._set_presence(PresenceState.BACKEND_NOT_CONNECTED, "Backend not connected")
+            self._set_presence(PresenceState.BACKEND_NOT_CONNECTED, "Local intelligence active")
         else:
             self._set_presence(PresenceState.IDLE, f"Backend ready ({status.get('backend')})")
 
@@ -1599,23 +1946,29 @@ class VisibilityWindow(QMainWindow):
 # Parental Controls Helpers
 # ---------------------------------------------------------------------------
 def _load_parental_settings() -> dict:
-    path = Path.home() / ".command_nexus" / "parental_controls.json"
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {
-        "enabled": False,
-        "block_mature_topics": True,
-        "block_violence": True,
-        "block_explicit_language": True,
-        "block_unsafe_web": True,
-        "require_approval_for_outbound": True,
-        "max_session_minutes": 120,
-        "log_all_conversations": True,
-        "password": "Nexus",
-    }
+    """Load parental controls settings using the hardened enforcer module."""
+    try:
+        from ...core.parental_controls_enforcer import load_parental_settings as _load_hardened
+        return _load_hardened()
+    except ImportError:
+        # Fallback to legacy loading if enforcer module not available
+        path = Path.home() / ".command_nexus" / "parental_controls.json"
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                return {}
+        return {
+            "enabled": False,
+            "block_mature_topics": True,
+            "block_violence": True,
+            "block_explicit_language": True,
+            "block_unsafe_web": True,
+            "require_approval_for_outbound": True,
+            "max_session_minutes": 120,
+            "log_all_conversations": True,
+            "password_hash": "",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -1637,30 +1990,38 @@ class ParentalControlsDialog(QDialog):
         self._apply_dark_theme()
 
     def _load_settings(self):
-        path = Path.home() / ".command_nexus" / "parental_controls.json"
-        if path.exists():
-            try:
-                self._settings = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                self._settings = {}
-        else:
-            self._settings = {
-                "enabled": False,
-                "block_mature_topics": True,
-                "block_violence": True,
-                "block_explicit_language": True,
-                "block_unsafe_web": True,
-                "require_approval_for_outbound": True,
-                "max_session_minutes": 120,
-                "log_all_conversations": True,
-                "password": "Nexus",
-            }
+        try:
+            from ...core.parental_controls_enforcer import load_parental_settings as _load_hardened
+            self._settings = _load_hardened()
+        except ImportError:
+            path = Path.home() / ".command_nexus" / "parental_controls.json"
+            if path.exists():
+                try:
+                    self._settings = json.loads(path.read_text(encoding="utf-8"))
+                except Exception:
+                    self._settings = {}
+            else:
+                self._settings = {
+                    "enabled": False,
+                    "block_mature_topics": True,
+                    "block_violence": True,
+                    "block_explicit_language": True,
+                    "block_unsafe_web": True,
+                    "require_approval_for_outbound": True,
+                    "max_session_minutes": 120,
+                    "log_all_conversations": True,
+                    "password_hash": "",
+                }
 
     def _save_settings(self):
-        base = Path.home() / ".command_nexus"
-        base.mkdir(parents=True, exist_ok=True)
-        path = base / "parental_controls.json"
-        path.write_text(json.dumps(self._settings, indent=2), encoding="utf-8")
+        try:
+            from ...core.parental_controls_enforcer import save_parental_settings as _save_hardened
+            _save_hardened(self._settings)
+        except ImportError:
+            base = Path.home() / ".command_nexus"
+            base.mkdir(parents=True, exist_ok=True)
+            path = base / "parental_controls.json"
+            path.write_text(json.dumps(self._settings, indent=2), encoding="utf-8")
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -1710,7 +2071,7 @@ class ParentalControlsDialog(QDialog):
         row = QHBoxLayout()
         row.addWidget(QLabel("Max session length (minutes):"))
         self._max_min = QLineEdit(str(self._settings.get("max_session_minutes", 120)))
-        self._max_min.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        self._max_min.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
         row.addWidget(self._max_min)
         layout.addLayout(row)
 
@@ -1731,15 +2092,15 @@ class ParentalControlsDialog(QDialog):
         self._old_pwd = QLineEdit()
         self._old_pwd.setPlaceholderText("Current password")
         self._old_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self._old_pwd.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        self._old_pwd.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
         self._new_pwd = QLineEdit()
         self._new_pwd.setPlaceholderText("New password")
         self._new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self._new_pwd.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        self._new_pwd.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
         self._confirm_pwd = QLineEdit()
         self._confirm_pwd.setPlaceholderText("Confirm new password")
         self._confirm_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self._confirm_pwd.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        self._confirm_pwd.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
         pwd_layout.addWidget(self._old_pwd)
         pwd_layout.addWidget(self._new_pwd)
         pwd_layout.addWidget(self._confirm_pwd)
@@ -1781,16 +2142,30 @@ class ParentalControlsDialog(QDialog):
         old = self._old_pwd.text()
         new_p = self._new_pwd.text()
         confirm = self._confirm_pwd.text()
-        if old != self._settings.get("password", "Nexus"):
-            QMessageBox.warning(self, "Error", "Current password is incorrect.")
-            return
+        # Use hashed password verification
+        try:
+            from ...core.parental_controls_enforcer import verify_password, _hash_password
+            if not verify_password(old, self._settings):
+                QMessageBox.warning(self, "Error", "Current password is incorrect.")
+                return
+        except ImportError:
+            # Fallback to legacy plaintext check
+            if old != self._settings.get("password", "Nexus"):
+                QMessageBox.warning(self, "Error", "Current password is incorrect.")
+                return
         if not new_p:
             QMessageBox.warning(self, "Error", "New password cannot be empty.")
             return
         if new_p != confirm:
             QMessageBox.warning(self, "Error", "New passwords do not match.")
             return
-        self._settings["password"] = new_p
+        # Store hashed password, remove plaintext
+        try:
+            from ...core.parental_controls_enforcer import _hash_password
+            self._settings["password_hash"] = _hash_password(new_p)
+            self._settings.pop("password", None)
+        except ImportError:
+            self._settings["password"] = new_p
         self._save_settings()
         QMessageBox.information(self, "Saved", "Password updated successfully.")
         self._old_pwd.clear()
@@ -1807,13 +2182,16 @@ class ParentalControlsDialog(QDialog):
         self.accept()
 
     def _apply_dark_theme(self):
-        self.setStyleSheet("""
-            QDialog{background:#0d1117;color:#c9d1d9;}
-            QLabel{color:#c9d1d9;}
-            QCheckBox{color:#c9d1d9;}
-            QGroupBox{color:#c9d1d9;border:1px solid #30363d;border-radius:8px;margin-top:12px;padding-top:12px;}
-            QLineEdit{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
-        """)
+        """Apply the current theme from theme_manager."""
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.setStyleSheet(generate_qss(t))
+                return
+        except Exception:
+            pass
+        self.setStyleSheet("")
 
 
 # ---------------------------------------------------------------------------
@@ -1853,7 +2231,7 @@ class ParentalControlsInfoDialog(QDialog):
         info.setReadOnly(True)
         info.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         info.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        info.setStyleSheet("background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:12px;")
+        info.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:12px;")
         info.setHtml("""
         <h3 style="color:#58a6ff;">What is Parental Controls?</h3>
         <p>Parental Controls let parents restrict what AIs can discuss, generate, or access. This keeps children from accidentally (or intentionally) interacting with inappropriate content or performing unsafe actions.</p>
@@ -1884,11 +2262,16 @@ class ParentalControlsInfoDialog(QDialog):
         layout.addWidget(close)
 
     def _apply_dark_theme(self):
-        self.setStyleSheet("""
-            QDialog{background:#0d1117;color:#c9d1d9;}
-            QLabel{color:#c9d1d9;}
-            QPushButton{background:#30363d;color:#fff;border:none;border-radius:8px;padding:12px;}
-        """)
+        """Apply the current theme from theme_manager."""
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.setStyleSheet(generate_qss(t))
+                return
+        except Exception:
+            pass
+        self.setStyleSheet("")
 
 
 # ---------------------------------------------------------------------------
@@ -2153,15 +2536,16 @@ class BackendConfigDialog(QDialog):
             self._status.setText(f"Policy error: {e}")
 
     def _apply_dark_theme(self):
-        self.setStyleSheet("""
-            QDialog{background:#0d1117;color:#c9d1d9;}
-            QLabel{color:#c9d1d9;}
-            QGroupBox{color:#c9d1d9;border:1px solid #30363d;border-radius:8px;margin-top:8px;padding-top:8px;}
-            QPushButton{background:#30363d;color:#fff;border:none;border-radius:8px;padding:10px;}
-            QLineEdit{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
-            QComboBox{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;}
-            QCheckBox{color:#c9d1d9;}
-        """)
+        """Apply the current theme from theme_manager."""
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.setStyleSheet(generate_qss(t))
+                return
+        except Exception:
+            pass
+        self.setStyleSheet("")
 
 
 # ---------------------------------------------------------------------------
@@ -2170,4 +2554,732 @@ class BackendConfigDialog(QDialog):
 
 # ---------------------------------------------------------------------------
 # End Parental Controls Dialog
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Usage Policy Dialog — Unified Policy Management
+# ---------------------------------------------------------------------------
+class UsagePolicyDialog(QDialog):
+    """Unified usage policy management for parental, enterprise, and custom modes."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Usage Policy — Access & Behavior Control")
+        self.setMinimumSize(620, 680)
+        self._settings = {}
+        self._load_settings()
+        self._setup_ui()
+        self._apply_dark_theme()
+
+    def _load_settings(self):
+        try:
+            from ...core.usage_policy import load_policy_settings
+            self._settings = load_policy_settings()
+        except ImportError:
+            self._settings = {"mode": "disabled", "parental": {}, "enterprise": {}}
+
+    def _save_settings(self):
+        try:
+            from ...core.usage_policy import save_policy_settings
+            save_policy_settings(self._settings)
+        except ImportError:
+            base = Path.home() / ".command_nexus"
+            base.mkdir(parents=True, exist_ok=True)
+            (base / "usage_policy.json").write_text(json.dumps(self._settings, indent=2), encoding="utf-8")
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        header = QLabel("USAGE POLICY")
+        header.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        header.setStyleSheet("color: #58a6ff;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+
+        subtitle = QLabel("Configure how Command Nexus can be used — for families, businesses, or both")
+        subtitle.setStyleSheet("color: #8b949e; font-size: 11px;")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(subtitle)
+
+        # Mode selector
+        mode_group = QGroupBox("Policy Mode")
+        mode_layout = QVBoxLayout(mode_group)
+        mode_label = QLabel("Choose who is using this system:")
+        mode_label.setStyleSheet("color: #c9d1d9;")
+        mode_layout.addWidget(mode_label)
+        self._mode_combo = QComboBox()
+        self._mode_combo.addItem("Disabled — No restrictions", "disabled")
+        self._mode_combo.addItem("Parental — Kid safety for families", "parental")
+        self._mode_combo.addItem("Enterprise — Employee restrictions for business", "enterprise")
+        self._mode_combo.addItem("Custom — Mix parental + enterprise rules", "custom")
+        current_mode = self._settings.get("mode", "disabled")
+        for i in range(self._mode_combo.count()):
+            if self._mode_combo.itemData(i) == current_mode:
+                self._mode_combo.setCurrentIndex(i)
+                break
+        self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        mode_layout.addWidget(self._mode_combo)
+        layout.addWidget(mode_group)
+
+        # Scroll area for settings
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setSpacing(12)
+
+        # ── Parental Controls Section ──
+        self._parental_group = QGroupBox("Parental Controls")
+        p_layout = QVBoxLayout(self._parental_group)
+
+        self._p_enabled = QCheckBox("Enable Parental Controls")
+        self._p_enabled.setChecked(self._settings.get("parental", {}).get("enabled", False))
+        p_layout.addWidget(self._p_enabled)
+
+        preset_row = QHBoxLayout()
+        preset_label = QLabel("Age Preset:")
+        preset_label.setStyleSheet("color: #c9d1d9;")
+        preset_row.addWidget(preset_label)
+        self._age_preset = QComboBox()
+        self._age_preset.addItem("Custom (no preset)", "")
+        self._age_preset.addItem("Child (5-8 years)", "child")
+        self._age_preset.addItem("Pre-Teen (9-12 years)", "preteen")
+        self._age_preset.addItem("Teen (13-17 years)", "teen")
+        self._age_preset.addItem("Study Focus Mode", "focus_mode")
+        current_preset = self._settings.get("parental", {}).get("age_preset", "")
+        for i in range(self._age_preset.count()):
+            if self._age_preset.itemData(i) == current_preset:
+                self._age_preset.setCurrentIndex(i)
+                break
+        self._age_preset.currentIndexChanged.connect(self._on_age_preset)
+        preset_row.addWidget(self._age_preset)
+        p_layout.addLayout(preset_row)
+
+        self._p_mature = QCheckBox("Block mature topics (dating, substances, gambling)")
+        self._p_mature.setChecked(self._settings.get("parental", {}).get("block_mature_topics", True))
+        p_layout.addWidget(self._p_mature)
+
+        self._p_violence = QCheckBox("Block violence & weapons")
+        self._p_violence.setChecked(self._settings.get("parental", {}).get("block_violence", True))
+        p_layout.addWidget(self._p_violence)
+
+        self._p_explicit = QCheckBox("Block explicit language")
+        self._p_explicit.setChecked(self._settings.get("parental", {}).get("block_explicit_language", True))
+        p_layout.addWidget(self._p_explicit)
+
+        # Interaction safety
+        is_group = QGroupBox("Interaction Safety")
+        is_layout = QVBoxLayout(is_group)
+        interaction = self._settings.get("parental", {}).get("interaction_safety", {})
+        self._p_personal_info = QCheckBox("Block personal info sharing")
+        self._p_personal_info.setChecked(interaction.get("block_personal_info", True))
+        is_layout.addWidget(self._p_personal_info)
+        self._p_location = QCheckBox("Block location sharing")
+        self._p_location.setChecked(interaction.get("block_location_sharing", True))
+        is_layout.addWidget(self._p_location)
+        self._p_photo = QCheckBox("Block photo/video requests")
+        self._p_photo.setChecked(interaction.get("block_photo_requests", True))
+        is_layout.addWidget(self._p_photo)
+        self._p_meet = QCheckBox("Block meet-in-person requests")
+        self._p_meet.setChecked(interaction.get("block_meet_requests", True))
+        is_layout.addWidget(self._p_meet)
+        self._p_platform = QCheckBox("Block platform redirects (Snapchat, etc.)")
+        self._p_platform.setChecked(interaction.get("block_platform_redirect", True))
+        is_layout.addWidget(self._p_platform)
+        self._p_links = QCheckBox("Block external links")
+        self._p_links.setChecked(interaction.get("block_external_links", False))
+        is_layout.addWidget(self._p_links)
+        p_layout.addWidget(is_group)
+
+        # Time limits
+        for label_text, attr, default, placeholder in [
+            ("Max session (minutes):", "_p_max_session", 120, ""),
+            ("Bedtime (HH:MM):", "_p_bedtime", "", "21:00"),
+            ("Break reminder (min, 0=off):", "_p_break", 0, ""),
+            ("Daily time limit (min, 0=none):", "_p_daily", 0, ""),
+        ]:
+            row = QHBoxLayout()
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("color: #c9d1d9;")
+            row.addWidget(lbl)
+            le = QLineEdit(str(self._settings.get("parental", {}).get(
+                "bedtime" if "bedtime" in attr else attr.replace("_p_", "").replace("max_session", "max_session_minutes").replace("break", "break_reminder_minutes").replace("daily", "daily_time_limit_minutes"),
+                default)))
+            le.setPlaceholderText(placeholder)
+            le.setMaximumWidth(80)
+            row.addWidget(le)
+            row.addStretch()
+            setattr(self, attr, le)
+            p_layout.addLayout(row)
+
+        # Scheduled access
+        sched_row = QHBoxLayout()
+        sched_label = QLabel("Allowed hours (start–end, HH:MM):")
+        sched_label.setStyleSheet("color: #c9d1d9;")
+        sched_row.addWidget(sched_label)
+        self._p_sched_start = QLineEdit(self._settings.get("parental", {}).get("scheduled_access_start", ""))
+        self._p_sched_start.setPlaceholderText("15:00")
+        self._p_sched_start.setMaximumWidth(60)
+        sched_row.addWidget(self._p_sched_start)
+        sched_row.addWidget(QLabel("–"))
+        self._p_sched_end = QLineEdit(self._settings.get("parental", {}).get("scheduled_access_end", ""))
+        self._p_sched_end.setPlaceholderText("19:00")
+        self._p_sched_end.setMaximumWidth(60)
+        sched_row.addWidget(self._p_sched_end)
+        sched_row.addStretch()
+        p_layout.addLayout(sched_row)
+
+        self._p_log = QCheckBox("Log all conversations for parent review")
+        self._p_log.setChecked(self._settings.get("parental", {}).get("log_all_conversations", True))
+        p_layout.addWidget(self._p_log)
+
+        # ── Expanded Parental Controls ──
+        expand_p_group = QGroupBox("Additional Protections")
+        ep_layout = QVBoxLayout(expand_p_group)
+
+        self._p_cyberbullying = QCheckBox("Block cyberbullying language")
+        self._p_cyberbullying.setChecked(self._settings.get("parental", {}).get("block_cyberbullying", True))
+        ep_layout.addWidget(self._p_cyberbullying)
+
+        self._p_gaming = QCheckBox("Block online gaming (Fortnite, Roblox, etc.)")
+        self._p_gaming.setChecked(self._settings.get("parental", {}).get("block_online_gaming", False))
+        ep_layout.addWidget(self._p_gaming)
+
+        self._p_streaming = QCheckBox("Block streaming (Netflix, Hulu, etc.)")
+        self._p_streaming.setChecked(self._settings.get("parental", {}).get("block_streaming", False))
+        ep_layout.addWidget(self._p_streaming)
+
+        self._p_shopping = QCheckBox("Block online shopping")
+        self._p_shopping.setChecked(self._settings.get("parental", {}).get("block_shopping", False))
+        ep_layout.addWidget(self._p_shopping)
+
+        self._p_financial = QCheckBox("Block financial content")
+        self._p_financial.setChecked(self._settings.get("parental", {}).get("block_financial", False))
+        ep_layout.addWidget(self._p_financial)
+
+        # Custom blocked keywords
+        kw_row = QHBoxLayout()
+        kw_label = QLabel("Custom blocked keywords (comma-separated):")
+        kw_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        kw_row.addWidget(kw_label)
+        ep_layout.addLayout(kw_row)
+        self._p_custom_kw = QLineEdit(", ".join(self._settings.get("parental", {}).get("custom_blocked_keywords", [])))
+        self._p_custom_kw.setPlaceholderText("fortnite, roblox, discord...")
+        ep_layout.addWidget(self._p_custom_kw)
+
+        # Blocked websites
+        web_row = QHBoxLayout()
+        web_label = QLabel("Blocked websites (comma-separated):")
+        web_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        web_row.addWidget(web_label)
+        ep_layout.addLayout(web_row)
+        self._p_blocked_sites = QLineEdit(", ".join(self._settings.get("parental", {}).get("blocked_websites", [])))
+        self._p_blocked_sites.setPlaceholderText("badsite.com, tiktok.com...")
+        ep_layout.addWidget(self._p_blocked_sites)
+
+        p_layout.addWidget(expand_p_group)
+
+        scroll_layout.addWidget(self._parental_group)
+
+        # ── Enterprise Controls Section ──
+        self._enterprise_group = QGroupBox("Enterprise Controls")
+        e_layout = QVBoxLayout(self._enterprise_group)
+
+        self._e_enabled = QCheckBox("Enable Enterprise Controls")
+        self._e_enabled.setChecked(self._settings.get("enterprise", {}).get("enabled", False))
+        e_layout.addWidget(self._e_enabled)
+
+        ent_preset_row = QHBoxLayout()
+        ent_preset_label = QLabel("Enterprise Preset:")
+        ent_preset_label.setStyleSheet("color: #c9d1d9;")
+        ent_preset_row.addWidget(ent_preset_label)
+        self._ent_preset = QComboBox()
+        self._ent_preset.addItem("Custom (no preset)", "")
+        self._ent_preset.addItem("Strict — Maximum lockdown", "strict")
+        self._ent_preset.addItem("Standard — Work-focused with logging", "standard")
+        self._ent_preset.addItem("Light — Compliance logging only", "light")
+        self._ent_preset.currentIndexChanged.connect(self._on_ent_preset)
+        ent_preset_row.addWidget(self._ent_preset)
+        e_layout.addLayout(ent_preset_row)
+
+        company_row = QHBoxLayout()
+        company_label = QLabel("Company name:")
+        company_label.setStyleSheet("color: #c9d1d9;")
+        company_row.addWidget(company_label)
+        self._e_company = QLineEdit(self._settings.get("enterprise", {}).get("company_name", ""))
+        self._e_company.setPlaceholderText("Your company name")
+        company_row.addWidget(self._e_company)
+        e_layout.addLayout(company_row)
+
+        self._e_work_only = QCheckBox("Work-only mode (block personal use)")
+        self._e_work_only.setChecked(self._settings.get("enterprise", {}).get("work_only_mode", True))
+        e_layout.addWidget(self._e_work_only)
+
+        self._e_entertainment = QCheckBox("Block entertainment (games, movies, music)")
+        self._e_entertainment.setChecked(self._settings.get("enterprise", {}).get("block_entertainment", True))
+        e_layout.addWidget(self._e_entertainment)
+
+        self._e_social = QCheckBox("Block social media")
+        self._e_social.setChecked(self._settings.get("enterprise", {}).get("block_social_media", True))
+        e_layout.addWidget(self._e_social)
+
+        self._e_personal = QCheckBox("Block personal use")
+        self._e_personal.setChecked(self._settings.get("enterprise", {}).get("block_personal_use", True))
+        e_layout.addWidget(self._e_personal)
+
+        # Data security
+        sec_group = QGroupBox("Data Security")
+        sec_layout = QVBoxLayout(sec_group)
+        self._e_exfil = QCheckBox("Block data exfiltration (sending data externally)")
+        self._e_exfil.setChecked(self._settings.get("enterprise", {}).get("block_data_exfiltration", True))
+        sec_layout.addWidget(self._e_exfil)
+        self._e_local_backend = QCheckBox("Local backend only (no cloud APIs)")
+        self._e_local_backend.setChecked(self._settings.get("enterprise", {}).get("local_backend_only", True))
+        sec_layout.addWidget(self._e_local_backend)
+        e_layout.addWidget(sec_group)
+
+        # Approval requirements
+        appr_group = QGroupBox("Approval Requirements")
+        appr_layout = QVBoxLayout(appr_group)
+        self._e_appr_outbound = QCheckBox("Require approval for outbound actions")
+        self._e_appr_outbound.setChecked(self._settings.get("enterprise", {}).get("require_approval_for_outbound", True))
+        appr_layout.addWidget(self._e_appr_outbound)
+        self._e_appr_write = QCheckBox("Require approval for file writes")
+        self._e_appr_write.setChecked(self._settings.get("enterprise", {}).get("require_approval_for_file_write", True))
+        appr_layout.addWidget(self._e_appr_write)
+        self._e_appr_shell = QCheckBox("Require approval for shell commands")
+        self._e_appr_shell.setChecked(self._settings.get("enterprise", {}).get("require_approval_for_shell", True))
+        appr_layout.addWidget(self._e_appr_shell)
+        e_layout.addWidget(appr_group)
+
+        # Compliance
+        comp_group = QGroupBox("Compliance & Logging")
+        comp_layout = QVBoxLayout(comp_group)
+        self._e_log = QCheckBox("Log all conversations for compliance")
+        self._e_log.setChecked(self._settings.get("enterprise", {}).get("log_all_conversations", True))
+        comp_layout.addWidget(self._e_log)
+        self._e_compliance = QCheckBox("Enable compliance audit logging")
+        self._e_compliance.setChecked(self._settings.get("enterprise", {}).get("compliance_logging", True))
+        comp_layout.addWidget(self._e_compliance)
+        e_layout.addWidget(comp_group)
+
+        # ── Expanded Enterprise Controls ──
+        expand_e_group = QGroupBox("Multi-User & Advanced Controls")
+        ee_layout = QVBoxLayout(expand_e_group)
+
+        # Seat count and license
+        seat_row = QHBoxLayout()
+        seat_label = QLabel("Licensed seats:")
+        seat_label.setStyleSheet("color: #c9d1d9;")
+        seat_row.addWidget(seat_label)
+        self._e_seats = QLineEdit(str(self._settings.get("enterprise", {}).get("seat_count", 1)))
+        self._e_seats.setMaximumWidth(60)
+        seat_row.addWidget(self._e_seats)
+        seat_row.addStretch()
+        ee_layout.addLayout(seat_row)
+
+        lic_row = QHBoxLayout()
+        lic_label = QLabel("Licensed to:")
+        lic_label.setStyleSheet("color: #c9d1d9;")
+        lic_row.addWidget(lic_label)
+        self._e_licensed_to = QLineEdit(self._settings.get("enterprise", {}).get("licensed_to", ""))
+        self._e_licensed_to.setPlaceholderText("Company or person name")
+        lic_row.addWidget(self._e_licensed_to)
+        ee_layout.addLayout(lic_row)
+
+        # Model restrictions
+        model_row = QHBoxLayout()
+        model_label = QLabel("Allowed models (comma-separated, empty=all):")
+        model_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        model_row.addWidget(model_label)
+        ee_layout.addLayout(model_row)
+        self._e_allowed_models = QLineEdit(", ".join(self._settings.get("enterprise", {}).get("allowed_models", [])))
+        self._e_allowed_models.setPlaceholderText("qwen2.5-coder-7b, qwen2.5-7b-instruct...")
+        ee_layout.addWidget(self._e_allowed_models)
+
+        blocked_model_row = QHBoxLayout()
+        blocked_model_label = QLabel("Blocked models (comma-separated):")
+        blocked_model_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        blocked_model_row.addWidget(blocked_model_label)
+        ee_layout.addLayout(blocked_model_row)
+        self._e_blocked_models = QLineEdit(", ".join(self._settings.get("enterprise", {}).get("blocked_models", [])))
+        self._e_blocked_models.setPlaceholderText("qwen2.5-coder-32b...")
+        ee_layout.addWidget(self._e_blocked_models)
+
+        # IP restrictions
+        ip_row = QHBoxLayout()
+        ip_label = QLabel("Allowed IP addresses (comma-separated, empty=all):")
+        ip_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        ip_row.addWidget(ip_label)
+        ee_layout.addLayout(ip_row)
+        self._e_allowed_ips = QLineEdit(", ".join(self._settings.get("enterprise", {}).get("allowed_ip_addresses", [])))
+        self._e_allowed_ips.setPlaceholderText("192.168.1.100, 10.0.0.5...")
+        ee_layout.addWidget(self._e_allowed_ips)
+
+        # Weekend / day restrictions
+        self._e_block_weekends = QCheckBox("Block weekend access (Sat/Sun)")
+        self._e_block_weekends.setChecked(self._settings.get("enterprise", {}).get("block_weekends", False))
+        ee_layout.addWidget(self._e_block_weekends)
+
+        days_row = QHBoxLayout()
+        days_label = QLabel("Allowed days (comma-separated, empty=all):")
+        days_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        days_row.addWidget(days_label)
+        ee_layout.addLayout(days_row)
+        self._e_allowed_days = QLineEdit(", ".join(self._settings.get("enterprise", {}).get("allowed_days", [])))
+        self._e_allowed_days.setPlaceholderText("mon, tue, wed, thu, fri")
+        ee_layout.addWidget(self._e_allowed_days)
+
+        # Advanced enterprise options
+        self._e_watermark = QCheckBox("Watermark all AI outputs with user ID")
+        self._e_watermark.setChecked(self._settings.get("enterprise", {}).get("watermark_outputs", True))
+        ee_layout.addWidget(self._e_watermark)
+
+        self._e_block_gaming = QCheckBox("Block online gaming")
+        self._e_block_gaming.setChecked(self._settings.get("enterprise", {}).get("block_online_gaming", True))
+        ee_layout.addWidget(self._e_block_gaming)
+
+        self._e_block_streaming = QCheckBox("Block streaming content")
+        self._e_block_streaming.setChecked(self._settings.get("enterprise", {}).get("block_streaming", True))
+        ee_layout.addWidget(self._e_block_streaming)
+
+        self._e_block_shopping = QCheckBox("Block online shopping")
+        self._e_block_shopping.setChecked(self._settings.get("enterprise", {}).get("block_online_shopping", True))
+        ee_layout.addWidget(self._e_block_shopping)
+
+        self._e_block_trading = QCheckBox("Block financial trading")
+        self._e_block_trading.setChecked(self._settings.get("enterprise", {}).get("block_financial_trading", True))
+        ee_layout.addWidget(self._e_block_trading)
+
+        self._e_block_jobsearch = QCheckBox("Block job search (HR setting)")
+        self._e_block_jobsearch.setChecked(self._settings.get("enterprise", {}).get("block_job_search", False))
+        ee_layout.addWidget(self._e_block_jobsearch)
+
+        # Data retention
+        retention_row = QHBoxLayout()
+        retention_label = QLabel("Data retention (days, 0=never delete):")
+        retention_label.setStyleSheet("color: #c9d1d9;")
+        retention_row.addWidget(retention_label)
+        self._e_retention = QLineEdit(str(self._settings.get("enterprise", {}).get("data_retention_days", 90)))
+        self._e_retention.setMaximumWidth(60)
+        retention_row.addWidget(self._e_retention)
+        retention_row.addStretch()
+        ee_layout.addLayout(retention_row)
+
+        # Custom blocked keywords (enterprise)
+        ent_kw_row = QHBoxLayout()
+        ent_kw_label = QLabel("Custom blocked keywords (comma-separated):")
+        ent_kw_label.setStyleSheet("color: #c9d1d9; font-size: 11px;")
+        ent_kw_row.addWidget(ent_kw_label)
+        ee_layout.addLayout(ent_kw_row)
+        self._e_custom_kw = QLineEdit(", ".join(self._settings.get("enterprise", {}).get("custom_blocked_keywords", [])))
+        self._e_custom_kw.setPlaceholderText("proprietary, internal only, confidential...")
+        ee_layout.addWidget(self._e_custom_kw)
+
+        # Enterprise scheduled access
+        ent_sched_row = QHBoxLayout()
+        ent_sched_label = QLabel("Work hours (start–end, HH:MM):")
+        ent_sched_label.setStyleSheet("color: #c9d1d9;")
+        ent_sched_row.addWidget(ent_sched_label)
+        self._e_sched_start = QLineEdit(self._settings.get("enterprise", {}).get("scheduled_access_start", ""))
+        self._e_sched_start.setPlaceholderText("09:00")
+        self._e_sched_start.setMaximumWidth(60)
+        ent_sched_row.addWidget(self._e_sched_start)
+        ent_sched_row.addWidget(QLabel("–"))
+        self._e_sched_end = QLineEdit(self._settings.get("enterprise", {}).get("scheduled_access_end", ""))
+        self._e_sched_end.setPlaceholderText("17:00")
+        self._e_sched_end.setMaximumWidth(60)
+        ent_sched_row.addWidget(self._e_sched_end)
+        ent_sched_row.addStretch()
+        ee_layout.addLayout(ent_sched_row)
+
+        e_layout.addWidget(expand_e_group)
+
+        ent_time_row = QHBoxLayout()
+        ent_time_label = QLabel("Max session (minutes, 0=none):")
+        ent_time_label.setStyleSheet("color: #c9d1d9;")
+        ent_time_row.addWidget(ent_time_label)
+        self._e_max_session = QLineEdit(str(self._settings.get("enterprise", {}).get("max_session_minutes", 0)))
+        self._e_max_session.setMaximumWidth(60)
+        ent_time_row.addWidget(self._e_max_session)
+        ent_time_row.addStretch()
+        e_layout.addLayout(ent_time_row)
+
+        scroll_layout.addWidget(self._enterprise_group)
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+        # Password section
+        pwd_group = QGroupBox("Password Protection")
+        pwd_layout = QVBoxLayout(pwd_group)
+        pwd_info = QLabel("Set a password to prevent unauthorized changes to this policy.")
+        pwd_info.setStyleSheet("color: #8b949e; font-size: 11px;")
+        pwd_layout.addWidget(pwd_info)
+        for label_text, attr in [("Current password:", "_old_pwd"), ("New password:", "_new_pwd"), ("Confirm:", "_confirm_pwd")]:
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label_text))
+            le = QLineEdit()
+            le.setEchoMode(QLineEdit.EchoMode.Password)
+            row.addWidget(le)
+            setattr(self, attr, le)
+            pwd_layout.addLayout(row)
+        change_pwd_btn = QPushButton("Change Password")
+        change_pwd_btn.clicked.connect(self._on_change_password)
+        pwd_layout.addWidget(change_pwd_btn)
+        layout.addWidget(pwd_group)
+
+        # Save / Close
+        btn_row = QHBoxLayout()
+        save_btn = QPushButton("Save Policy")
+        save_btn.setStyleSheet("background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold;")
+        save_btn.clicked.connect(self._on_save)
+        btn_row.addWidget(save_btn)
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet("background: #30363d; color: #c9d1d9; border: none; padding: 10px 20px; border-radius: 6px;")
+        close_btn.clicked.connect(self.reject)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+        self._on_mode_changed()
+
+    def _on_mode_changed(self):
+        mode = self._mode_combo.currentData()
+        self._parental_group.setVisible(mode in ("parental", "custom"))
+        self._enterprise_group.setVisible(mode in ("enterprise", "custom"))
+
+    def _on_age_preset(self):
+        preset_name = self._age_preset.currentData()
+        if not preset_name:
+            return
+        try:
+            from ...core.usage_policy import AGE_PRESETS
+            preset = AGE_PRESETS.get(preset_name)
+            if preset:
+                s = preset["settings"]
+                self._p_mature.setChecked(s.get("block_mature_topics", True))
+                self._p_violence.setChecked(s.get("block_violence", True))
+                self._p_explicit.setChecked(s.get("block_explicit_language", True))
+                self._p_max_session.setText(str(s.get("max_session_minutes", 120)))
+                self._p_bedtime.setText(s.get("bedtime", ""))
+                self._p_break.setText(str(s.get("break_reminder_minutes", 0)))
+                self._p_daily.setText(str(s.get("daily_time_limit_minutes", 0)))
+                interaction = s.get("interaction_safety", {})
+                self._p_personal_info.setChecked(interaction.get("block_personal_info", True))
+                self._p_location.setChecked(interaction.get("block_location_sharing", True))
+                self._p_photo.setChecked(interaction.get("block_photo_requests", True))
+                self._p_meet.setChecked(interaction.get("block_meet_requests", True))
+                self._p_platform.setChecked(interaction.get("block_platform_redirect", True))
+                self._p_links.setChecked(interaction.get("block_external_links", False))
+        except ImportError:
+            pass
+
+    def _on_ent_preset(self):
+        preset_name = self._ent_preset.currentData()
+        if not preset_name:
+            return
+        try:
+            from ...core.usage_policy import ENTERPRISE_PRESETS
+            preset = ENTERPRISE_PRESETS.get(preset_name)
+            if preset:
+                s = preset["settings"]
+                self._e_work_only.setChecked(s.get("work_only_mode", True))
+                self._e_entertainment.setChecked(s.get("block_entertainment", True))
+                self._e_social.setChecked(s.get("block_social_media", True))
+                self._e_personal.setChecked(s.get("block_personal_use", True))
+                self._e_appr_outbound.setChecked(s.get("require_approval_for_outbound", True))
+                self._e_appr_write.setChecked(s.get("require_approval_for_file_write", True))
+                self._e_appr_shell.setChecked(s.get("require_approval_for_shell", True))
+                self._e_log.setChecked(s.get("log_all_conversations", True))
+                self._e_compliance.setChecked(s.get("compliance_logging", True))
+                self._e_exfil.setChecked(s.get("block_data_exfiltration", True))
+                self._e_local_backend.setChecked(s.get("local_backend_only", True))
+                self._e_max_session.setText(str(s.get("max_session_minutes", 0)))
+        except ImportError:
+            pass
+
+    def _on_change_password(self):
+        old = self._old_pwd.text()
+        new_p = self._new_pwd.text()
+        confirm = self._confirm_pwd.text()
+        try:
+            from ...core.usage_policy import verify_password, _hash_password
+            if not verify_password(old, self._settings):
+                QMessageBox.warning(self, "Error", "Current password is incorrect.")
+                return
+        except ImportError:
+            if old != self._settings.get("password", "Nexus"):
+                QMessageBox.warning(self, "Error", "Current password is incorrect.")
+                return
+        if not new_p:
+            QMessageBox.warning(self, "Error", "New password cannot be empty.")
+            return
+        if new_p != confirm:
+            QMessageBox.warning(self, "Error", "New passwords do not match.")
+            return
+        try:
+            from ...core.usage_policy import _hash_password
+            self._settings["password_hash"] = _hash_password(new_p)
+            self._settings.pop("password", None)
+        except ImportError:
+            self._settings["password"] = new_p
+        self._save_settings()
+        QMessageBox.information(self, "Saved", "Password updated successfully.")
+        self._old_pwd.clear()
+        self._new_pwd.clear()
+        self._confirm_pwd.clear()
+
+    def _on_save(self):
+        self._settings["mode"] = self._mode_combo.currentData()
+        self._settings.setdefault("parental", {})
+        p = self._settings["parental"]
+        p["enabled"] = self._p_enabled.isChecked()
+        p["block_mature_topics"] = self._p_mature.isChecked()
+        p["block_violence"] = self._p_violence.isChecked()
+        p["block_explicit_language"] = self._p_explicit.isChecked()
+        p["bedtime"] = self._p_bedtime.text().strip()
+        p["scheduled_access_start"] = self._p_sched_start.text().strip()
+        p["scheduled_access_end"] = self._p_sched_end.text().strip()
+        try: p["max_session_minutes"] = int(self._p_max_session.text())
+        except ValueError: p["max_session_minutes"] = 120
+        try: p["break_reminder_minutes"] = int(self._p_break.text())
+        except ValueError: p["break_reminder_minutes"] = 0
+        try: p["daily_time_limit_minutes"] = int(self._p_daily.text())
+        except ValueError: p["daily_time_limit_minutes"] = 0
+        p["age_preset"] = self._age_preset.currentData()
+        p["log_all_conversations"] = self._p_log.isChecked()
+        p["block_cyberbullying"] = self._p_cyberbullying.isChecked()
+        p["block_online_gaming"] = self._p_gaming.isChecked()
+        p["block_streaming"] = self._p_streaming.isChecked()
+        p["block_shopping"] = self._p_shopping.isChecked()
+        p["block_financial"] = self._p_financial.isChecked()
+        p["custom_blocked_keywords"] = [k.strip() for k in self._p_custom_kw.text().split(",") if k.strip()]
+        p["blocked_websites"] = [w.strip() for w in self._p_blocked_sites.text().split(",") if w.strip()]
+        p["interaction_safety"] = {
+            "block_personal_info": self._p_personal_info.isChecked(),
+            "block_location_sharing": self._p_location.isChecked(),
+            "block_photo_requests": self._p_photo.isChecked(),
+            "block_meet_requests": self._p_meet.isChecked(),
+            "block_platform_redirect": self._p_platform.isChecked(),
+            "block_external_links": self._p_links.isChecked(),
+        }
+        self._settings.setdefault("enterprise", {})
+        e = self._settings["enterprise"]
+        e["enabled"] = self._e_enabled.isChecked()
+        e["company_name"] = self._e_company.text().strip()
+        e["work_only_mode"] = self._e_work_only.isChecked()
+        e["block_entertainment"] = self._e_entertainment.isChecked()
+        e["block_social_media"] = self._e_social.isChecked()
+        e["block_personal_use"] = self._e_personal.isChecked()
+        e["require_approval_for_outbound"] = self._e_appr_outbound.isChecked()
+        e["require_approval_for_file_write"] = self._e_appr_write.isChecked()
+        e["require_approval_for_shell"] = self._e_appr_shell.isChecked()
+        e["log_all_conversations"] = self._e_log.isChecked()
+        e["compliance_logging"] = self._e_compliance.isChecked()
+        e["block_data_exfiltration"] = self._e_exfil.isChecked()
+        e["local_backend_only"] = self._e_local_backend.isChecked()
+        try: e["max_session_minutes"] = int(self._e_max_session.text())
+        except ValueError: e["max_session_minutes"] = 0
+        # Expanded enterprise settings
+        try: e["seat_count"] = int(self._e_seats.text())
+        except ValueError: e["seat_count"] = 1
+        e["licensed_to"] = self._e_licensed_to.text().strip()
+        e["allowed_models"] = [m.strip() for m in self._e_allowed_models.text().split(",") if m.strip()]
+        e["blocked_models"] = [m.strip() for m in self._e_blocked_models.text().split(",") if m.strip()]
+        e["allowed_ip_addresses"] = [ip.strip() for ip in self._e_allowed_ips.text().split(",") if ip.strip()]
+        e["block_weekends"] = self._e_block_weekends.isChecked()
+        e["allowed_days"] = [d.strip() for d in self._e_allowed_days.text().split(",") if d.strip()]
+        e["watermark_outputs"] = self._e_watermark.isChecked()
+        e["block_online_gaming"] = self._e_block_gaming.isChecked()
+        e["block_streaming"] = self._e_block_streaming.isChecked()
+        e["block_online_shopping"] = self._e_block_shopping.isChecked()
+        e["block_financial_trading"] = self._e_block_trading.isChecked()
+        e["block_job_search"] = self._e_block_jobsearch.isChecked()
+        try: e["data_retention_days"] = int(self._e_retention.text())
+        except ValueError: e["data_retention_days"] = 90
+        e["custom_blocked_keywords"] = [k.strip() for k in self._e_custom_kw.text().split(",") if k.strip()]
+        e["scheduled_access_start"] = self._e_sched_start.text().strip()
+        e["scheduled_access_end"] = self._e_sched_end.text().strip()
+        self._save_settings()
+        QMessageBox.information(self, "Saved", "Usage policy saved successfully.")
+
+    def _apply_dark_theme(self):
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.setStyleSheet(generate_qss(t))
+                return
+        except Exception:
+            pass
+        self.setStyleSheet("")
+
+
+class UsagePolicyInfoDialog(QDialog):
+    """Informational dialog explaining the Usage Policy system."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("About Usage Policy")
+        self.setMinimumSize(500, 400)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        title = QLabel("Usage Policy — Access & Behavior Control")
+        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #58a6ff;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        info = QLabel(
+            "The Usage Policy system lets you control how Command Nexus is used:\n\n"
+            "PARENTAL MODE — For families with children:\n"
+            "  • Block mature topics, violence, explicit language\n"
+            "  • Block personal info, location sharing, photo requests\n"
+            "  • Block meet-in-person requests and platform redirects\n"
+            "  • Cyberbullying detection and blocking\n"
+            "  • Block online gaming, streaming, shopping, financial\n"
+            "  • Custom blocked keywords and website blocking\n"
+            "  • Set bedtimes, scheduled access hours, session limits\n"
+            "  • Break reminders and daily time limits\n"
+            "  • Age presets: Child, Pre-Teen, Teen, Study Focus\n"
+            "  • Multiple child profiles with per-child settings\n"
+            "  • Usage reports (daily/weekly summaries)\n"
+            "  • Log all conversations for parent review\n\n"
+            "ENTERPRISE MODE — For businesses with employees:\n"
+            "  • Work-only mode (block personal use)\n"
+            "  • Block entertainment, social media, gaming, streaming\n"
+            "  • Block online shopping and financial trading\n"
+            "  • Block data exfiltration (sending data externally)\n"
+            "  • Local backend only (no cloud APIs)\n"
+            "  • Model whitelist/blacklist (restrict which AI models)\n"
+            "  • IP address restrictions (office network only)\n"
+            "  • Weekend and day-of-week access controls\n"
+            "  • Multi-seat licensing with user roles:\n"
+            "      Admin, Manager, Employee, Contractor\n"
+            "  • Per-role quotas (messages/day, tokens/day)\n"
+            "  • Output watermarking with user ID for compliance\n"
+            "  • Data retention policy (auto-delete old logs)\n"
+            "  • Custom blocked keywords (company-specific)\n"
+            "  • Job search blocking (HR setting)\n"
+            "  • Require approval for outbound, file writes, shell\n"
+            "  • Compliance audit logging for all conversations\n"
+            "  • Enterprise presets: Strict, Standard, Light\n\n"
+            "CUSTOM MODE — Mix parental and enterprise rules together.\n\n"
+            "All settings are password protected and tamper-proof."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #c9d1d9; font-size: 12px;")
+        layout.addWidget(info)
+
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet("background: #30363d; color: #c9d1d9; border: none; padding: 10px 20px; border-radius: 6px;")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+
+# ---------------------------------------------------------------------------
+# End Usage Policy Dialog
 # ---------------------------------------------------------------------------

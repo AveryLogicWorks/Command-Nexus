@@ -12,6 +12,7 @@ Windows-compatible, limited-C-drive-aware.
 """
 
 import json
+import os
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import List
@@ -61,9 +62,10 @@ class NexusSettings:
     custom_api_key: str = ""
     backend_timeout: float = 30.0
 
-    # PayPal integration (upgrades store)
-    paypal_client_id: str = ""        # Public Client ID — safe to embed
-    paypal_sandbox: bool = True       # Use sandbox for testing, live for production
+    # PayPal integration (upgrades store) — loaded from env vars, not hardcoded
+    paypal_client_id: str = os.environ.get("PAYPAL_CLIENT_ID", "")
+    paypal_client_secret: str = os.environ.get("PAYPAL_CLIENT_SECRET", "")
+    paypal_sandbox: bool = False      # Live mode for production payments
     paypal_callback_port: int = 8755  # Local port for PayPal redirect callback
 
     # Membership tier (0=Free, 1=Pro, 2=Business, 3=Enterprise, 4=All-Rounder)

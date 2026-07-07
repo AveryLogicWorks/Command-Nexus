@@ -1,11 +1,12 @@
 """
-FIX FOR CAPABILITY DIALOG ISSUES
-=================================
-This module contains fixes for:
-1. Capability checkboxes not appearing
-2. Save/Apply buttons not working
+DEPRECATED — DO NOT IMPORT OR USE
+===================================
+This module is no longer imported anywhere in the codebase.
+It contains leftover references to the removed "Legal Assistant" capability
+(legal_research, case_summaries, document_drafting) that have been superseded
+by the "Legal Document Reviewer" capability in capability_actions.py.
 
-Usage: Import and use CapabilitySelectionDialogFixed instead of the original.
+Kept for historical reference only. Do not use in production.
 """
 
 from PyQt6.QtWidgets import (
@@ -287,7 +288,7 @@ class CapabilitySelectionDialogFixed(QDialog):
             QScrollArea {
                 border: 1px solid #30363d;
                 border-radius: 6px;
-                background-color: #161b22;
+                
             }
         """)
         
@@ -396,7 +397,7 @@ class CapabilitySelectionDialogFixed(QDialog):
                     padding: 4px;
                 }
                 QCheckBox:hover {
-                    background-color: #21262d;
+                    
                     border-radius: 4px;
                 }
             """)

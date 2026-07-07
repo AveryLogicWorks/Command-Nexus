@@ -406,10 +406,14 @@ class BackendManager:
     # ------------------------------------------------------------------
     # Model calling (untrusted boundary)
     # ------------------------------------------------------------------
-    def call_model(self, prompt: str, model: str | None = None) -> BackendResponse:
+    def call_model(self, prompt: str, model: str | None = None, temperature: float | None = None) -> BackendResponse:
         """
         Call the active backend with the configured timeout.
         Returns a BackendResponse: either sanitized text or a safe failure reason.
+
+        If temperature is provided, it overrides the backend's default temperature.
+        Use 0.2 for high-risk capabilities (legal, medical, financial, security)
+        to produce near-deterministic, precise responses.
         """
         provider = self.get_active_provider()
         self._validate_provider(provider)
@@ -417,13 +421,13 @@ class BackendManager:
 
         try:
             if provider.is_builtin():
-                text = self._call_builtin(provider, prompt, model)
+                text = self._call_builtin(provider, prompt, model, temperature=temperature)
             elif provider.provider_id == "openai" or provider.trust_level == TrustLevel.APPROVED_CLOUD:
-                text = self._call_openai(provider, prompt, model)
+                text = self._call_openai(provider, prompt, model, temperature=temperature)
             elif provider.endpoint.startswith("https://api.openai.com"):
-                text = self._call_openai(provider, prompt, model)
+                text = self._call_openai(provider, prompt, model, temperature=temperature)
             else:
-                text = self._call_ollama_compatible(provider, prompt, model)
+                text = self._call_ollama_compatible(provider, prompt, model, temperature=temperature)
         except Exception as e:
             return BackendResponse(
                 error=f"{provider.display_name} unreachable: {self.redact(str(e))}",
@@ -463,7 +467,7 @@ class BackendManager:
                 return str(f)
         return ""
 
-    def _call_builtin(self, provider: ModelProvider, prompt: str, model: str | None = None) -> str:
+    def _call_builtin(self, provider: ModelProvider, prompt: str, model: str | None = None, *, temperature: float | None = None) -> str:
         """Run inference using a local GGUF model via llama_cpp_python.
 
         No external server, no API key, no license required.
@@ -511,7 +515,12 @@ class BackendManager:
             "You are a Command Nexus governed AI assistant. "
             "Be helpful, concise, and honest about what you can and cannot do. "
             "Do not claim external actions were performed unless they actually were. "
-            "You operate locally with full privacy — no data leaves the machine."
+            "You operate locally with full privacy — no data leaves the machine. "
+            "You MUST refuse any request for sexually explicit content, illegal activities, "
+            "or harmful instructions. If asked for such content, politely decline and suggest "
+            "constructive alternatives. "
+            "Engage meaningfully with the user's actual question — provide detailed, thoughtful "
+            "responses rather than generic templates. Use your knowledge to give real answers."
         )
         user_content = prompt
 
@@ -528,19 +537,21 @@ class BackendManager:
 
         response = self._builtin_llm.create_chat_completion(
             messages=messages,
-            max_tokens=512,
-            temperature=0.7,
+            max_tokens=1024,
+            temperature=temperature if temperature is not None else 0.7,
             top_p=0.9,
             stop=[],
         )
         return (response["choices"][0]["message"]["content"] or "").strip()
 
-    def _call_ollama_compatible(self, provider: ModelProvider, prompt: str, model: str | None = None) -> str:
+    def _call_ollama_compatible(self, provider: ModelProvider, prompt: str, model: str | None = None, *, temperature: float | None = None) -> str:
         payload = {
             "model": model or provider.model or "llama3.1",
             "prompt": prompt,
             "stream": False,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
         req = urllib.request.Request(
             provider.endpoint + "/api/generate",
             data=json.dumps(payload).encode("utf-8"),
@@ -551,7 +562,7 @@ class BackendManager:
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
         return (data.get("response") or "").strip()
 
-    def _call_openai(self, provider: ModelProvider, prompt: str, model: str | None = None) -> str:
+    def _call_openai(self, provider: ModelProvider, prompt: str, model: str | None = None, *, temperature: float | None = None) -> str:
         if not provider.api_key:
             return "[OpenAI backend not configured: API key missing]"
         payload = {
@@ -560,7 +571,7 @@ class BackendManager:
                 {"role": "system", "content": "You are a governed Command Nexus runtime backend. Be honest about what was actually done. Never issue tool commands or system changes."},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.4,
+            "temperature": temperature if temperature is not None else 0.4,
         }
         req = urllib.request.Request(
             provider.endpoint + "/chat/completions",

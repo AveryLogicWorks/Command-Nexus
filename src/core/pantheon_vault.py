@@ -1,8 +1,15 @@
 """
-Pantheon Vault - Secure key storage (stub for customer build)
-===========================================================
-This is a simplified stub version for the customer-facing build.
-Full vault functionality requires enterprise licensing.
+DEPRECATED STUB — DO NOT USE FOR REAL KEY STORAGE
+===================================================
+Pantheon Vault was a placeholder for enterprise key storage.
+It uses simple XOR obfuscation, NOT real encryption.
+
+This module is retained only as a lattice node (CoherenceMatrix
+checks its file integrity) but is never imported or called by
+any active code path. Do not store real credentials here.
+
+Enterprise builds should replace this with a proper secrets
+backend (e.g. OS keyring, HSM, or vault service).
 """
 from __future__ import annotations
 
@@ -12,8 +19,8 @@ from typing import Optional, Dict, Any
 
 class PantheonVault:
     """
-    Secure vault for sensitive keys and credentials.
-    This stub version provides basic functionality for the customer build.
+    DEPRECATED. Do not use for real key storage.
+    Uses XOR obfuscation only — not encryption.
     """
 
     def __init__(self, vault_path: Optional[Path] = None):

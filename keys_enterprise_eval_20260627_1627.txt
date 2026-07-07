@@ -1,0 +1,25 @@
+=== COMMAND NEXUS - ENTERPRISE EVAL (15 DAYS, ALL) KEYS ===
+Generated: 2026-06-27 16:27
+Tier: Enterprise Eval (15 days, all)
+Duration: 15 days
+Total keys: 2
+
+--- READY TO DISTRIBUTE ---
+
+Key 01: EE00-6A54-22CC-5654-6D00-4D75-BEFA-A606-0E7A
+  Raw:  EE006A5422CC56546D004D75BEFAA6060E7A
+  Expires: 2026-07-12
+
+Key 02: EE00-6A54-22CC-79E3-8488-C936-824D-6F8D-409E
+  Raw:  EE006A5422CC79E38488C936824D6F8D409E
+  Expires: 2026-07-12
+
+=== HOW TO USE ===
+1. Give one key to each person
+2. They download CommandNexus.exe from averylogicworks.com
+3. On first launch, they paste the key to activate
+4. License valid for 15 days from activation
+
+=== SECURITY NOTE ===
+Each key is HMAC-signed and cannot be forged.
+Keep this file secure. Do not share publicly.

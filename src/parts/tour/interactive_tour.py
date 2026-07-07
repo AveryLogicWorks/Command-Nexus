@@ -645,7 +645,7 @@ class TourTooltip(QFrame):
             detail = QLabel(self._step.detail_text)
             detail.setFont(QFont("Segoe UI", 10))
             detail.setWordWrap(True)
-            detail.setStyleSheet("color: #c9d1d9; background-color: #161b22; padding: 15px; border-radius: 8px;")
+            detail.setStyleSheet("color: #c9d1d9;  padding: 15px; border-radius: 8px;")
             layout.addWidget(detail)
         
         # Buttons
@@ -654,7 +654,7 @@ class TourTooltip(QFrame):
         if on_back:
             btn_back = QPushButton("← Back")
             btn_back.clicked.connect(on_back)
-            btn_back.setStyleSheet("background-color: #21262d; color: #c9d1d9;")
+            btn_back.setStyleSheet(" color: #c9d1d9;")
             btn_layout.addWidget(btn_back)
         
         btn_layout.addStretch()
@@ -680,7 +680,7 @@ class TourTooltip(QFrame):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             QFrame {
-                background-color: #21262d;
+                
                 border: 2px solid #30363d;
                 border-radius: 12px;
             }

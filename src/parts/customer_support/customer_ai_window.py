@@ -133,7 +133,7 @@ class CustomerAIWindow(QMainWindow):
         # Current customer info
         self._customer_info = QLabel("No active customer")
         self._customer_info.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
-        self._customer_info.setStyleSheet("color: #8b949e; padding: 10px; background-color: #161b22; border-radius: 6px;")
+        self._customer_info.setStyleSheet("color: #8b949e; padding: 10px;  border-radius: 6px;")
         right_layout.addWidget(self._customer_info)
         
         # Chat display
@@ -173,7 +173,7 @@ class CustomerAIWindow(QMainWindow):
         for label, text in quick_buttons:
             btn = QPushButton(label)
             btn.clicked.connect(lambda checked, t=text: self._insert_quick_message(t))
-            btn.setStyleSheet("background-color: #21262d; color: #c9d1d9;")
+            btn.setStyleSheet(" color: #c9d1d9;")
             quick_layout.addWidget(btn)
         
         quick_layout.addStretch()
@@ -211,10 +211,10 @@ class CustomerAIWindow(QMainWindow):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #0d1117;
+                
             }
             QWidget {
-                background-color: #0d1117;
+                
                 color: #c9d1d9;
             }
             QGroupBox {
@@ -230,7 +230,7 @@ class CustomerAIWindow(QMainWindow):
                 padding: 0 5px;
             }
             QLineEdit, QTextEdit, QComboBox {
-                background-color: #21262d;
+                
                 border: 1px solid #30363d;
                 border-radius: 6px;
                 padding: 8px;
@@ -240,7 +240,7 @@ class CustomerAIWindow(QMainWindow):
                 border-color: #58a6ff;
             }
             QListWidget {
-                background-color: #161b22;
+                
                 border: 1px solid #30363d;
                 border-radius: 6px;
             }
@@ -252,7 +252,7 @@ class CustomerAIWindow(QMainWindow):
                 background-color: #1f6feb;
             }
             QPushButton {
-                background-color: #21262d;
+                
                 border: 1px solid #30363d;
                 border-radius: 6px;
                 padding: 6px 12px;
@@ -410,18 +410,18 @@ class CustomerAIWindow(QMainWindow):
             name = self._current_customer_name or "Unknown"
             self._customer_info.setText(f"👤 {name} (ID: {self._current_customer_id})")
             self._customer_info.setStyleSheet(
-                "color: #58a6ff; padding: 10px; background-color: #161b22; border-radius: 6px; font-weight: bold;"
+                "color: #58a6ff; padding: 10px;  border-radius: 6px; font-weight: bold;"
             )
         else:
             self._customer_info.setText("No active customer")
             self._customer_info.setStyleSheet(
-                "color: #8b949e; padding: 10px; background-color: #161b22; border-radius: 6px;"
+                "color: #8b949e; padding: 10px;  border-radius: 6px;"
             )
     
     def _add_customer_message(self, message: str):
         """Add a customer message to the chat display."""
         self._chat_display.append(
-            f'<div style="margin: 10px 0; padding: 10px; background-color: #21262d; border-radius: 8px; border-left: 3px solid #58a6ff;">'
+            f'<div style="margin: 10px 0; padding: 10px;  border-radius: 8px; border-left: 3px solid #58a6ff;">'
             f'<b style="color: #58a6ff;">Customer:</b><br>{message}'
             f'</div>'
         )

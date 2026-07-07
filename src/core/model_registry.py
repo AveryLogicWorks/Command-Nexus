@@ -25,6 +25,21 @@ class ModelRegistry:
         "tutor": "llama3.1",
         "creative": "llama3.1",
         "tool": "llama3.1",
+        # Phase 3-4 capabilities
+        "data_analysis": "llama3.1",
+        "code_review": "llama3.1",
+        "meeting_facilitation": "llama3.1",
+        "security_audit": "llama3.1",
+        "financial_gain": "llama3.1",
+        "memory_recording": "llama3.1",
+        "activity_watching": "llama3.1",
+        "game_companion": "llama3.1",
+        # Phase 5 capabilities
+        "email_automation": "llama3.1",
+        "api_integration": "llama3.1",
+        "team_orchestration": "llama3.1",
+        "voice_interface": "llama3.1",
+        "visual_canvas": "llama3.1",
     }
 
     def __init__(self, settings: SettingsManager | None = None):
@@ -84,6 +99,27 @@ class ModelRegistry:
             "tutor": "tutor",
             "creative writing": "creative",
             "tool user": "tool",
+            # Phase 3-4
+            "data analyst": "data_analysis",
+            "data analyst pro": "data_analysis",
+            "code reviewer": "code_review",
+            "meeting facilitator": "meeting_facilitation",
+            "security auditor": "security_audit",
+            "financial gainer": "financial_gain",
+            "memory recorder": "memory_recording",
+            "activity watcher": "activity_watching",
+            "game companion": "game_companion",
+            # Phase 5
+            "email automation": "email_automation",
+            "email": "email_automation",
+            "api integrator": "api_integration",
+            "api": "api_integration",
+            "team orchestrator": "team_orchestration",
+            "team": "team_orchestration",
+            "voice interface": "voice_interface",
+            "voice": "voice_interface",
+            "visual canvas": "visual_canvas",
+            "vision": "visual_canvas",
         }
         for key, mapped in aliases.items():
             if key in intent or intent in key:

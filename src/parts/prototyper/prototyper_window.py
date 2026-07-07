@@ -199,7 +199,7 @@ class PrototyperWindow(QMainWindow):
             btn = QPushButton(label)
             btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #21262d; color: #c9d1d9;
+                     color: #c9d1d9;
                     border: 1px solid #30363d; border-radius: 4px;
                     padding: 8px; font-size: 12px; text-align: left;
                 }
@@ -226,7 +226,7 @@ class PrototyperWindow(QMainWindow):
             btn = QPushButton(label)
             btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #21262d; color: #c9d1d9;
+                     color: #c9d1d9;
                     border: 1px solid #30363d; border-radius: 4px;
                     padding: 6px; font-size: 12px;
                 }
@@ -284,7 +284,7 @@ class PrototyperWindow(QMainWindow):
         self._selection_info = QLabel("No selection")
         self._selection_info.setStyleSheet("""
             color: #c9d1d9; font-size: 11px; padding: 4px 8px;
-            background-color: #161b22; border-top: 1px solid #30363d;
+             border-top: 1px solid #30363d;
         """)
         layout.addWidget(self._selection_info)
 
@@ -312,7 +312,7 @@ class PrototyperWindow(QMainWindow):
         self._ai_display.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._ai_display.setStyleSheet("""
             QTextEdit {
-                background-color: #0d1117; color: #c9d1d9;
+                 color: #c9d1d9;
                 border: 1px solid #30363d; border-radius: 6px;
                 padding: 8px; font-size: 12px;
             }
@@ -367,7 +367,7 @@ class PrototyperWindow(QMainWindow):
             btn = QPushButton(label)
             btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #21262d; color: #c9d1d9;
+                     color: #c9d1d9;
                     border: 1px solid #30363d; border-radius: 4px;
                     padding: 4px 8px; font-size: 11px;
                 }
@@ -386,41 +386,41 @@ class PrototyperWindow(QMainWindow):
         props_layout.setSpacing(4)
 
         self._prop_name = QLineEdit()
-        self._prop_name.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px; border-radius: 3px;")
+        self._prop_name.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px; border-radius: 3px;")
         self._prop_name.editingFinished.connect(self._on_prop_changed)
         props_layout.addRow("Name:", self._prop_name)
 
         self._prop_material = QComboBox()
         self._prop_material.addItems(list(MATERIALS.keys()))
-        self._prop_material.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
+        self._prop_material.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
         self._prop_material.currentTextChanged.connect(self._on_prop_changed)
         props_layout.addRow("Material:", self._prop_material)
 
         self._prop_width = QDoubleSpinBox()
         self._prop_width.setRange(0.1, 9999)
         self._prop_width.setSuffix(" mm")
-        self._prop_width.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
+        self._prop_width.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
         self._prop_width.valueChanged.connect(self._on_prop_changed)
         props_layout.addRow("Width:", self._prop_width)
 
         self._prop_height = QDoubleSpinBox()
         self._prop_height.setRange(0.1, 9999)
         self._prop_height.setSuffix(" mm")
-        self._prop_height.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
+        self._prop_height.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
         self._prop_height.valueChanged.connect(self._on_prop_changed)
         props_layout.addRow("Height:", self._prop_height)
 
         self._prop_depth = QDoubleSpinBox()
         self._prop_depth.setRange(0.1, 9999)
         self._prop_depth.setSuffix(" mm")
-        self._prop_depth.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
+        self._prop_depth.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
         self._prop_depth.valueChanged.connect(self._on_prop_changed)
         props_layout.addRow("Depth:", self._prop_depth)
 
         self._prop_rotation = QDoubleSpinBox()
         self._prop_rotation.setRange(0, 360)
         self._prop_rotation.setSuffix(" °")
-        self._prop_rotation.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
+        self._prop_rotation.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px;")
         self._prop_rotation.valueChanged.connect(self._on_prop_changed)
         props_layout.addRow("Rotation:", self._prop_rotation)
 
@@ -433,7 +433,7 @@ class PrototyperWindow(QMainWindow):
         self._prop_notes.setMaximumHeight(60)
         self._prop_notes.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._prop_notes.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._prop_notes.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px; border-radius: 3px;")
+        self._prop_notes.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d; padding: 4px; border-radius: 3px;")
         self._prop_notes.setPlaceholderText("Notes...")
         props_layout.addRow("Notes:", self._prop_notes)
 
@@ -444,7 +444,7 @@ class PrototyperWindow(QMainWindow):
         list_group.setStyleSheet("QGroupBox { color: #58a6ff; font-weight: bold; }")
         list_layout = QVBoxLayout(list_group)
         self._shape_list = QListWidget()
-        self._shape_list.setStyleSheet("background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d;")
+        self._shape_list.setStyleSheet(" color: #c9d1d9; border: 1px solid #30363d;")
         self._shape_list.itemClicked.connect(self._on_shape_list_clicked)
         list_layout.addWidget(self._shape_list)
         layout.addWidget(list_group)
@@ -605,7 +605,7 @@ class PrototyperWindow(QMainWindow):
     def _on_context_menu(self, pos: QPointF):
         """Right-click context menu on canvas."""
         menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; }")
+        menu.setStyleSheet("QMenu {  color: #c9d1d9; border: 1px solid #30363d; }")
 
         act_add_box = menu.addAction("Add Box Here")
         act_add_cyl = menu.addAction("Add Cylinder Here")
@@ -1093,7 +1093,7 @@ class PrototyperWindow(QMainWindow):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QMainWindow { background-color: #0d1117; }
+            QMainWindow {  }
             QWidget { color: #c9d1d9; }
             QGroupBox {
                 border: 1px solid #30363d; border-radius: 6px;
@@ -1105,24 +1105,24 @@ class PrototyperWindow(QMainWindow):
                 padding: 0 4px;
             }
             QPushButton {
-                background-color: #21262d; color: #c9d1d9;
+                 color: #c9d1d9;
                 border: 1px solid #30363d; border-radius: 4px;
                 padding: 6px 12px;
             }
             QPushButton:hover { background-color: #30363d; }
             QPushButton:pressed { background-color: #1f6feb; }
-            QToolBar { background-color: #161b22; border-bottom: 1px solid #30363d; }
+            QToolBar {  border-bottom: 1px solid #30363d; }
             QToolBar QToolButton { color: #c9d1d9; }
             QListWidget {
-                background-color: #0d1117; color: #c9d1d9;
+                 color: #c9d1d9;
                 border: 1px solid #30363d;
             }
-            QStatusBar { background-color: #161b22; color: #8b949e; }
+            QStatusBar {  color: #8b949e; }
             QScrollBar:vertical { border: none; background: #0d1117; width: 8px; }
             QScrollBar::handle:vertical { background: #30363d; border-radius: 4px; }
             QScrollBar:horizontal { border: none; background: #0d1117; height: 8px; }
             QScrollBar::handle:horizontal { background: #30363d; border-radius: 4px; }
             QLabel { color: #c9d1d9; }
-            QComboBox { background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px; }
-            QDoubleSpinBox, QSpinBox { background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 4px; }
+            QComboBox {  color: #c9d1d9; border: 1px solid #30363d; padding: 4px; }
+            QDoubleSpinBox, QSpinBox {  color: #c9d1d9; border: 1px solid #30363d; padding: 4px; }
         """)

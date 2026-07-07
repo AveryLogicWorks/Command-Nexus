@@ -3,13 +3,13 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('src', 'src'), ('assets', 'assets'), ('release_manifest.json', '.')]
 binaries = []
-hiddenimports = ['llama_cpp', 'llama_cpp.llama']
+hiddenimports = ['llama_cpp', 'llama_cpp.llama', 'win32com', 'win32com.client', 'pythoncom']
 tmp_ret = collect_all('llama_cpp')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['B:\\Documents\\GitHub\\Command Nexus\\src\\main.py'],
+    ['B:\\Documents\\GitHub\\Command Nexus Lattice\\src\\main.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -17,9 +17,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['matplotlib', 'scipy', 'pandas', 'PIL', 'test', 'unittest'],
+    excludes=['matplotlib', 'scipy', 'pandas', 'PIL', 'test', 'unittest', 'owner_console', 'pdb', 'ipdb', 'pydoc', 'doctest', 'trace', 'sysmonitor'],
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
@@ -32,7 +32,7 @@ exe = EXE(
     name='CommandNexus',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,

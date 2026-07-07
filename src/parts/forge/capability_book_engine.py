@@ -1,16 +1,27 @@
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
 """
 Command Nexus — Capability Knowledge Engine
 Generates Knowledge entries for capabilities automatically.
-Each entry describes standalone behavior + interconnections.
+Each entry describes standalone behavior + interconnections + scenarios + memory.
 Code-driven — no giant static files.
 """
 
 from __future__ import annotations
 
+from src.core.capability_memory import (
+    get_scenarios_as_prompt_text,
+    get_all_scenarios_as_prompt_text,
+    get_memory_manager,
+)
+
 CAPABILITIES = [
     "Chatbot", "Research", "Creative Writing", "Coder",
     "Planner", "Notebook", "Document Processor", "Archive",
     "Tool User", "Tutor", "Business Workflow", "Hephaestus Relay",
+    "Activity Watcher", "Financial Gainer", "Memory Recorder", "Game Companion",
+    # Phase 5 capabilities
+    "Email Automation", "API Integrator", "Team Orchestrator",
+    "Voice Interface", "Visual Canvas",
 ]
 
 STANDALONE = {
@@ -26,6 +37,16 @@ STANDALONE = {
     "Tutor": {"role": "Educational explanation, adaptive teaching, assessment, study support", "input": "Learning goals, questions, quiz requests, study needs", "process": "Assess level → explain → check understanding → adapt → provide practice", "output": "Explanations, quizzes, study sheets, practice, assessments", "fallback": "Assess level; ask preferred format"},
     "Business Workflow": {"role": "SOP creation, checklist generation, support drafting, handoff prep", "input": "Process descriptions, support scenarios, SOP requests", "process": "Map → create checklists → draft responses → prepare handoffs → identify automation", "output": "SOPs, checklists, drafts, handoff packets, workflow maps, proposals", "fallback": "Draft workflow; ask for validation"},
     "Hephaestus Relay": {"role": "Design brief intake, constraint analysis, handoff preparation", "input": "Design ideas, requirements, constraints, materials", "process": "Structure requirements → identify constraints → list unknowns → format brief", "output": "Structured briefs, constraint lists, unknown identifications, handoff packets", "fallback": "Preliminary brief; ask for missing requirements"},
+    "Activity Watcher": {"role": "Observes user work patterns, learns recurring tasks, suggests improvements and can repeat tasks with approval", "input": "User work activity, screen events, task patterns, recurring workflows", "process": "Observe → detect patterns → confirm repetition → suggest improvements → propose automation with approval", "output": "Learned task patterns, improvement suggestions, automation proposals, efficiency reports", "fallback": "Describe what it would watch; ask user to demonstrate the task"},
+    "Financial Gainer": {"role": "Explores income opportunities, side hustles, monetization strategies, and financial productivity (advisory only, no guarantees)", "input": "User skills, interests, available time, financial goals, current resources", "process": "Assess skills → research opportunities → estimate ROI → flag risks → present realistic paths with disclaimer", "output": "Income path suggestions, ROI estimates, risk assessments, skill development recommendations (all advisory)", "fallback": "Provide general guidance; remind user that results depend on their effort and market conditions"},
+    "Memory Recorder": {"role": "Records all session activity for auditability, recollection, and continuity — like a flight recorder for work", "input": "User actions, AI interactions, decisions, task outcomes, capability usage", "process": "Capture events → timestamp → index → store securely → enable search and replay", "output": "Session timelines, audit trails, searchable event logs, replay capability, compliance exports", "fallback": "Record what it can; flag any gaps in coverage"},
+    "Game Companion": {"role": "Learns and plays games, teaches rules, suggests strategy, analyzes positions, and provides practice for individual enjoyment", "input": "Game rules, board states, user skill level, game preferences", "process": "Learn rules → assess position → suggest strategy → adapt to skill level → provide practice", "output": "Rule explanations, strategy suggestions, position analysis, practice games, skill assessments", "fallback": "Explain rules at a basic level; suggest resources for deeper learning"},
+    # ─── Phase 5 Capabilities ───────────────────────────────────────
+    "Email Automation": {"role": "Drafts, organizes, and manages email communications (advisory — never auto-sends)", "input": "Email requests, draft needs, inbox organization, campaign planning", "process": "Identify email type → draft content → suggest organization → plan sequences → flag compliance", "output": "Email drafts, organization frameworks, campaign plans, template suggestions", "fallback": "Provide email scaffold; remind user to review before sending"},
+    "API Integrator": {"role": "Connects external APIs and services securely (advisory — never exposes credentials)", "input": "API connection requests, webhook setup, integration debugging", "process": "Identify API → determine auth method → plan connection → security checklist → test guidance", "output": "Integration plans, security checklists, debugging frameworks, configuration guidance", "fallback": "Provide integration framework; emphasize security best practices"},
+    "Team Orchestrator": {"role": "Coordinates multiple AIs for complex multi-step tasks", "input": "Complex projects, multi-step workflows, task decomposition needs", "process": "Decompose task → match sub-tasks to AIs by capability → define handoffs → set execution order → aggregate results", "output": "Task assignments, workflow designs, handoff specifications, coordination plans", "fallback": "Provide decomposition framework; suggest which capabilities to use"},
+    "Voice Interface": {"role": "Enables voice commands, dictation, and text-to-speech (all processing local)", "input": "Voice commands, dictation text, TTS requests, voice configuration", "process": "Receive voice input → transcribe → route to appropriate capability → synthesize response if needed", "output": "Transcribed commands, executed actions, spoken responses, voice configuration guidance", "fallback": "Provide voice command reference; suggest text input as alternative"},
+    "Visual Canvas": {"role": "Creates visual representations — diagrams, mind maps, layouts, and flowcharts", "input": "Diagram requests, mind map topics, layout needs, visual organization tasks", "process": "Identify visual type → determine structure → provide text representation → suggest layout → guide creation", "output": "Text-based diagrams, mind map structures, layout frameworks, visual guidance", "fallback": "Provide text-based visual representation; suggest using Visual Canvas workspace"},
 }
 
 # (trigger, pattern, description, conflict, synergy)
@@ -186,6 +207,78 @@ INTERCONNECTIONS = {
         "Tutor": ("See Tutor → Hephaestus Relay (symmetric)", "design_edu", "Tutor creates design learning paths; Relay provides real-world design briefs as exercises", "Tutor ensures pedagogical soundness; Relay provides authentic challenges", "Tutor teaches principles; Relay provides practice; combined = applied design education"),
         "Business Workflow": ("See Business Workflow → Hephaestus Relay (symmetric)", "biz_design", "Business Workflow defines business requirements; Relay structures them into design briefs", "Business Workflow defines business needs; Relay structures for implementation", "Business Workflow defines WHAT; Relay structures HOW to deliver; combined = business-driven design"),
     },
+
+    # ─── Activity Watcher ──────────────────────────────────────────────
+    "Activity Watcher": {
+        "Chatbot": ("User asks about learned patterns", "watcher_router", "Activity Watcher reports learned patterns to Chatbot; Chatbot presents suggestions conversationally", "Activity Watcher never interrupts; Chatbot decides when to surface suggestions", "Activity Watcher learns; Chatbot communicates; combined = proactive assistance"),
+        "Planner": ("Learned tasks need scheduling", "watcher_planner", "Activity Watcher identifies recurring tasks; Planner creates optimized schedules around them", "Planner structures; Activity Watcher provides data; both align on timing", "Activity Watcher finds patterns; Planner optimizes schedules; combined = efficient workflows"),
+        "Tool User": ("Learned task can be automated", "watcher_tools", "Activity Watcher identifies automatable patterns; Tool User proposes safe automation with approval", "Tool User NEVER auto-automates; Activity Watcher suggests; both require approval", "Activity Watcher finds automation; Tool User enables it safely; combined = smart automation"),
+        "Memory Recorder": ("Observations need logging", "watcher_recorder", "Activity Watcher logs all observations to Memory Recorder for auditability", "Memory Recorder records silently; Activity Watcher provides the data", "Activity Watcher observes; Memory Recorder preserves; combined = auditable learning"),
+        "Notebook": ("Learned patterns need notes", "watcher_notes", "Activity Watcher stores pattern descriptions in Notebook for recall", "Notebook stores pattern summaries; Activity Watcher provides raw observations", "Activity Watcher discovers; Notebook remembers; combined = persistent learning"),
+    },
+
+    # ─── Financial Gainer ──────────────────────────────────────────────
+    "Financial Gainer": {
+        "Chatbot": ("User asks about making money", "gainer_router", "Chatbot routes financial opportunity questions to Financial Gainer; Gainer returns advisory suggestions", "Financial Gainer ALWAYS shows disclaimer; Chatbot presents results", "Chatbot routes; Financial Gainer advises; combined = safe financial guidance"),
+        "Research": ("Opportunities need research", "gainer_research", "Research investigates market viability, competition, and demand for suggested income paths", "Research provides facts; Financial Gainer adds advisory framing with disclaimers", "Research validates; Financial Gainer advises; combined = evidence-based opportunities"),
+        "Planner": ("Income path needs a plan", "gainer_planner", "Financial Gainer suggests income paths; Planner creates step-by-step execution plans", "Planner structures the effort; Financial Gainer provides the direction", "Financial Gainer identifies; Planner structures; combined = actionable income plans"),
+        "Business Workflow": ("Side hustle needs SOPs", "gainer_business", "Financial Gainer identifies business opportunity; Business Workflow creates SOPs and checklists", "Business Workflow formalizes; Financial Gainer provides the idea", "Financial Gainer finds; Business Workflow structures; combined = real business execution"),
+        "Data Analyst Pro": ("ROI needs analysis", "gainer_analyst", "Data Analyst Pro estimates ROI and financial projections; Financial Gainer presents with disclaimers", "Data Analyst Pro provides numbers; Financial Gainer adds context and disclaimers", "Data Analyst Pro quantifies; Financial Gainer contextualizes; combined = realistic projections"),
+    },
+
+    # ─── Memory Recorder ───────────────────────────────────────────────
+    "Memory Recorder": {
+        "Chatbot": ("Session needs context", "recorder_router", "Memory Recorder provides session history to Chatbot for continuity", "Memory Recorder works silently; Chatbot uses data for context", "Memory Recorder captures; Chatbot uses; combined = continuous sessions"),
+        "Notebook": ("Active notes vs recordings", "recorder_notes", "Notebook holds user-created notes; Memory Recorder holds automatic session logs", "Notebook is user-driven; Memory Recorder is automatic; both serve different purposes", "Notebook is the journal; Memory Recorder is the camera; combined = complete record"),
+        "Archive": ("Recordings need long-term storage", "recorder_archive", "Memory Recorder stores session logs in Archive for long-term retrieval", "Archive stores recordings; Memory Recorder creates them", "Memory Recorder records; Archive preserves; combined = permanent audit trail"),
+        "Activity Watcher": ("Observations feed the recorder", "recorder_watcher", "Activity Watcher sends observations to Memory Recorder for logging", "Activity Watcher provides data; Memory Recorder stores it", "Activity Watcher watches; Memory Recorder remembers; combined = complete activity log"),
+        "Document Processor": ("Recordings need searchability", "recorder_docs", "Document Processor indexes recordings for search; Memory Recorder provides the raw logs", "Document Processor structures; Memory Recorder provides content", "Memory Recorder captures; Document Processor organizes; combined = searchable history"),
+    },
+
+    # ─── Game Companion ────────────────────────────────────────────────
+    "Game Companion": {
+        "Chatbot": ("User wants to play", "game_router", "Chatbot routes game requests to Game Companion; Companion returns analysis/suggestions", "Game Companion is advisory; Chatbot presents conversationally", "Chatbot routes; Game Companion advises; combined = friendly game help"),
+        "Tutor": ("Game needs teaching", "game_tutor", "Tutor provides pedagogical structure; Game Companion provides game-specific content", "Tutor adapts to skill level; Game Companion knows the game", "Tutor teaches how to learn; Game Companion teaches the game; combined = effective game education"),
+        "Research": ("Strategy needs research", "game_research", "Research finds optimal strategies, openings, and game theory; Game Companion adapts to user level", "Research provides theory; Game Companion makes it practical", "Research finds; Game Companion applies; combined = informed gameplay"),
+    },
+
+    # ─── Email Automation ──────────────────────────────────────────────
+    "Email Automation": {
+        "Chatbot": ("User asks about email", "email_router", "Chatbot routes email requests to Email Automation; Automation returns drafts/plans", "Email Automation NEVER auto-sends; Chatbot presents drafts for review", "Chatbot routes; Email Automation drafts; combined = safe email assistance"),
+        "Business Workflow": ("Email needs business context", "email_business", "Business Workflow provides context and tone; Email Automation drafts the email", "Business Workflow defines requirements; Email Automation creates the draft", "Business Workflow knows the audience; Email Automation knows the format; combined = professional emails"),
+        "Research": ("Email needs facts", "email_research", "Research provides verified information; Email Automation incorporates into drafts", "Research provides facts with confidence; Email Automation includes or flags", "Research ensures accuracy; Email Automation ensures readability; combined = factual emails"),
+        "Planner": ("Email campaign needs scheduling", "email_planner", "Planner creates email sequence timeline; Email Automation drafts each email", "Planner manages schedule; Email Automation manages content", "Planner structures the campaign; Email Automation creates the content; combined = organized campaigns"),
+    },
+
+    # ─── API Integrator ────────────────────────────────────────────────
+    "API Integrator": {
+        "Chatbot": ("User asks about API integration", "api_router", "Chatbot routes API requests to API Integrator; Integrator returns plans/checklists", "API Integrator NEVER auto-connects; Chatbot presents plans for approval", "Chatbot routes; API Integrator advises; combined = safe API guidance"),
+        "Coder": ("API integration needs code", "api_coder", "API Integrator defines the integration; Coder implements the connection code", "API Integrator defines what; Coder defines how; both ensure security", "API Integrator plans; Coder implements; combined = working integrations"),
+        "Tool User": ("API needs tool execution", "api_tools", "API Integrator identifies needs; Tool User proposes safe testing tools", "Tool User NEVER auto-executes API calls; always proposes and waits", "API Integrator plans; Tool User enables safe testing; combined = verified integrations"),
+        "Research": ("API needs documentation", "api_research", "Research finds API docs and best practices; API Integrator incorporates into plan", "Research provides current docs; API Integrator structures the integration", "Research finds docs; API Integrator applies them; combined = informed integrations"),
+    },
+
+    # ─── Team Orchestrator ─────────────────────────────────────────────
+    "Team Orchestrator": {
+        "Chatbot": ("User has a complex multi-step task", "team_router", "Chatbot routes to Team Orchestrator; Orchestrator decomposes and assigns", "Team Orchestrator plans; Chatbot presents plan conversationally", "Chatbot routes; Team Orchestrator structures; combined = organized multi-AI work"),
+        "Planner": ("Multi-AI work needs scheduling", "team_planner", "Team Orchestrator defines sub-tasks; Planner creates timeline for each", "Team Orchestrator assigns; Planner schedules; both align on dependencies", "Team Orchestrator decomposes; Planner schedules; combined = coordinated execution"),
+        "Activity Watcher": ("Team workflow needs observation", "team_watcher", "Activity Watcher monitors multi-AI handoffs; Team Orchestrator adjusts based on observations", "Activity Watcher observes; Team Orchestrator adapts; both improve over time", "Activity Watcher finds bottlenecks; Team Orchestrator optimizes; combined = efficient multi-AI work"),
+    },
+
+    # ─── Voice Interface ───────────────────────────────────────────────
+    "Voice Interface": {
+        "Chatbot": ("User wants voice interaction", "voice_router", "Chatbot routes voice requests; Voice Interface handles speech input/output", "Voice Interface processes audio; Chatbot handles the conversation", "Voice Interface enables hands-free; Chatbot enables natural conversation; combined = accessible AI"),
+        "Tutor": ("Learning needs voice support", "voice_tutor", "Voice Interface enables spoken questions; Tutor provides spoken explanations", "Voice Interface transcribes; Tutor teaches; Voice Interface can read aloud", "Voice Interface enables accessibility; Tutor enables learning; combined = accessible education"),
+        "Memory Recorder": ("Voice sessions need recording", "voice_recorder", "Voice Interface transcribes speech; Memory Recorder stores transcripts", "Voice Interface captures; Memory Recorder preserves; both maintain privacy", "Voice Interface enables input; Memory Recorder ensures continuity; combined = hands-free memory"),
+    },
+
+    # ─── Visual Canvas ─────────────────────────────────────────────────
+    "Visual Canvas": {
+        "Chatbot": ("User wants visual representation", "canvas_router", "Chatbot routes to Visual Canvas; Canvas returns text-based visual structures", "Visual Canvas provides structure; Chatbot presents conversationally", "Chatbot routes; Visual Canvas structures; combined = visual guidance"),
+        "Planner": ("Plans need visual representation", "canvas_planner", "Planner creates task breakdown; Visual Canvas represents as flowchart/mind map", "Planner creates structure; Visual Canvas visualizes it", "Planner structures; Visual Canvas visualizes; combined = visual planning"),
+        "Research": ("Research needs visual organization", "canvas_research", "Research provides findings; Visual Canvas organizes as mind map or diagram", "Research provides data; Visual Canvas structures visually", "Research discovers; Visual Canvas organizes; combined = visual knowledge maps"),
+        "Business Workflow": ("Processes need flowcharts", "canvas_business", "Business Workflow defines process; Visual Canvas creates flowchart representation", "Business Workflow defines steps; Visual Canvas visualizes the flow", "Business Workflow structures; Visual Canvas visualizes; combined = visual process docs"),
+    },
 }
 
 
@@ -225,6 +318,18 @@ def generate_capability_book_entry(capability: str) -> str:
             lines.append(f"- Synergy: {synergy}")
             lines.append("")
 
+    # Add scenarios (use-case reference for the AI)
+    scenario_text = get_scenarios_as_prompt_text(capability)
+    if scenario_text:
+        lines.append(scenario_text)
+
+    # Add learned memory (AI-updated, scope-validated)
+    mem_manager = get_memory_manager()
+    mem = mem_manager.get_memory(capability)
+    memory_text = mem.to_prompt_context()
+    if memory_text:
+        lines.append(memory_text)
+
     lines.append("---")
     lines.append("")
     return "\n".join(lines)
@@ -257,7 +362,7 @@ def generate_full_book_for_ai(capabilities: list[str]) -> str:
     sections.append("6. **Tool User is the ONLY capability that proposes external actions.** All proposals require approval.")
     sections.append("7. **Document Processor feeds extracted content to Research, Writing, Coder, and Planner.**")
     sections.append("8. **When capabilities conflict, the user's explicit request takes priority, then Chatbot mediates.**")
-    sections.append("9. **All capabilities fall back to safe stub mode if backends are not connected.**")
+    sections.append("9. **All capabilities work with built-in local intelligence. Optional backends can be configured for enhanced output.**")
     sections.append("10. **Hephaestus Relay structures output for external handoff; it never modifies internal systems.**")
     sections.append("")
     sections.append("---")
@@ -272,6 +377,13 @@ def generate_full_book_for_ai(capabilities: list[str]) -> str:
     sections.append("| Research + Document Processor both want to analyze | User uploaded a document | Document Processor extracts; Research verifies externally |")
     sections.append("| Tool User + Any capability wants external action | User did not explicitly request it | Tool User proposes; capability waits for approval |")
     sections.append("")
+
+    # Add all scenarios for quick reference
+    sections.append(get_all_scenarios_as_prompt_text(capabilities))
+
+    # Add learned memory from all capabilities
+    mem_manager = get_memory_manager()
+    sections.append(mem_manager.get_all_memory_as_prompt_text(capabilities))
 
     return "\n".join(sections)
 

@@ -114,7 +114,7 @@ class LicenseActivationDialog(QDialog):
             "  ✗ Cannot save or export configurations\n\n"
             "Purchase a license at any time to unlock full functionality."
         )
-        demo_text.setStyleSheet("background-color: #161b22; color: #8b949e; border: 1px solid #30363d;")
+        demo_text.setStyleSheet(" color: #8b949e; border: 1px solid #30363d;")
         demo_layout.addWidget(demo_text)
 
         self._demo_btn = QPushButton("Continue in Demo Mode")
@@ -128,23 +128,24 @@ class LicenseActivationDialog(QDialog):
         # Pricing info
         pricing = QLabel(
             "<b>Available Tiers:</b><br>"
-            "  Trial — $10, 15-day early access  |  "
-            "  Basic — $30/mo, premium capabilities  |  "
-            "  Pro — $50/mo, business capabilities  |  "
-            "  Business — $80/mo, enterprise capabilities  |  "
-            "  All-Rounder — $39.99, everything unlocked"
+            "  Trial — FREE 3-day trial at AveryLogicWorks.com  |  "
+            "  Pro — $30/mo  |  "
+            "  Business — $50/mo  |  "
+            "  Unlimited — $80/mo  |  "
+            "  Enterprise — contact for pricing"
         )
         pricing.setWordWrap(True)
         pricing.setStyleSheet("font-size: 11px; color: #8b949e; padding: 8px;")
         layout.addWidget(pricing)
 
         # Early purchase notice
-        early_purchase = QLabel(
-            "<i>Early Access: activate a valid key now to unlock the usable current build.</i>"
+        free_trial_note = QLabel(
+            "<i>Get a FREE 3-day trial key at <a style='color:#58a6ff;' href='https://averylogicworks.com/command-nexus.html#free-trial'>AveryLogicWorks.com</a></i>"
         )
-        early_purchase.setWordWrap(True)
-        early_purchase.setStyleSheet("font-size: 10px; color: #58a6ff; padding: 4px;")
-        layout.addWidget(early_purchase)
+        free_trial_note.setWordWrap(True)
+        free_trial_note.setOpenExternalLinks(True)
+        free_trial_note.setStyleSheet("font-size: 11px; color: #58a6ff; padding: 4px;")
+        layout.addWidget(free_trial_note)
 
         # Enterprise info
         enterprise_info = QLabel(
@@ -175,6 +176,14 @@ class LicenseActivationDialog(QDialog):
         self._key_input.blockSignals(False)
 
     def _on_activate(self):
+        try:
+            self._do_activate()
+        except Exception as e:
+            self._result_label.setText(
+                f"<span style='color: #f44336;'>Error during activation: {e}</span>"
+            )
+
+    def _do_activate(self):
         if self._watcher is not None and not self._watcher.check_action("license_activation", risk_level="risky"):
             if self._watcher.is_locked_down():
                 msg = "<span style='color: #f44336;'>License activation blocked by protection layer. Restore protected files or contact support.</span>"
@@ -233,8 +242,8 @@ class LicenseActivationDialog(QDialog):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QDialog { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QDialog {  }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }

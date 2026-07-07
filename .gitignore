@@ -26,3 +26,8 @@ Thumbs.db
 *.log
 cnx_stdout.txt
 cnx_stderr.txt
+
+# Environment files — secrets never committed
+.env
+.env.local
+*.env

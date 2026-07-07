@@ -13,13 +13,12 @@ Tiers:
   BASIC      — $30/mo, up to 5 per AI agent, unlocks premium capabilities
   PRO        — $50/mo, up to 8 per AI agent, unlocks business-tier capabilities
   BUSINESS   — $80/mo, unlimited per AI agent, unlocks enterprise capabilities
-  ALL_ROUNDER— $39.99, unlimited per AI agent, everything unlocked (best value)
 """
 from __future__ import annotations
 
 from enum import IntEnum
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Set
 
 
 # --- IP Watermark ---
@@ -46,7 +45,6 @@ TIER_NAMES = {
     MembershipTier.BASIC: "Basic",
     MembershipTier.PRO: "Pro",
     MembershipTier.BUSINESS: "Business",
-    MembershipTier.ALL_ROUNDER: "All-Rounder",
 }
 
 TIER_PRICES = {
@@ -55,7 +53,6 @@ TIER_PRICES = {
     MembershipTier.BASIC: "$30/mo",
     MembershipTier.PRO: "$50/mo",
     MembershipTier.BUSINESS: "$80/mo",
-    MembershipTier.ALL_ROUNDER: "$39.99",
 }
 
 TIER_DESCRIPTIONS = {
@@ -63,8 +60,7 @@ TIER_DESCRIPTIONS = {
     MembershipTier.TRIAL: "15-day trial. Select up to 3 capabilities per AI agent, including a few premium capabilities to try out. After the trial, upgrade to Basic or higher to keep premium access.",
     MembershipTier.BASIC: "Select up to 5 capabilities per AI agent. Unlocks premium capabilities like Memory Bridge, Voice Interface, and Visual Canvas. Best for personal users and students.",
     MembershipTier.PRO: "Select up to 8 capabilities per AI agent. Unlocks business-tier capabilities like Team Orchestrator, Data Analyst Pro, and API Integrator. Best for small to mid-size businesses.",
-    MembershipTier.BUSINESS: "Unlimited capabilities per AI agent. Unlocks enterprise capabilities like Security Auditor, Code Reviewer, Medical Researcher, and Legal Assistant. Best for large organizations.",
-    MembershipTier.ALL_ROUNDER: "Unlimited capabilities per AI agent. Everything unlocked across all use cases — no restrictions. The best value for power users who need flexibility. Best for multitaskers.",
+    MembershipTier.BUSINESS: "Unlimited capabilities per AI agent. Unlocks enterprise capabilities like Security Auditor, Code Reviewer, Medical Researcher, and Legal Document Reviewer. Best for large organizations.",
 }
 
 TIER_UPGRADE_IDS = {
@@ -72,7 +68,6 @@ TIER_UPGRADE_IDS = {
     MembershipTier.BASIC: "membership_pro",
     MembershipTier.PRO: "membership_business",
     MembershipTier.BUSINESS: "membership_enterprise",
-    MembershipTier.ALL_ROUNDER: "membership_all_rounder",
 }
 
 # ---------------------------------------------------------------------------
@@ -88,7 +83,6 @@ TIER_CAPABILITY_LIMITS: dict[MembershipTier, int] = {
     MembershipTier.BASIC: 5,
     MembershipTier.PRO: 8,
     MembershipTier.BUSINESS: -1,  # unlimited
-    MembershipTier.ALL_ROUNDER: -1,  # unlimited
 }
 
 
@@ -163,11 +157,69 @@ CAPABILITY_MIN_TIER: dict[str, MembershipTier] = {
     "Security Auditor": MembershipTier.BUSINESS,
     "Code Reviewer": MembershipTier.BUSINESS,
     "Medical Researcher": MembershipTier.BUSINESS,
-    "Legal Assistant": MembershipTier.BUSINESS,
     "Legal Document Reviewer": MembershipTier.PRO,
 
     # Everything else defaults to FREE — see get_min_tier()
 }
+
+# ---------------------------------------------------------------------------
+# Individual Capability Add-on Subscriptions
+# ---------------------------------------------------------------------------
+# Users who don't want a full tier subscription can buy individual
+# capabilities as standalone add-ons at a cheaper price than the tier.
+# ---------------------------------------------------------------------------
+CAPABILITY_ADDON_PRICES: dict[str, dict[str, str]] = {
+    # BASIC-tier caps (full tier is $30/mo for all 7)
+    "Memory Bridge": {"monthly": "$5/mo", "yearly": "$50/yr"},
+    "Visual Canvas": {"monthly": "$5/mo", "yearly": "$50/yr"},
+    "Voice Interface": {"monthly": "$6/mo", "yearly": "$60/yr"},
+    "Email Automation": {"monthly": "$6/mo", "yearly": "$60/yr"},
+    "Advanced Memory System": {"monthly": "$7/mo", "yearly": "$70/yr"},
+    "Custom Model Connector": {"monthly": "$7/mo", "yearly": "$70/yr"},
+    "Workflow Automator": {"monthly": "$8/mo", "yearly": "$80/yr"},
+    # PRO-tier caps (full tier is $50/mo for all 7)
+    "Team Orchestrator": {"monthly": "$9/mo", "yearly": "$90/yr"},
+    "Data Analyst Pro": {"monthly": "$10/mo", "yearly": "$100/yr"},
+    "API Integrator": {"monthly": "$10/mo", "yearly": "$100/yr"},
+    "Competitive Analyst": {"monthly": "$9/mo", "yearly": "$90/yr"},
+    "Multi-Department Orchestrator": {"monthly": "$12/mo", "yearly": "$120/yr"},
+    "Business Intelligence Analyst": {"monthly": "$11/mo", "yearly": "$110/yr"},
+    # BUSINESS-tier caps (full tier is $80/mo for all 4)
+    "Security Auditor": {"monthly": "$15/mo", "yearly": "$150/yr"},
+    "Code Reviewer": {"monthly": "$14/mo", "yearly": "$140/yr"},
+    "Medical Researcher": {"monthly": "$16/mo", "yearly": "$160/yr"},
+    "Legal Document Reviewer": {"monthly": "$12/mo", "yearly": "$120/yr"},
+}
+
+# Maps add-on upgrade IDs to capability names
+CAPABILITY_TO_ADDON_ID: dict[str, str] = {
+    cap: f"addon_{cap.lower().replace(' ', '_').replace('/', '_')}"
+    for cap in CAPABILITY_ADDON_PRICES
+}
+ADDON_ID_TO_CAPABILITY: dict[str, str] = {
+    v: k for k, v in CAPABILITY_TO_ADDON_ID.items()
+}
+
+
+def load_purchased_capabilities() -> set[str]:
+    """Load the set of individually purchased capability add-ons from disk."""
+    try:
+        import json
+        from pathlib import Path
+        purchased_file = Path.home() / ".command_nexus" / "purchased_upgrades.json"
+        if purchased_file.exists():
+            data = json.loads(purchased_file.read_text(encoding="utf-8"))
+            purchased_ids = data.get("purchased", [])
+            result = set()
+            for pid in purchased_ids:
+                if pid in ADDON_ID_TO_CAPABILITY:
+                    result.add(ADDON_ID_TO_CAPABILITY[pid])
+                elif pid.endswith("_yearly") and pid[:-7] in ADDON_ID_TO_CAPABILITY:
+                    result.add(ADDON_ID_TO_CAPABILITY[pid[:-7]])
+            return result
+    except Exception:
+        pass
+    return set()
 
 
 def get_min_tier(capability: str) -> MembershipTier:
@@ -176,8 +228,18 @@ def get_min_tier(capability: str) -> MembershipTier:
     return CAPABILITY_MIN_TIER.get(capability, MembershipTier.FREE)
 
 
-def is_capability_unlocked(capability: str, current_tier: MembershipTier) -> bool:
-    """Check if a capability is unlocked for the given membership tier."""
+def is_capability_unlocked(
+    capability: str,
+    current_tier: MembershipTier,
+    purchased_capabilities: Set[str] | None = None,
+) -> bool:
+    """Check if a capability is unlocked for the given membership tier.
+
+    Also checks if the capability was individually purchased as an add-on.
+    """
+    # Individually purchased add-on overrides tier check
+    if purchased_capabilities and capability in purchased_capabilities:
+        return True
     min_tier = get_min_tier(capability)
     # All-Rounder tier unlocks everything
     if current_tier >= MembershipTier.ALL_ROUNDER:
@@ -191,14 +253,22 @@ def is_capability_unlocked(capability: str, current_tier: MembershipTier) -> boo
     return current_tier >= min_tier
 
 
-def get_locked_capabilities(capabilities: list[str], current_tier: MembershipTier) -> list[str]:
+def get_locked_capabilities(
+    capabilities: list[str],
+    current_tier: MembershipTier,
+    purchased_capabilities: Set[str] | None = None,
+) -> list[str]:
     """Return only the capabilities that are locked for the given tier."""
-    return [c for c in capabilities if not is_capability_unlocked(c, current_tier)]
+    return [c for c in capabilities if not is_capability_unlocked(c, current_tier, purchased_capabilities)]
 
 
-def get_unlocked_capabilities(capabilities: list[str], current_tier: MembershipTier) -> list[str]:
+def get_unlocked_capabilities(
+    capabilities: list[str],
+    current_tier: MembershipTier,
+    purchased_capabilities: Set[str] | None = None,
+) -> list[str]:
     """Return only the capabilities that are unlocked for the given tier."""
-    return [c for c in capabilities if is_capability_unlocked(c, current_tier)]
+    return [c for c in capabilities if is_capability_unlocked(c, current_tier, purchased_capabilities)]
 
 
 def get_upgrade_prompt_for_capability(capability: str) -> str:
@@ -208,9 +278,19 @@ def get_upgrade_prompt_for_capability(capability: str) -> str:
         return ""
     tier_name = TIER_NAMES.get(min_tier, "a higher tier")
     price = TIER_PRICES.get(min_tier, "")
+    addon_price = CAPABILITY_ADDON_PRICES.get(capability, {})
+    addon_monthly = addon_price.get("monthly", "")
     if capability in TRIAL_CAPABILITIES:
-        return f"🔒 Available during trial or with {tier_name} membership ({price}). Upgrade to keep this capability after trial ends."
-    return f"🔒 Requires {tier_name} membership ({price}). Upgrade to unlock this capability."
+        msg = f"🔒 Available during trial or with {tier_name} membership ({price})."
+        if addon_monthly:
+            msg += f" Or buy individually as an add-on ({addon_monthly})."
+        msg += " Upgrade to keep this capability after trial ends."
+        return msg
+    msg = f"🔒 Requires {tier_name} membership ({price})."
+    if addon_monthly:
+        msg += f" Or buy individually as an add-on ({addon_monthly})."
+    msg += " Upgrade to unlock this capability."
+    return msg
 
 
 def get_upgrade_prompt_for_limit(current_tier: MembershipTier) -> str:
@@ -242,7 +322,11 @@ def get_upgrade_prompt_for_limit(current_tier: MembershipTier) -> str:
     return f"You've selected the maximum of {limit} capabilities for {tier_name}."
 
 
-def count_unlocked_for_use_case(use_case_caps: list[str], tier: MembershipTier) -> tuple[int, int]:
+def count_unlocked_for_use_case(
+    use_case_caps: list[str],
+    tier: MembershipTier,
+    purchased_capabilities: Set[str] | None = None,
+) -> tuple[int, int]:
     """Return (unlocked_count, total_count) for a use case at a given tier."""
-    unlocked = sum(1 for c in use_case_caps if is_capability_unlocked(c, tier))
+    unlocked = sum(1 for c in use_case_caps if is_capability_unlocked(c, tier, purchased_capabilities))
     return (unlocked, len(use_case_caps))

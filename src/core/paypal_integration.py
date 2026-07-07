@@ -17,17 +17,16 @@ Flow:
 6. On success, the upgrade is unlocked and persisted.
 
 Security:
-- Only the PayPal Client ID is stored in the app (public, safe to embed).
-- The Client Secret is NEVER stored in the app — capture is done via
-  PayPal's client-side token flow or a backend proxy (future).
+- PayPal access tokens are obtained via a Supabase Edge Function proxy.
+- The Client Secret is stored server-side in the proxy — never shipped in the EXE.
+- The Client ID is kept locally for API calls that require it.
 - No payment data touches Command Nexus — PayPal handles all card/bank info.
-
-For production, you should add a backend server to hold the Client Secret
-and perform server-side capture. For beta, we use the client-side flow.
+- All API calls go to PayPal's servers over HTTPS using the proxied access token.
 """
 from __future__ import annotations
 
 import json
+import os
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -44,6 +43,10 @@ _PAYPAL_SANDBOX = "https://api-m.sandbox.paypal.com"
 _PAYPAL_LIVE = "https://api-m.paypal.com"
 _PAYPAL_SANDBOX_WEB = "https://www.sandbox.paypal.com"
 _PAYPAL_LIVE_WEB = "https://www.paypal.com"
+
+# Supabase Edge Function proxy for PayPal token (keeps Client Secret server-side)
+_PAYPAL_PROXY_URL = "https://esoiezxddkqlmvsgscqw.supabase.co/functions/v1/paypal-token-proxy"
+_NEXUS_API_KEY = os.environ.get("NEXUS_API_KEY", "")
 
 
 @dataclass
@@ -114,15 +117,16 @@ class PayPalClient:
     """
     PayPal Orders API v2 client for Command Nexus.
 
-    Uses the client-side flow (Client ID only, no secret in the app).
-    For production, add a backend server to hold the secret and do
-    server-side capture for stronger security.
+    Uses a Supabase Edge Function proxy to obtain PayPal OAuth2 access tokens,
+    keeping the Client Secret server-side. The Client ID is used locally
+    for order creation and capture API calls.
     """
 
     def __init__(self, settings: SettingsManager | None = None):
         self._settings = settings or SettingsManager()
         s = self._settings.get()
         self._client_id = getattr(s, "paypal_client_id", "") or ""
+        self._client_secret = getattr(s, "paypal_client_secret", "") or ""
         self._sandbox = getattr(s, "paypal_sandbox", True)
         self._callback_port = getattr(s, "paypal_callback_port", 8755)
 
@@ -132,7 +136,7 @@ class PayPalClient:
         self._callback_thread: Optional[Thread] = None
 
     def is_configured(self) -> bool:
-        """Check if PayPal Client ID is configured."""
+        """Check if PayPal is configured (Client ID required; secret is server-side)."""
         return bool(self._client_id)
 
     def get_callback_url(self) -> str:
@@ -140,19 +144,15 @@ class PayPalClient:
 
     def _get_access_token(self) -> str:
         """
-        Get an access token using client credentials (client-side flow).
-        For sandbox, this uses the Client ID only with the 'client_credentials' grant.
-        In production, you'd use a backend with the Client Secret.
+        Get a PayPal OAuth2 access token via the Supabase Edge Function proxy.
+        The proxy holds the Client Secret server-side and returns a token.
         """
         if not self._client_id:
             raise ValueError("PayPal Client ID is not configured.")
 
-        url = f"{self._api_base}/v1/oauth2/token"
-        data = urllib.parse.urlencode({"grant_type": "client_credentials"}).encode()
-
-        req = urllib.request.Request(url, data=data, method="POST")
-        req.add_header("Authorization", f"Basic {self._client_id}:")  # Client ID only, no secret
-        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        req = urllib.request.Request(_PAYPAL_PROXY_URL, data=b"", method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("X-Nexus-Key", _NEXUS_API_KEY)
 
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = json.loads(resp.read().decode("utf-8"))

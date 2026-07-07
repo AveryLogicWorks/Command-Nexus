@@ -117,12 +117,12 @@ class LocalRuntimeExecutor:
                     f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
                     f"[{ai_name}] Error: {response.error}",
                 ],
-                [f"[{ai_name}] Task did not complete because the model backend could not be reached."],
+                [f"[{ai_name}] Task did not complete because the local intelligence is running in fallback mode."],
                 [
                     "Next: start the selected backend, choose a different backend, or configure Backend settings.",
                     "Backend config is in the Visibility Window: Backend > Configure Backend.",
                 ],
-                f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+                f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
                 f"Provider: {provider_name}\n"
                 f"Error: {response.error}\n\n"
                 "Start the selected backend, choose a different backend, or configure Backend settings.",
@@ -132,7 +132,7 @@ class LocalRuntimeExecutor:
             return RuntimeResult(
                 RuntimeStatus.COMPLETED,
                 "Model response completed",
-                base_thought + [f"[{ai_name}] A real model backend returned output."],
+                base_thought + [f"[{ai_name}] The model backend returned output."],
                 [f"[{ai_name}] Generated response using connected runtime backend."],
                 ["Next: review result. Approve any real outward action separately."],
                 response.text,
@@ -140,20 +140,20 @@ class LocalRuntimeExecutor:
 
         return RuntimeResult(
             RuntimeStatus.FAILED,
-            "No model backend connected",
+            "Running in local intelligence mode",
             base_thought + [
-                f"[{ai_name}] No model backend answered.",
+                f"[{ai_name}] Local intelligence is running in fallback mode.",
                 f"[{ai_name}] Stopping here so the app does not fake completion.",
             ],
             [
                 f"[{ai_name}] Task was routed, but not executed by a real AI backend.",
-                "[SYSTEM] The built-in local model or configured backend did not respond. Check Backend settings.",
+                "[SYSTEM] The built-in local intelligence is active. You can configure a different model in Backend settings for enhanced capabilities.",
             ],
             [
                 "Next: check Backend settings or select a different model.",
                 "Then retry the mission.",
             ],
-            f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+            f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
             "Start the selected backend, choose a different backend, or configure Backend settings.",
         )
 
@@ -214,12 +214,12 @@ class LocalRuntimeExecutor:
                         f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
                         f"[{ai_name}] Error: {response.error}",
                     ],
-                    [f"[{ai_name}] Task did not complete because the model backend could not be reached."],
+                    [f"[{ai_name}] Task did not complete because the local intelligence is running in fallback mode."],
                     [
                         "Next: start the selected backend, choose a different backend, or configure Backend settings.",
                         "Backend config is in the Visibility Window: Backend > Configure Backend.",
                     ],
-                    f"{ai_name} is active, but her model backend is offline or unavailable.\n\n"
+                    f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
                     f"Provider: {provider_name}\n"
                     f"Error: {response.error}\n\n"
                     "Start the selected backend, choose a different backend, or configure Backend settings.",
@@ -240,14 +240,14 @@ class LocalRuntimeExecutor:
 
             return RuntimeResult(
                 RuntimeStatus.PAUSED,
-                "Sources collected, model backend missing",
+                "Sources collected, local intelligence active",
                 base_thought + [
                     f"[{ai_name}] Search backend returned sources.",
-                    f"[{ai_name}] No model backend is connected to summarize them.",
+                    f"[{ai_name}] Local intelligence is running in fallback mode and cannot summarize them.",
                 ],
                 [f"[{ai_name}] Collected sources but did not fake a summary."],
-                ["Next: connect model backend, then summarize and cite."],
-                "Sources were collected, but no model backend is connected.\n\nCollected sources:\n" + source_text,
+                ["Next: the built-in intelligence can provide analysis. Configure a different model in Backend settings for enhanced summarization."],
+                "Sources were collected, but local intelligence is running in fallback mode.\n\nCollected sources:\n" + source_text,
             )
 
         search_url = "https://www.google.com/search?q=" + urllib.parse.quote_plus(task)

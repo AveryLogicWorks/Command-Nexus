@@ -251,7 +251,7 @@ class GoalDiscoveryDialog(QDialog):
         self._suggestion_text.setReadOnly(True)
         self._suggestion_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._suggestion_text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._suggestion_text.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._suggestion_text.setStyleSheet(" color: #c9d1d9;")
         suggest_layout.addWidget(self._suggestion_text)
 
         self._btn_use_suggestion = QPushButton("Use this suggestion")
@@ -515,7 +515,7 @@ class BookWindow(QMainWindow):
         self._running_memory.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._running_memory.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._running_memory.setStyleSheet(
-            "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
+            " color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
         )
         running_layout.addWidget(self._running_memory)
         top_splitter.addWidget(running_widget)
@@ -572,7 +572,7 @@ class BookWindow(QMainWindow):
         self._memory_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._memory_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._memory_edit.setStyleSheet(
-            "background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
+            " color: #c9d1d9; border: 1px solid #30363d; padding: 8px; font-size: 12px;"
         )
         memory_layout.addWidget(self._memory_edit)
 
@@ -750,7 +750,7 @@ class BookWindow(QMainWindow):
         self._obfuscation_summary.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._obfuscation_summary.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._obfuscation_summary.setStyleSheet(
-            "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 12px; font-size: 13px;"
+            " color: #c9d1d9; border: 1px solid #30363d; padding: 12px; font-size: 13px;"
         )
         main_layout.addWidget(self._obfuscation_summary, stretch=1)
 
@@ -909,8 +909,8 @@ class BookWindow(QMainWindow):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QMainWindow { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QMainWindow {  }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }
@@ -920,8 +920,8 @@ class BookWindow(QMainWindow):
             QTreeWidget { border: 1px solid #30363d; }
             QTreeWidget::item:selected { background-color: #1f6feb; color: white; }
             QTableWidget { border: 1px solid #30363d; }
-            QHeaderView::section { background-color: #21262d; color: #c9d1d9; padding: 4px; border: 1px solid #30363d; }
-            QMenu { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; }
+            QHeaderView::section {  color: #c9d1d9; padding: 4px; border: 1px solid #30363d; }
+            QMenu {  color: #c9d1d9; border: 1px solid #30363d; }
             QMenu::item { padding: 4px 20px; }
             QMenu::item:selected { background-color: #1f6feb; color: white; }
         """)
@@ -1749,19 +1749,22 @@ class BookWindow(QMainWindow):
             self._refresh_tree()
 
     def _delete_node(self):
-        if not self._current_node or not self._current_book:
-            return
-        reply = QMessageBox.question(
-            self, "Confirm", f"Delete '{self._current_node.title}' and all its children?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self._delete_node_recursive(self._current_book.root, self._current_node.id)
-            self._current_node = None
-            self._title_edit.clear()
-            self._content_edit.clear()
-            self._relations_edit.clear()
-            self._refresh_tree()
+        try:
+            if not self._current_node or not self._current_book:
+                return
+            reply = QMessageBox.question(
+                self, "Confirm", f"Delete '{self._current_node.title}' and all its children?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._delete_node_recursive(self._current_book.root, self._current_node.id)
+                self._current_node = None
+                self._title_edit.clear()
+                self._content_edit.clear()
+                self._relations_edit.clear()
+                self._refresh_tree()
+        except Exception as e:
+            QMessageBox.warning(self, "Delete Error", f"Could not delete node: {e}")
 
     def _delete_node_recursive(self, node: BookNode, target_id: str) -> bool:
         for i, child in enumerate(node.children):

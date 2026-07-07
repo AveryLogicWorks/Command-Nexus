@@ -222,14 +222,14 @@ class OwnerConsole(QDialog):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QDialog { background-color: #0d1117; color: #c9d1d9; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QDialog {  color: #c9d1d9; }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }
             QPushButton:hover { border-color: #58a6ff; }
             QTableWidget { border: 1px solid #30363d; }
-            QHeaderView::section { background-color: #21262d; color: #c9d1d9; padding: 4px; border: 1px solid #30363d; }
+            QHeaderView::section {  color: #c9d1d9; padding: 4px; border: 1px solid #30363d; }
             QTextEdit { border: 1px solid #30363d; }
             QCheckBox { color: #c9d1d9; }
             QLabel { color: #c9d1d9; }

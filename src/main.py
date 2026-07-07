@@ -6,11 +6,29 @@
 # ---------------------
 
 import sys
+import os
 from pathlib import Path
 
 # Ensure src is on path when run from project root
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
+
+# Load .env file — checks project root, script dir, and EXE directory
+# In a PyInstaller EXE, __file__ is in a temp dir, so we also check next to sys.executable
+_env_candidates = [
+    project_root / ".env",
+    Path(__file__).resolve().parent / ".env",
+    Path(sys.executable).resolve().parent / ".env",
+]
+for _env_file in _env_candidates:
+    if _env_file.exists():
+        with open(_env_file, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _, _v = _line.partition("=")
+                    os.environ.setdefault(_k.strip(), _v.strip())
+        break
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -36,6 +54,10 @@ from src.core.license_manager import get_license_manager
 from src.core.license_dialog import LicenseActivationDialog
 from src.core.tripwire_manager import TripwireManager, WatcherMode
 from src.core.ip_watermark import get_build_fingerprint, get_watermark_string
+from src.core.coherence_matrix import CoherenceMatrix, FlagLevel as LatticeFlag
+from src.core.termination_dialog import TerminationDialog
+from src.core.ingestion_security import IngestionSecurityGate
+from src.core.termination_beacon import launch_beacon, is_beacon_running
 
 
 class CommandNexusApp:
@@ -44,6 +66,15 @@ class CommandNexusApp:
         self.app.setStyle(QStyleFactory.create("Fusion"))
         self.app.setApplicationName("Command Nexus")
         self.app.setApplicationVersion("0.1.0-prototype")
+        
+        # Apply saved theme
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.app.setStyleSheet(generate_qss(t))
+        except Exception:
+            pass
         
         # Track resources for cleanup on failure
         self._server = None
@@ -82,19 +113,32 @@ class CommandNexusApp:
         except Exception:
             pass
 
-        # License check
+        # License check — non-fatal: degrade to restricted mode if init fails
         try:
             self._license = get_license_manager()
         except Exception as e:
-            QMessageBox.critical(None, "Initialization Error", f"Failed to initialize license manager: {e}")
-            sys.exit(1)
+            try:
+                self._audit.log(tool="CommandNexusApp", action="LICENSE_INIT_ERROR", target=str(e), approved=False, status="error")
+            except Exception:
+                pass
+            QMessageBox.warning(
+                None,
+                "License System Warning",
+                f"The license system could not be fully initialized: {e}\n\n"
+                "Command Nexus will run in restricted mode. Some features may be unavailable.\n"
+                "Contact support@averylogicworks.com if this persists.",
+            )
+            self._license = None
 
         # ── Watcher / Anti-Tamper Tripwire ───────────────────────────────
         # Initialize the Watcher before any protected UI (license dialog).
         # Release/customer builds auto-start the Watcher armed. Source builds
         # default to DEV mode so normal development does not trip anything.
+        #
+        # NON-FATAL: If the Watcher fails to initialize, the app continues in
+        # degraded mode. One broken security component must not kill the app.
+        watcher_mode = TripwireManager.recommended_mode().value
         try:
-            watcher_mode = TripwireManager.recommended_mode().value
             self._watcher = WatcherEngine(
                 mode=watcher_mode,
                 audit_logger=self._audit,
@@ -102,27 +146,176 @@ class CommandNexusApp:
             )
             self._tripwire = self._watcher._core
 
-            # In release mode, a failed startup check must not silently continue.
+            # In release mode, a failed startup check restricts features but
+            # does NOT kill the app. The user gets a warning and degraded mode.
             if watcher_mode == WatcherMode.RELEASE.value:
                 if not self._tripwire.is_trusted():
-                    QMessageBox.critical(
+                    QMessageBox.warning(
                         None,
                         "Security Alert",
                         "Command Nexus has detected unauthorized modification or tampering.\n\n"
-                        "The application is entering lockdown and cannot continue.\n"
+                        "The application will run in restricted mode. Some features may be blocked.\n"
                         "Contact support@averylogicworks.com if you believe this is an error.",
                     )
                     try:
-                        self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_STARTUP_LOCKDOWN", target=self._tripwire.report(), approved=False, status="critical")
+                        self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_STARTUP_DEGRADED", target=self._tripwire.report(), approved=False, status="critical")
                     except Exception:
                         pass
-                    sys.exit(1)
         except Exception as e:
-            QMessageBox.critical(None, "Security Error", f"Protection system initialization failed: {e}")
-            sys.exit(1)
+            try:
+                self._audit.log(tool="CommandNexusApp", action="TRIPWIRE_INIT_ERROR", target=str(e), approved=False, status="error")
+            except Exception:
+                pass
+            QMessageBox.warning(
+                None,
+                "Protection System Warning",
+                f"The protection system could not be initialized: {e}\n\n"
+                "Command Nexus will continue without file integrity monitoring.\n"
+                "Some security features may be unavailable.",
+            )
+            self._watcher = None
+            self._tripwire = None
         # ──────────────────────────────────────────────────────────────────
 
-        if not self._license.is_activated:
+        # ── Coherence Matrix / Lattice Verification ───────────────────────
+        # The lattice weaves all modules into an interdependent web.
+        # Removing any single module cascades failures across the lattice.
+        # Violations escalate: YELLOW (warning) -> RED (repeat) -> CRIMSON (restricted).
+        #
+        # NON-FATAL: Lattice failure degrades to warning + license review flag.
+        # The app continues running — one broken security layer must not kill it.
+        try:
+            self._lattice = CoherenceMatrix(
+                tripwire=self._tripwire,
+                audit=self._audit,
+                license_manager=self._license,
+            )
+            self._lattice.initialize()
+            lattice_flag = self._lattice.verify()
+            self._audit.log(
+                tool="CommandNexusApp",
+                action="LATTICE_VERIFY_STARTUP",
+                target=f"flag={lattice_flag.value}, nodes={self._lattice.get_node_count()}",
+                approved=True,
+                status="info",
+            )
+            # Start background monitoring (only in non-DEV modes)
+            if watcher_mode != WatcherMode.DEV.value:
+                self._lattice.start_monitor()
+            # In release mode, a crimson lattice flag restricts features but
+            # does NOT kill the app. License is flagged for review.
+            if watcher_mode == WatcherMode.RELEASE.value and lattice_flag == LatticeFlag.CRIMSON:
+                QMessageBox.warning(
+                    None,
+                    "Structural Integrity Alert",
+                    "Command Nexus has detected structural inconsistencies.\n\n"
+                    "The application will run in restricted mode with reduced functionality.\n"
+                    "Contact support@averylogicworks.com if you believe this is an error.",
+                )
+        except Exception as e:
+            # Lattice failure is non-fatal — log and continue in all modes
+            try:
+                self._audit.log(tool="CommandNexusApp", action="LATTICE_INIT_ERROR", target=str(e), approved=False, status="error")
+            except Exception:
+                pass
+            if watcher_mode == WatcherMode.RELEASE.value:
+                QMessageBox.warning(
+                    None,
+                    "Structural Integrity Warning",
+                    f"The structural integrity system could not be initialized: {e}\n\n"
+                    "Command Nexus will continue without lattice verification.\n"
+                    "Some security features may be unavailable.",
+                )
+        # ──────────────────────────────────────────────────────────────────
+
+        # ── License Termination Check ─────────────────────────────────────
+        # If the license has been terminated (due to accumulated security flags),
+        # show the termination dialog and block all access.
+        # Also launch the background beacon to phone home the termination report.
+        try:
+            if self._license is not None and self._license.is_terminated():
+                self._audit.log(
+                    tool="CommandNexusApp",
+                    action="LICENSE_TERMINATED_DETECTED",
+                    target="Termination detected at startup — showing dialog + launching beacon",
+                    approved=False,
+                    status="critical",
+                )
+                # Launch background beacon — phones home the second they're online
+                try:
+                    if not is_beacon_running():
+                        launch_beacon()
+                        self._audit.log(
+                            tool="CommandNexusApp",
+                            action="TERMINATION_BEACON_LAUNCHED",
+                            target="Background beacon launched to phone home termination report",
+                            approved=False,
+                            status="critical",
+                        )
+                except Exception as beacon_err:
+                    self._audit.log(
+                        tool="CommandNexusApp",
+                        action="TERMINATION_BEACON_ERROR",
+                        target=str(beacon_err),
+                        approved=False,
+                        status="error",
+                    )
+
+                term_dlg = TerminationDialog(
+                    license_manager=self._license,
+                    audit_logger=self._audit,
+                )
+                term_dlg.exec()
+                sys.exit(1)
+            elif self._license is not None and self._license.is_under_review():
+                QMessageBox.warning(
+                    None,
+                    "License Under Review",
+                    "Your license is currently under review due to security flags.\n\n"
+                    "You may continue using Command Nexus, but certain features may be restricted.\n"
+                    "If you believe this is an error, contact averylogicworks@gmail.com.",
+                )
+                self._audit.log(
+                    tool="CommandNexusApp",
+                    action="LICENSE_UNDER_REVIEW_STARTUP",
+                    target="License under review — user warned",
+                    approved=True,
+                    status="warning",
+                )
+        except Exception as e:
+            try:
+                self._audit.log(tool="CommandNexusApp", action="TERMINATION_CHECK_ERROR", target=str(e), approved=False, status="error")
+            except Exception:
+                pass
+        # ──────────────────────────────────────────────────────────────────
+
+        # ── Ingestion Security Gate ───────────────────────────────────────
+        # Multi-layer security for all external data entering the application.
+        try:
+            self._ingestion_gate = IngestionSecurityGate(
+                audit=self._audit,
+                tripwire=self._tripwire,
+                license_manager=self._license,
+                coherence_matrix=self._lattice if hasattr(self, "_lattice") else None,
+            )
+            self._audit.log(
+                tool="CommandNexusApp",
+                action="INGESTION_GATE_INIT",
+                target="Multi-layer ingestion security gate initialized",
+                approved=True,
+                status="info",
+            )
+        except Exception as e:
+            try:
+                self._audit.log(tool="CommandNexusApp", action="INGESTION_GATE_ERROR", target=str(e), approved=False, status="error")
+            except Exception:
+                pass
+        # ──────────────────────────────────────────────────────────────────
+
+        if self._license is None:
+            # License system failed to init — skip activation dialog, run in restricted mode
+            pass
+        elif not self._license.is_activated:
             try:
                 dlg = LicenseActivationDialog(watcher=self._watcher)
                 dlg.exec()
@@ -168,6 +361,11 @@ class CommandNexusApp:
             nav.open_customer_ai.connect(self._open_customer_ai)
             nav.open_upgrades.connect(self._open_upgrades)
             nav.open_license.connect(self._open_license_manager)
+            nav.open_themes.connect(self._open_themes)
+            nav.open_models.connect(self._open_models)
+            nav.open_knowledge.connect(self._open_knowledge)
+            nav.open_voice.connect(self._open_voice)
+            nav.open_scheduler.connect(self._open_scheduler)
         except Exception as e:
             QMessageBox.critical(None, "Navigation Error", f"Failed to wire navigation signals: {e}")
             self._cleanup()
@@ -192,6 +390,13 @@ class CommandNexusApp:
 
         # Show guided tour on first run (after signals are wired so buttons work)
         self._maybe_show_tour()
+
+        # Check for updates asynchronously (non-blocking, silent)
+        try:
+            from src.core.update_checker import check_for_updates_async
+            check_for_updates_async(parent=self._visibility, delay_ms=5000)
+        except Exception:
+            pass
 
         # Wire the already-created Watcher to the UI and owner console.
         try:
@@ -383,19 +588,57 @@ class CommandNexusApp:
 
     def _open_upgrades(self):
         """Open the Upgrades Store dialog."""
-        from .parts.visibility.upgrades_panel import UpgradesDialog
+        from src.parts.visibility.upgrades_panel import UpgradesDialog
         dlg = UpgradesDialog(self._visibility)
+        dlg.exec()
+
+    def _open_themes(self):
+        """Open the Visual Themes selector dialog."""
+        from src.parts.visibility.theme_dialog import ThemeSelectorDialog
+        dlg = ThemeSelectorDialog(app_ref=self.app, parent=self._visibility)
         dlg.exec()
 
     def _open_license_manager(self):
         """Open the License Manager dialog for upgrading or changing license."""
-        from .core.license_manager_dialog import LicenseManagerDialog
+        from src.core.license_manager_dialog import LicenseManagerDialog
         dlg = LicenseManagerDialog(self._visibility)
         dlg.exec()
 
     def _open_governance(self):
         """Show Governance Policy dialog with embedded Parental Controls button."""
         dlg = GovernanceRulesDialog(self._governance, self._visibility)
+        dlg.exec()
+
+    def _open_models(self):
+        """Open the Model Manager panel."""
+        from src.parts.visibility.model_manager_panel import ModelManagerDialog
+        dlg = ModelManagerDialog(self._visibility)
+        dlg.exec()
+
+    def _open_knowledge(self):
+        """Open the Knowledge Base (RAG) panel."""
+        from src.parts.forge.knowledge_panel import KnowledgeDialog
+        dlg = KnowledgeDialog(self._visibility)
+        dlg.exec()
+
+    def _open_voice(self):
+        """Open the Voice Interaction panel."""
+        from src.parts.visibility.voice_panel import VoiceDialog
+        dlg = VoiceDialog(self._visibility)
+        dlg.exec()
+
+    def _open_scheduler(self):
+        """Open the Scheduled Missions panel."""
+        from src.core.task_scheduler import TaskScheduler
+        from src.parts.visibility.scheduler_panel import SchedulerDialog
+        if not hasattr(self, '_scheduler') or self._scheduler is None:
+            self._scheduler = TaskScheduler(
+                settings=self._settings,
+                runtime=self._runtime if hasattr(self, '_runtime') else None,
+                audit_logger=self._audit,
+            )
+            self._scheduler.start()
+        dlg = SchedulerDialog(self._scheduler, self._visibility)
         dlg.exec()
 
     def _open_customer_ai(self):
@@ -437,6 +680,11 @@ class CommandNexusApp:
         try:
             if self._watcher and hasattr(self._watcher, 'stop'):
                 self._watcher.stop()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_lattice") and self._lattice:
+                self._lattice.stop_monitor()
         except Exception:
             pass
         try:
@@ -528,11 +776,49 @@ class GovernanceRulesDialog(QDialog):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
+        # Separator
+        sep2 = QLabel("")
+        sep2.setStyleSheet("border-top: 1px solid #30363d; margin: 8px 0;")
+        layout.addWidget(sep2)
+
+        # Usage Policy section
+        up_header = QLabel("USAGE POLICY — ACCESS & BEHAVIOR CONTROL")
+        up_header.setStyleSheet("font-size: 14px; font-weight: bold; color: #58a6ff;")
+        layout.addWidget(up_header)
+
+        up_desc = QLabel(
+            "Configure how Command Nexus can be used — for families (parental controls), "
+            "businesses (enterprise restrictions), or both. Set content filters, session limits, "
+            "work-only mode, data exfiltration prevention, compliance logging, and more."
+        )
+        up_desc.setStyleSheet("color: #8b949e; font-size: 12px;")
+        up_desc.setWordWrap(True)
+        layout.addWidget(up_desc)
+
+        up_btn_row = QHBoxLayout()
+        btn_policy = QPushButton("Open Usage Policy")
+        btn_policy.setStyleSheet(
+            "background-color: #238636; color: white; font-weight: bold; "
+            "border: none; border-radius: 8px; padding: 12px 20px;"
+        )
+        btn_policy.clicked.connect(self._open_usage_policy)
+        up_btn_row.addWidget(btn_policy)
+
+        btn_policy_info = QPushButton("What is this?")
+        btn_policy_info.setStyleSheet(
+            "background-color: #30363d; color: #c9d1d9; font-weight: bold; "
+            "border: 1px solid #30363d; border-radius: 8px; padding: 12px 20px;"
+        )
+        btn_policy_info.clicked.connect(self._open_usage_policy_info)
+        up_btn_row.addWidget(btn_policy_info)
+        up_btn_row.addStretch()
+        layout.addLayout(up_btn_row)
+
         layout.addStretch()
 
         btn_close = QPushButton("CLOSE")
         btn_close.setStyleSheet(
-            "background-color: #21262d; color: #c9d1d9; font-weight: bold; "
+            " color: #c9d1d9; font-weight: bold; "
             "border: 1px solid #30363d; border-radius: 8px; padding: 10px 20px;"
         )
         btn_close.clicked.connect(self.accept)
@@ -554,9 +840,17 @@ class GovernanceRulesDialog(QDialog):
         )
         if not ok:
             return
-        if pwd != settings.get("password", "Nexus"):
-            QMessageBox.warning(self, "Access Denied", "Incorrect password.")
-            return
+        # Use hashed password verification
+        try:
+            from src.core.parental_controls_enforcer import verify_password
+            if not verify_password(pwd, settings):
+                QMessageBox.warning(self, "Access Denied", "Incorrect password.")
+                return
+        except ImportError:
+            # Fallback to legacy plaintext check
+            if pwd != settings.get("password", "Nexus"):
+                QMessageBox.warning(self, "Access Denied", "Incorrect password.")
+                return
         dlg = ParentalControlsDialog(self)
         dlg.exec()
 
@@ -569,13 +863,52 @@ class GovernanceRulesDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Import Error", f"Failed to open parental controls info: {e}")
 
+    def _open_usage_policy(self):
+        """Prompt for password then open UsagePolicyDialog."""
+        try:
+            from src.core.usage_policy import load_policy_settings, verify_password
+            settings = load_policy_settings()
+        except Exception as e:
+            QMessageBox.warning(self, "Import Error", f"Failed to load usage policy: {e}")
+            return
+
+        pwd, ok = QInputDialog.getText(
+            self, "Usage Policy Locked",
+            "Enter password to access Usage Policy settings.\nHint: Default is 'Nexus'",
+            QLineEdit.EchoMode.Password,
+        )
+        if not ok:
+            return
+        if not verify_password(pwd, settings):
+            QMessageBox.warning(self, "Access Denied", "Incorrect password.")
+            return
+        try:
+            from src.parts.visibility.visibility_window import UsagePolicyDialog
+            dlg = UsagePolicyDialog(self)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Import Error", f"Failed to open usage policy: {e}")
+
+    def _open_usage_policy_info(self):
+        """Show informational dialog about Usage Policy."""
+        try:
+            from src.parts.visibility.visibility_window import UsagePolicyInfoDialog
+            dlg = UsagePolicyInfoDialog(self)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Import Error", f"Failed to open usage policy info: {e}")
+
     def _apply_dark_theme(self):
-        self.setStyleSheet("""
-            QDialog { background-color: #0d1117; color: #c9d1d9; }
-            QLabel { color: #c9d1d9; }
-            QPushButton { border: 1px solid #30363d; border-radius: 8px; padding: 10px; }
-            QPushButton:hover { border-color: #58a6ff; }
-        """)
+        """Apply the current theme from theme_manager."""
+        try:
+            from src.core.theme_manager import load_theme_id, get_theme, generate_qss
+            t = get_theme(load_theme_id())
+            if t:
+                self.setStyleSheet(generate_qss(t))
+                return
+        except Exception:
+            pass
+        self.setStyleSheet("")
 
 
 def _run_safe_owner_mode():

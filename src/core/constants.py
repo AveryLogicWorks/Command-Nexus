@@ -13,6 +13,8 @@ class UseCaseClass(Enum):
     TASK_READY = "Task-Ready"
     BUSINESS = "Business"
     ENTERPRISE = "Enterprise"
+    FINANCIAL_GAINER = "Financial Gainer"
+    MEMORY_SAVER = "Memory Saver"
     ALL_ROUNDER = "All-Rounder"
 
 

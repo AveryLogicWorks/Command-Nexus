@@ -246,7 +246,7 @@ class DemoTourTooltip(QFrame):
         self._close_btn = QPushButton("✕")
         self._close_btn.setFixedSize(28, 28)
         self._close_btn.setStyleSheet(
-            "QPushButton { background-color: #21262d; color: #8b949e; border-radius: 4px; font-size: 14px; }"
+            "QPushButton {  color: #8b949e; border-radius: 4px; font-size: 14px; }"
             "QPushButton:hover { background-color: #da3633; color: white; }"
         )
         self._close_btn.setToolTip("Close tour")
@@ -259,7 +259,7 @@ class DemoTourTooltip(QFrame):
         self._progress.setTextVisible(False)
         self._progress.setStyleSheet("""
             QProgressBar {
-                background-color: #21262d;
+                
                 border: none;
                 border-radius: 3px;
             }
@@ -304,7 +304,7 @@ class DemoTourTooltip(QFrame):
         self._detail_text.setFont(QFont("Segoe UI", 11))
         self._detail_text.setStyleSheet("""
             QTextEdit {
-                background-color: #161b22;
+                
                 border: 1px solid #30363d;
                 border-radius: 8px;
                 color: #c9d1d9;
@@ -352,7 +352,7 @@ class DemoTourTooltip(QFrame):
         self._next_btn.setStyleSheet(
             "QPushButton { background-color: #238636; color: white; font-weight: bold; padding: 8px 20px; border-radius: 6px; border: none; }"
             "QPushButton:hover { background-color: #2ea043; }"
-            "QPushButton:disabled { background-color: #21262d; color: #484f58; }"
+            "QPushButton:disabled {  color: #484f58; }"
         )
         self._next_btn.setDefault(True)
         button_layout.addWidget(self._next_btn)
@@ -370,7 +370,7 @@ class DemoTourTooltip(QFrame):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             DemoTourTooltip {
-                background-color: #0d1117;
+                
                 border: 2px solid #30363d;
                 border-radius: 12px;
             }
@@ -889,7 +889,7 @@ class DemoTourController(QWidget):
                 <ul>
                     <li><b>Premium Features</b> \u2014 Visual themes, export pack, advanced memory</li>
                     <li><b>Productivity Tools</b> \u2014 Workflow automation, analytics dashboard</li>
-                    <li><b>Enterprise Options</b> \u2014 Security suite, white label license</li>
+                    <li><b>Enterprise Options</b> \u2014 Security suite, priority support</li>
                 </ul>
                 <p>Some capabilities work with <b>local intelligence</b> right away.</p>
                 <p>The <b>built-in local model</b> provides AI power right away — no external server needed.</p>
@@ -897,7 +897,7 @@ class DemoTourController(QWidget):
                 target_widget_name="nav_constraints",
                 action_prompt="Click 'Next' to continue",
                 wait_for_click=False,
-                narration="Step 9. Explore Upgrades. The orange Upgrades button opens the store where you can unlock more capabilities. Upgrades include Premium Features like visual themes, export pack, and advanced memory. Productivity Tools like workflow automation and analytics dashboard. And Enterprise Options like security suite and white label license. The built-in local model provides AI power right away with no external server needed. You can browse the store anytime after the tour by clicking Upgrades.",
+                narration="Step 9. Explore Upgrades. The orange Upgrades button opens the store where you can unlock more capabilities. Upgrades include Premium Features like visual themes, export pack, and advanced memory. Productivity Tools like workflow automation and analytics dashboard. And Enterprise Options like security suite and priority support. The built-in local model provides AI power right away with no external server needed. You can browse the store anytime after the tour by clicking Upgrades.",
             ),
 
             # === STEP 10: Customer Support ===

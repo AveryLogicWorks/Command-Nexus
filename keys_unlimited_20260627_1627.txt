@@ -1,0 +1,25 @@
+=== COMMAND NEXUS - UNLIMITED (ALL AIS, ALL FEATURES) KEYS ===
+Generated: 2026-06-27 16:27
+Tier: Unlimited (all AIs, all features)
+Duration: 365 days
+Total keys: 2
+
+--- READY TO DISTRIBUTE ---
+
+Key 01: UN00-6C21-8FCC-2CD8-E1CF-4D4C-18EA-F400-A467
+  Raw:  UN006C218FCC2CD8E1CF4D4C18EAF400A467
+  Expires: 2027-06-27
+
+Key 02: UN00-6C21-8FCC-436F-F430-3E17-C1E2-CCCB-3BE5
+  Raw:  UN006C218FCC436FF4303E17C1E2CCCB3BE5
+  Expires: 2027-06-27
+
+=== HOW TO USE ===
+1. Give one key to each person
+2. They download CommandNexus.exe from averylogicworks.com
+3. On first launch, they paste the key to activate
+4. License valid for 365 days from activation
+
+=== SECURITY NOTE ===
+Each key is HMAC-signed and cannot be forged.
+Keep this file secure. Do not share publicly.

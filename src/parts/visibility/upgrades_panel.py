@@ -39,20 +39,58 @@ from ...core.settings_manager import SettingsManager
 class UpgradeCategory(Enum):
     """Categories for organizing upgrades."""
     MEMBERSHIP = auto()
+    COSMETIC = auto()
     APPEARANCE = auto()
     FUNCTIONALITY = auto()
     ANALYTICS = auto()
     SECURITY = auto()
     PERFORMANCE = auto()
+    AI_ENHANCEMENT = auto()
+    RESOURCE = auto()
+    PRODUCTIVITY = auto()
+    CONTENT = auto()
+    CAPABILITY_ADDON = auto()
 
 
 class UpgradeTier(Enum):
     """Pricing tiers for upgrades."""
+    MICRO = "$0.99"
+    SMALL = "$1.99"
     BASIC = "$4.99"
     STANDARD = "$9.99"
     PRO = "$14.99"
+    PREMIUM = "$24.99"
     ENTERPRISE = "$49.99"
     ELITE = "$99.99"
+    LIFETIME = "$299.99"
+
+
+class BillingType(Enum):
+    """How an upgrade is billed."""
+    ONE_TIME = "one-time"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+    CUSTOM = "custom"
+
+    @property
+    def label(self) -> str:
+        if self == BillingType.MONTHLY:
+            return "/mo"
+        elif self == BillingType.YEARLY:
+            return "/yr"
+        elif self == BillingType.CUSTOM:
+            return ""
+        return ""
+
+    @property
+    def display(self) -> str:
+        if self == BillingType.MONTHLY:
+            return "Monthly Subscription"
+        elif self == BillingType.YEARLY:
+            return "Yearly Subscription"
+        elif self == BillingType.CUSTOM:
+            return "Custom Pricing"
+        return "One-Time Purchase"
 
 
 @dataclass
@@ -71,6 +109,7 @@ class UpgradeFeature:
     popular: bool = False
     new: bool = False
     limited_time: bool = False
+    billing_type: BillingType = BillingType.ONE_TIME
 
 
 # PREMIUM UPGRADE CATALOG
@@ -101,6 +140,7 @@ After the trial, upgrade to Basic or higher to keep premium access.
             "All common capabilities unlocked",
             "Up to 3 capabilities per AI agent"
         ],
+        billing_type=BillingType.ONE_TIME,
     ),
 
     UpgradeFeature(
@@ -127,7 +167,8 @@ Perfect for: Students, freelancers, personal productivity, and small projects.
             "Select up to 5 capabilities per AI agent",
             "Priority email support included"
         ],
-        popular=True
+        popular=True,
+        billing_type=BillingType.MONTHLY,
     ),
 
     UpgradeFeature(
@@ -158,7 +199,7 @@ Perfect for: Small to mid-size businesses, startups, agencies, and growing teams
             "Advanced data analysis and API integrations",
             "Select up to 8 capabilities per AI agent"
         ],
-        requires=["membership_pro"]
+        billing_type=BillingType.MONTHLY,
     ),
 
     UpgradeFeature(
@@ -172,7 +213,7 @@ Enterprise Membership provides the highest level of capability and security:
 • Security Auditor: Scan code and configs for vulnerabilities
 • Code Reviewer: Automated code review with best practices
 • Medical Researcher: Search medical literature and check drug interactions
-• Legal Assistant: Review contracts and legal documents with AI
+• Legal Document Reviewer: Analyze legal documents, extract clauses, and flag risks
 • Unlimited capabilities per AI agent
 • Full audit trail and compliance reporting
 • Enterprise-grade security features
@@ -192,42 +233,11 @@ Perfect for: Large organizations, healthcare, legal firms, and enterprises with 
         benefits=[
             "Everything in Business, plus enterprise-tier capabilities",
             "Security auditing and code review",
-            "Medical research and legal assistant tools",
+            "Medical research and legal document review tools",
             "Unlimited capabilities per AI agent",
             "Custom integrations and deployment support"
         ],
-        requires=["membership_business"]
-    ),
-
-    UpgradeFeature(
-        id="membership_all_rounder",
-        name="All-Rounder Membership",
-        description="Everything unlocked across all use cases. Best value for power users and multitaskers.",
-        detailed_description="""
-All-Rounder Membership is the ultimate Command Nexus experience:
-
-• Every single capability unlocked — no restrictions
-• All use cases fully accessible: Individual, Educational, Task-Ready, Business, Enterprise
-• All premium upgrades included
-• All future capabilities automatically unlocked
-• Unlimited capabilities per AI agent
-• Priority processing for all AI operations
-• Early access to new features
-• Direct line to the development team
-
-Perfect for: Power users, multitaskers, consultants, and anyone who wants it all without limits.
-        """,
-        category=UpgradeCategory.MEMBERSHIP,
-        price="$39.99",
-        icon="💎",
-        benefits=[
-            "Every capability unlocked — zero restrictions",
-            "All use cases, all premium upgrades, all features",
-            "Future capabilities automatically included",
-            "Best value for multitaskers — replaces Basic + Pro"
-        ],
-        popular=True,
-        new=True
+        billing_type=BillingType.CUSTOM,
     ),
 
     # === APPEARANCE ===
@@ -254,7 +264,8 @@ Transform Command Nexus with premium visual themes:
             "Match your brand or personal style",
             "Accessibility options for vision impairments"
         ],
-        popular=True
+        popular=True,
+        billing_type=BillingType.ONE_TIME,
     ),
 
     # === FUNCTIONALITY ===
@@ -284,7 +295,8 @@ Professional document export capabilities:
             "Works with your existing workflow tools",
             "Publish directly to web or e-book platforms",
             "Academic paper formatting included"
-        ]
+        ],
+        billing_type=BillingType.ONE_TIME,
     ),
 
     UpgradeFeature(
@@ -313,7 +325,8 @@ Supercharge your AI's memory capabilities:
             "Personalized responses based on your history",
             "Build up complex knowledge over time"
         ],
-        popular=True
+        popular=True,
+        billing_type=BillingType.MONTHLY,
     ),
 
     UpgradeFeature(
@@ -340,7 +353,8 @@ Use any AI model you want, not just defaults:
             "Keep data private with local models",
             "Reduce costs with model optimization",
             "Access latest models immediately"
-        ]
+        ],
+        billing_type=BillingType.MONTHLY,
     ),
 
     UpgradeFeature(
@@ -369,7 +383,8 @@ Automate repetitive AI tasks:
             "Consistent results without manual work",
             "Focus on high-value creative work"
         ],
-        new=True
+        new=True,
+        billing_type=BillingType.MONTHLY,
     ),
 
     # === ANALYTICS ===
@@ -397,7 +412,8 @@ Understand and optimize your AI usage:
             "Identify optimization opportunities",
             "Track ROI and productivity gains",
             "Make data-driven decisions about usage"
-        ]
+        ],
+        billing_type=BillingType.MONTHLY,
     ),
 
     UpgradeFeature(
@@ -426,7 +442,8 @@ Professional content analysis tools:
             "Maintain professional writing standards",
             "Avoid plagiarism and copyright issues"
         ],
-        new=True
+        new=True,
+        billing_type=BillingType.MONTHLY,
     ),
 
     # === SECURITY ===
@@ -455,7 +472,8 @@ Never lose your work again:
             "Peace of mind with automatic backups",
             "Version history prevents mistakes"
         ],
-        popular=True
+        popular=True,
+        billing_type=BillingType.MONTHLY,
     ),
 
     UpgradeFeature(
@@ -482,7 +500,36 @@ Bank-grade security for sensitive work:
             "Compliance with regulations",
             "Peace of mind with bank-grade security"
         ],
-        requires=["backup_pack"]
+        billing_type=BillingType.MONTHLY,
+    ),
+
+    UpgradeFeature(
+        id="security_backup_bundle",
+        name="Security & Backup Bundle",
+        description="Enterprise Security + Backup & Sync together — save $5",
+        detailed_description="""
+Get both security essentials in one bundle:
+
+• Everything in Enterprise Security:
+  - 2FA, audit logs, encryption, security scanning
+  - Compliance reporting and vulnerability alerts
+
+• Everything in Backup & Sync:
+  - Automatic backups and version history
+  - Multi-device sync
+
+Buy together and save $5 vs purchasing separately.
+        """,
+        category=UpgradeCategory.SECURITY,
+        price="$54.99",
+        icon="🛡️",
+        benefits=[
+            "Security and backup in one purchase",
+            "Save $5 vs buying separately",
+            "Protect data and keep it backed up",
+            "Best value for security-conscious users"
+        ],
+        billing_type=BillingType.MONTHLY,
     ),
 
     # === PERFORMANCE ===
@@ -511,41 +558,210 @@ Get answers faster with priority access:
             "Better experience for time-sensitive tasks",
             "Reliability for critical business use"
         ],
-        popular=True
+        popular=True,
+        billing_type=BillingType.MONTHLY,
     ),
 
-    # === ENTERPRISE ===
+    # === AI ENHANCEMENT ===
     UpgradeFeature(
-        id="white_label",
-        name="White Label License",
-        description="Remove Command Nexus branding and add your own — full reseller rights",
+        id="financial_gainer",
+        name="Financial Gainer",
+        description="AI-powered income strategy analysis, monetization paths, and risk assessment",
         detailed_description="""
-Make it your own:
-• Remove all "Command Nexus" branding
-• Add your company logo and colors
-• Custom domain support
-• Branded email notifications
-• Custom terms of service
-• Branded documentation
-• Custom login page
-• Branded billing and invoices
-• Reseller rights (sell to your customers)
-• Revenue share options available
-• Marketing material templates
-• Priority bug fixes included
+Financial Gainer gives your AI the ability to analyze income opportunities:
+
+• Identify monetization paths and revenue models
+• Break-even and ROI analysis
+• Risk assessment (market, competition, regulatory)
+• Action plans with smallest safe first steps
+• Covers: crypto, affiliate, freelance, content, sales funnels
+
+DISCLAIMER: Planning tool only — not financial advice.
         """,
-        category=UpgradeCategory.SECURITY,
-        price="$499.99",
-        icon="🏷️",
+        category=UpgradeCategory.AI_ENHANCEMENT,
+        price="$19.99",
+        icon="💰",
         benefits=[
-            "Present as your own product",
-            "Build brand recognition",
-            "Resell and keep profits",
-            "Enterprise-ready appearance"
+            "AI analyzes income opportunities",
+            "Risk assessment built in",
+            "Action plans you can follow",
+            "Not financial advice — planning only"
         ],
-        requires=["security_pack"]
+        billing_type=BillingType.MONTHLY,
     ),
+
+    UpgradeFeature(
+        id="memory_recorder",
+        name="Memory Recorder",
+        description="Record sessions, recall past context, and never lose where you left off",
+        detailed_description="""
+Memory Recorder gives your AI a persistent session memory:
+
+• Automatic session recording — never lose context
+• Smart recall: search past tasks and decisions
+• 'Where I left off' restoration
+• Decision tracking and audit trails
+• Habit and progress journaling
+• Knowledge archiving for future reference
+
+Everything you do is recorded for recall. Pick up exactly where you stopped.
+        """,
+        category=UpgradeCategory.AI_ENHANCEMENT,
+        price="$14.99",
+        icon="🧠",
+        benefits=[
+            "Never lose your place",
+            "Search past sessions instantly",
+            "Track decisions over time",
+            "Automatic — no manual saving"
+        ],
+        billing_type=BillingType.MONTHLY,
+    ),
+
+    UpgradeFeature(
+        id="activity_watcher",
+        name="Activity Watcher",
+        description="AI observes your work patterns and suggests ways to work faster",
+        detailed_description="""
+Activity Watcher learns how you work and helps you improve:
+
+• Observes repeated task patterns
+• Identifies bottlenecks in your workflow
+• Suggests automation candidates
+• Time analysis: where effort goes vs. value produced
+• Improvement suggestions tailored to your habits
+
+The more you use it, the smarter the suggestions get.
+        """,
+        category=UpgradeCategory.AI_ENHANCEMENT,
+        price="$12.99",
+        icon="👁️",
+        benefits=[
+            "AI learns your work patterns",
+            "Find bottlenecks automatically",
+            "Suggestions to work faster",
+            "Gets smarter over time"
+        ],
+        billing_type=BillingType.MONTHLY,
+    ),
+
+    UpgradeFeature(
+        id="game_companion",
+        name="Game Companion",
+        description="AI strategy guide for board games, card games, puzzles, and video games",
+        detailed_description="""
+Game Companion turns your AI into a strategy partner:
+
+• Chess: opening principles, tactics, endgame guidance
+• Board games and card games: rules, strategy, optimal play
+• Puzzle solving: constraint analysis, pattern recognition
+• Video games: mechanics breakdown and strategy tips
+• Learn game rules and mechanics quickly
+
+Your AI becomes a gaming coach that explains, suggests, and strategizes.
+        """,
+        category=UpgradeCategory.AI_ENHANCEMENT,
+        price="$9.99",
+        icon="🎮",
+        benefits=[
+            "AI strategy coach for any game",
+            "Chess tactics and endgame help",
+            "Puzzle-solving frameworks",
+            "Learn game rules fast"
+        ],
+        billing_type=BillingType.ONE_TIME,
+    ),
+
 ]
+
+# ---------------------------------------------------------------------------
+# Individual Capability Add-on Subscriptions
+# ---------------------------------------------------------------------------
+# Generate upgrade entries for each premium capability that can be purchased
+# individually without upgrading to a full tier subscription.
+# ---------------------------------------------------------------------------
+from ...core.membership_tiers import (
+    CAPABILITY_ADDON_PRICES as _ADDON_PRICES,
+    CAPABILITY_TO_ADDON_ID as _CAP_TO_ADDON_ID,
+    CAPABILITY_MIN_TIER as _CAP_MIN_TIER,
+    TIER_NAMES as _TIER_NAMES,
+)
+
+_ADDON_ICONS = {
+    "Memory Bridge": "🔗",
+    "Visual Canvas": "🎨",
+    "Voice Interface": "🎤",
+    "Email Automation": "📧",
+    "Advanced Memory System": "🧠",
+    "Custom Model Connector": "🤖",
+    "Workflow Automator": "⚡",
+    "Team Orchestrator": "👥",
+    "Data Analyst Pro": "📊",
+    "API Integrator": "🔌",
+    "Competitive Analyst": "🔍",
+    "Multi-Department Orchestrator": "🏢",
+    "Business Intelligence Analyst": "📈",
+    "Security Auditor": "🔒",
+    "Code Reviewer": "👀",
+    "Medical Researcher": "⚕️",
+    "Legal Document Reviewer": "⚖️",
+}
+
+for _cap_name, _pricing in _ADDON_PRICES.items():
+    _addon_id = _CAP_TO_ADDON_ID[_cap_name]
+    _min_tier = _CAP_MIN_TIER.get(_cap_name, None)
+    _tier_label = _TIER_NAMES.get(_min_tier, "") if _min_tier else ""
+    _monthly = _pricing["monthly"]
+    _yearly = _pricing["yearly"]
+    _icon = _ADDON_ICONS.get(_cap_name, "🔧")
+    # Monthly entry
+    UPGRADE_FEATURES.append(UpgradeFeature(
+        id=_addon_id,
+        name=f"{_cap_name} (Monthly)",
+        description=f"Individual monthly subscription to {_cap_name}. Normally requires {_tier_label} membership.",
+        detailed_description=f"""
+Purchase {_cap_name} as a standalone add-on without upgrading your membership tier.
+
+• Monthly: {_monthly}
+• Yearly also available at {_yearly} (save ~17% vs monthly)
+
+This unlocks {_cap_name} for ALL your AI agents. No membership tier upgrade required.
+        """,
+        category=UpgradeCategory.CAPABILITY_ADDON,
+        price=_monthly,
+        icon=_icon,
+        benefits=[
+            f"Unlocks {_cap_name} for all AI agents",
+            f"No membership tier upgrade required",
+            f"Cancel anytime — keep the capability until billing cycle ends",
+            f"Yearly option available at {_yearly}",
+        ],
+        billing_type=BillingType.MONTHLY,
+    ))
+    # Yearly entry
+    UPGRADE_FEATURES.append(UpgradeFeature(
+        id=f"{_addon_id}_yearly",
+        name=f"{_cap_name} (Yearly)",
+        description=f"Individual yearly subscription to {_cap_name}. Save ~17% vs monthly. Normally requires {_tier_label} membership.",
+        detailed_description=f"""
+Purchase {_cap_name} as a standalone yearly add-on and save ~17% vs monthly billing.
+
+• Yearly: {_yearly}
+• Monthly also available at {_monthly}
+
+This unlocks {_cap_name} for ALL your AI agents. No membership tier upgrade required.
+        """,
+        category=UpgradeCategory.CAPABILITY_ADDON,
+        price=_yearly,
+        icon=_icon,
+        benefits=[
+            f"Unlocks {_cap_name} for all AI agents",
+            f"Save ~17% vs monthly billing",
+            f"No membership tier upgrade required",
+            f"Full year of access",
+        ],
+        billing_type=BillingType.YEARLY,
+    ))
 
 
 def get_upgrades_by_category(category: UpgradeCategory) -> List[UpgradeFeature]:
@@ -705,6 +921,22 @@ class UpgradesDialog(QDialog):
         self._settings = SettingsManager()
         self._paypal = PayPalClient(self._settings)
         self._purchase_thread: threading.Thread | None = None
+        
+        # Founder mode: unlock all upgrades
+        self._is_founder = False
+        try:
+            from ...core.license_manager import get_license_manager
+            if get_license_manager().is_founder_mode:
+                self._is_founder = True
+                # Mark all upgrades as purchased for founder
+                all_ids = [u.id for u in UPGRADE_FEATURES]
+                for uid in all_ids:
+                    if uid not in self._purchased:
+                        self._purchased.append(uid)
+                save_purchased_upgrades(self._purchased)
+        except Exception:
+            pass
+        
         layout = QVBoxLayout(self)
 
         # Header
@@ -712,18 +944,24 @@ class UpgradesDialog(QDialog):
         header.setStyleSheet("font-size: 22px; font-weight: bold; color: #58a6ff; padding: 8px;")
         layout.addWidget(header)
 
-        subheader = QLabel(
-            f"{len(UPGRADE_FEATURES)} premium features available. "
-            f"{len(self._purchased)} purchased."
-        )
-        subheader.setStyleSheet("font-size: 13px; color: #8b949e; padding: 4px;")
+        if self._is_founder:
+            subheader = QLabel(
+                "★ Founder Absolute Mode — All upgrades unlocked. ★"
+            )
+            subheader.setStyleSheet("font-size: 14px; color: #f0883e; padding: 4px; font-weight: bold;")
+        else:
+            subheader = QLabel(
+                f"{len(UPGRADE_FEATURES)} premium features available. "
+                f"{len(self._purchased)} purchased."
+            )
+            subheader.setStyleSheet("font-size: 13px; color: #8b949e; padding: 4px;")
         layout.addWidget(subheader)
 
         # PayPal status bar
         self._paypal_status = QLabel(self._paypal_status_text())
         self._paypal_status.setStyleSheet(
             "font-size: 11px; color: #8b949e; padding: 2px 8px; "
-            "background-color: #161b22; border: 1px solid #30363d; border-radius: 4px;"
+            " border: 1px solid #30363d; border-radius: 4px;"
         )
         paypal_row = QHBoxLayout()
         paypal_row.addWidget(self._paypal_status, stretch=1)
@@ -790,7 +1028,7 @@ class UpgradesDialog(QDialog):
         """Build a single upgrade card widget."""
         card = QFrame()
         card.setStyleSheet(
-            "QFrame { background-color: #161b22; border: 1px solid #30363d; "
+            "QFrame {  border: 1px solid #30363d; "
             "border-radius: 6px; padding: 8px; margin: 4px; }"
         )
         card_layout = QVBoxLayout(card)
@@ -798,7 +1036,7 @@ class UpgradesDialog(QDialog):
         # Top row: icon + name + price
         top = QHBoxLayout()
         icon_label = QLabel(f"[{upgrade.category.name[:3]}]")
-        icon_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #58a6ff; padding: 2px 6px; background-color: #21262d; border-radius: 3px;")
+        icon_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #58a6ff; padding: 2px 6px;  border-radius: 3px;")
         top.addWidget(icon_label)
 
         name_label = QLabel(upgrade.name)
@@ -808,6 +1046,24 @@ class UpgradesDialog(QDialog):
         price_label = QLabel(upgrade.price)
         price_label.setStyleSheet("font-size: 15px; font-weight: bold; color: #3fb950;")
         top.addWidget(price_label)
+
+        # Billing type badge
+        if upgrade.billing_type != BillingType.ONE_TIME and upgrade.billing_type != BillingType.CUSTOM:
+            billing_label = QLabel(upgrade.billing_type.display)
+            billing_label.setStyleSheet(
+                "font-size: 10px; color: #d29922; font-weight: bold; "
+                "padding: 2px 6px; border: 1px solid rgba(210,153,34,.3); "
+                "border-radius: 3px; background-color: rgba(210,153,34,.1);"
+            )
+            top.addWidget(billing_label)
+        elif upgrade.billing_type == BillingType.CUSTOM:
+            billing_label = QLabel("Custom")
+            billing_label.setStyleSheet(
+                "font-size: 10px; color: #a371f7; font-weight: bold; "
+                "padding: 2px 6px; border: 1px solid rgba(163,113,247,.3); "
+                "border-radius: 3px; background-color: rgba(163,113,247,.1);"
+            )
+            top.addWidget(billing_label)
 
         if upgrade.popular:
             pop = QLabel("POPULAR")
@@ -911,7 +1167,7 @@ class UpgradesDialog(QDialog):
         )
 
     def _open_paypal_config(self):
-        """Open a small dialog to configure PayPal Client ID."""
+        """Open a small dialog to configure PayPal credentials."""
         s = self._settings.get()
         dlg = QDialog(self)
         dlg.setWindowTitle("PayPal Configuration")
@@ -921,15 +1177,15 @@ class UpgradesDialog(QDialog):
         dlg_layout.addWidget(QLabel("PayPal Client ID:"))
         client_id_input = QLineEdit(s.paypal_client_id)
         client_id_input.setStyleSheet(
-            "background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px;"
+            " color: #c9d1d9; border: 1px solid #30363d; padding: 6px;"
         )
         dlg_layout.addWidget(client_id_input)
 
         dlg_layout.addWidget(QLabel(
-            "Get your Client ID from:\n"
+            "Get your credentials from:\n"
             "PayPal Developer Dashboard → My Apps & Credentials → REST API Apps\n"
-            "Create an app, copy the Client ID. The Client Secret is NOT needed\n"
-            "for the client-side flow used by Command Nexus."
+            "Create an app, copy the Client ID.\n"
+            "The Client Secret is stored securely on the server — no need to enter it here."
         ))
 
         sandbox_check = QCheckBox("Use Sandbox (test mode — no real charges)")
@@ -1044,9 +1300,16 @@ class UpgradesDialog(QDialog):
 
         # Confirm purchase
         mode = "SANDBOX (test — no real charge)" if self._settings.get().paypal_sandbox else "LIVE (real charge)"
+        billing_note = ""
+        if upgrade.billing_type == BillingType.MONTHLY:
+            billing_note = "\nThis is a MONTHLY SUBSCRIPTION — you will be billed each month until cancelled.\n"
+        elif upgrade.billing_type == BillingType.YEARLY:
+            billing_note = "\nThis is a YEARLY SUBSCRIPTION — you will be billed each year until cancelled.\n"
         reply = QMessageBox.question(
             self, "Confirm Purchase",
             f"Purchase '{upgrade.name}' for {upgrade.price}?\n\n"
+            f"Billing: {upgrade.billing_type.display}\n"
+            f"{billing_note}"
             f"PayPal mode: {mode}\n\n"
             "Your browser will open to PayPal for secure checkout.\n"
             "After payment, return to Command Nexus automatically.",
@@ -1146,7 +1409,6 @@ class UpgradesDialog(QDialog):
             "membership_pro": 2,
             "membership_business": 3,
             "membership_enterprise": 4,
-            "membership_all_rounder": 5,
         }
         if upgrade.id in membership_map:
             try:

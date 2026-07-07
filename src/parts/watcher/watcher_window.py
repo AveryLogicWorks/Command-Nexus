@@ -293,7 +293,7 @@ class WatcherWindow(QMainWindow):
         scope_group = QGroupBox("Protected Scope")
         scope_layout = QVBoxLayout(scope_group)
         self._scope_list = QListWidget()
-        self._scope_list.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._scope_list.setStyleSheet(" color: #c9d1d9;")
         scope_layout.addWidget(self._scope_list)
         top_bar.addWidget(scope_group, stretch=1)
         main_layout.addLayout(top_bar)
@@ -325,7 +325,7 @@ class WatcherWindow(QMainWindow):
         self._alert_log.setReadOnly(True)
         self._alert_log.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._alert_log.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._alert_log.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._alert_log.setStyleSheet(" color: #c9d1d9;")
         alert_layout.addWidget(self._alert_log, stretch=2)
 
         # Alert filter
@@ -346,7 +346,7 @@ class WatcherWindow(QMainWindow):
 
         # Alert list (structured)
         self._alert_list = QListWidget()
-        self._alert_list.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._alert_list.setStyleSheet(" color: #c9d1d9;")
         alert_layout.addWidget(self._alert_list, stretch=1)
 
         splitter.addWidget(alert_widget)
@@ -397,8 +397,8 @@ class WatcherWindow(QMainWindow):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QMainWindow { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QMainWindow {  }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }
@@ -406,11 +406,11 @@ class WatcherWindow(QMainWindow):
             QComboBox, QLineEdit { border: 1px solid #30363d; padding: 4px; }
             QLabel { color: #c9d1d9; }
             QTableWidget { border: 1px solid #30363d; }
-            QHeaderView::section { background-color: #21262d; color: #c9d1d9; padding: 4px; border: 1px solid #30363d; }
+            QHeaderView::section {  color: #c9d1d9; padding: 4px; border: 1px solid #30363d; }
             QListWidget { border: 1px solid #30363d; }
             QListWidget::item:selected { background-color: #1f6feb; color: white; }
             QTextEdit { border: 1px solid #30363d; }
-            QMenu { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; }
+            QMenu {  color: #c9d1d9; border: 1px solid #30363d; }
             QMenu::item { padding: 4px 20px; }
             QMenu::item:selected { background-color: #1f6feb; color: white; }
         """)

@@ -270,7 +270,7 @@ class KnowledgeAIDialog(QDialog):
         self._chat_display = QTextEdit()
         self._chat_display.setReadOnly(True)
         self._chat_display.setStyleSheet(
-            "background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 8px;"
+            " color: #c9d1d9; border: 1px solid #30363d; padding: 8px;"
         )
         layout.addWidget(self._chat_display, stretch=1)
 
@@ -282,7 +282,7 @@ class KnowledgeAIDialog(QDialog):
         self._input = QLineEdit()
         self._input.setPlaceholderText("Type your answer and press Enter...")
         self._input.setStyleSheet(
-            "background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px;"
+            " color: #c9d1d9; border: 1px solid #30363d; padding: 6px;"
         )
         self._input.returnPressed.connect(self._on_send)
         input_layout.addWidget(self._input, stretch=1)
@@ -302,14 +302,14 @@ class KnowledgeAIDialog(QDialog):
         btn_layout.addWidget(btn_save)
 
         btn_cancel = QPushButton("Close")
-        btn_cancel.setStyleSheet("background-color: #21262d; color: #c9d1d9; padding: 6px 16px;")
+        btn_cancel.setStyleSheet(" color: #c9d1d9; padding: 6px 16px;")
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
 
         layout.addLayout(btn_layout)
 
     def _apply_dark_theme(self):
-        self.setStyleSheet("background-color: #161b22; color: #c9d1d9;")
+        self.setStyleSheet(" color: #c9d1d9;")
 
     def _start_conversation(self):
         msg = self._conversation.start()

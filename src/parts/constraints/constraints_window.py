@@ -103,7 +103,7 @@ class ModuleCard(QFrame):
         super().__init__(parent)
         self._module = module
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet("background-color: #161b22; border: 1px solid #30363d; border-radius: 6px;")
+        self.setStyleSheet(" border: 1px solid #30363d; border-radius: 6px;")
         self._setup_ui()
 
     def _setup_ui(self):
@@ -295,8 +295,8 @@ class ConstraintsWindow(QMainWindow):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QMainWindow { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QMainWindow {  }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }
@@ -306,7 +306,7 @@ class ConstraintsWindow(QMainWindow):
             QListWidget { border: 1px solid #30363d; }
             QListWidget::item:selected { background-color: #1f6feb; color: white; }
             QFrame { border: 1px solid #30363d; }
-            QMenu { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; }
+            QMenu {  color: #c9d1d9; border: 1px solid #30363d; }
             QMenu::item { padding: 4px 20px; }
             QMenu::item:selected { background-color: #1f6feb; color: white; }
         """)

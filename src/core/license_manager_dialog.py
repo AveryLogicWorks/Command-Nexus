@@ -109,10 +109,10 @@ class LicenseManagerDialog(QDialog):
             "  • Basic — $30/mo, premium capabilities, 5 per AI\n"
             "  • Pro — $50/mo, business capabilities, 8 per AI\n"
             "  • Business — $80/mo, enterprise capabilities, unlimited per AI\n"
-            "  • All-Rounder — $39.99, everything unlocked, unlimited\n\n"
+            "  • Enterprise — Contact for Pricing, custom deployment\n\n"
             "Questions? Contact support@averylogicworks.com"
         )
-        upgrade_text.setStyleSheet("background-color: #161b22; color: #8b949e; border: 1px solid #30363d;")
+        upgrade_text.setStyleSheet(" color: #8b949e; border: 1px solid #30363d;")
         upgrade_text.setMaximumHeight(200)
         upgrade_layout.addWidget(upgrade_text)
         layout.addWidget(upgrade_group)
@@ -122,7 +122,7 @@ class LicenseManagerDialog(QDialog):
         btn_row.addStretch()
         close_btn = QPushButton("Close")
         close_btn.setStyleSheet(
-            "background-color: #21262d; color: #c9d1d9; padding: 8px 24px; font-weight: bold;"
+            " color: #c9d1d9; padding: 8px 24px; font-weight: bold;"
         )
         close_btn.clicked.connect(self.accept)
         btn_row.addWidget(close_btn)
@@ -170,6 +170,14 @@ class LicenseManagerDialog(QDialog):
         self._key_input.blockSignals(False)
 
     def _on_activate(self):
+        try:
+            self._do_activate()
+        except Exception as e:
+            self._result_label.setText(
+                f"<span style='color: #f85149;'>Error during activation: {e}</span>"
+            )
+
+    def _do_activate(self):
         key = self._key_input.text().strip()
         if not key:
             self._result_label.setText(
@@ -225,8 +233,8 @@ class LicenseManagerDialog(QDialog):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QDialog { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QDialog {  }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }

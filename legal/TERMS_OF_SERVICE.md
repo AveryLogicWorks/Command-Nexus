@@ -2,7 +2,7 @@
 
 **Effective Date:** June 15, 2026  
 **Last Updated:** June 15, 2026  
-**Company:** Pantheon Forge LLC ("Company," "we," "us," or "our")  
+**Company:** Avery Logic Works ("Company," "we," "us," or "our")  
 **Software:** Command Nexus™ Desktop Application ("Software," "Application," or "Service")
 
 ---
@@ -11,7 +11,7 @@
 
 **BY DOWNLOADING, INSTALLING, ACTIVATING, OR USING COMMAND NEXUS, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS OF SERVICE ("TERMS").** If you do not agree to these Terms in their entirety, do not install, access, or use the Software.
 
-These Terms constitute a legally binding agreement between you ("User," "you," or "your") and Pantheon Forge LLC regarding your use of the Software. If you are using the Software on behalf of an organization, you represent and warrant that you have authority to bind that organization to these Terms.
+These Terms constitute a legally binding agreement between you ("User," "you," or "your") and Avery Logic Works regarding your use of the Software. If you are using the Software on behalf of an organization, you represent and warrant that you have authority to bind that organization to these Terms.
 
 ## 2. DEFINITIONS
 
@@ -27,7 +27,7 @@ These Terms constitute a legally binding agreement between you ("User," "you," o
 ## 3. LICENSE GRANT AND SCOPE
 
 ### 3.1 Limited License
-Subject to your compliance with these Terms and payment of applicable fees, Pantheon Forge LLC grants you a limited, non-exclusive, non-transferable, non-sublicensable, revocable license to:
+Subject to your compliance with these Terms and payment of applicable fees, Avery Logic Works grants you a limited, non-exclusive, non-transferable, non-sublicensable, revocable license to:
 - Download and install the Software on authorized devices
 - Create and configure AI Agents within your subscription limits
 - Use the Software for your internal business or personal purposes
@@ -38,11 +38,13 @@ Your usage rights are determined by your subscription tier:
 
 | Tier | AI Agents | Monthly Fee | Key Features |
 |------|-----------|-------------|--------------|
-| **Trial** | 1 | Free (15 days) | Basic features, no outbound actions |
-| **Starter** | 2 | $20/month | Standard features, limited actions |
-| **Pro** | 4 | $30/month ($324/year) | Full features, priority support |
-| **Business** | 5 | $50/month ($552/year) | Team features, enhanced governance |
-| **Unlimited** | Unlimited | $80/month ($900/year) | All features, unlimited agents |
+| **Trial** | 1 | $10 (15 days, one-time) | Basic features, no outbound actions |
+| **Starter (Basic)** | 2 | $30/month | Standard features, up to 5 capabilities per AI |
+| **Pro** | 4 | $50/month ($552/year) | Full features, up to 8 capabilities per AI, priority support |
+| **Business** | 5 | $80/month ($900/year) | Team features, unlimited capabilities per AI, enhanced governance |
+| **Enterprise** | Unlimited | Contact for Pricing | All features, unlimited agents, custom integrations |
+
+**Individual Capability Add-ons:** Any premium capability can be purchased individually as a monthly or yearly add-on subscription without upgrading to a higher tier. See the Upgrades panel in-app for current pricing.
 
 **Founder Keys:** Users with Founder keys may have additional privileges as specified at time of issuance.
 
@@ -150,7 +152,7 @@ Upon license voidance:
 ## 6. INTELLECTUAL PROPERTY RIGHTS
 
 ### 6.1 Company Ownership
-Pantheon Forge LLC retains all right, title, and interest in and to the Software, including:
+Avery Logic Works retains all right, title, and interest in and to the Software, including:
 - All source code, object code, algorithms, and methodologies
 - All patents, copyrights, trademarks, trade secrets, and other intellectual property
 - All documentation, user interfaces, designs, and trade dress
@@ -163,7 +165,7 @@ Pantheon Forge LLC retains all right, title, and interest in and to the Software
 - The Company does not claim ownership of your proprietary business data or information
 
 ### 6.3 License Grant to Company
-You grant Pantheon Forge LLC a non-exclusive, worldwide, royalty-free license to:
+You grant Avery Logic Works a non-exclusive, worldwide, royalty-free license to:
 - Use, reproduce, and modify your Input as necessary to provide the Software services
 - Use De-identified Data (as defined below) for product improvement and research
 - Use your User Content to enforce these Terms and prevent abuse
@@ -190,7 +192,7 @@ You acknowledge and agree that:
 ### 7.2 GENERAL DISCLAIMER OF WARRANTIES
 **THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND.**
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PANTHEON FORGE LLC EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING BUT NOT LIMITED TO:
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, AVERY LOGIC WORKS EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING BUT NOT LIMITED TO:
 - IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT
 - WARRANTIES THAT THE SOFTWARE WILL BE UNINTERRUPTED, TIMELY, SECURE, OR ERROR-FREE
 - WARRANTIES REGARDING THE ACCURACY, RELIABILITY, OR COMPLETENESS OF ANY OUTPUT
@@ -207,7 +209,7 @@ From time to time, we may offer beta, preview, or early-access features ("Beta F
 ## 8. LIMITATION OF LIABILITY
 
 ### 8.1 Exclusion of Consequential Damages
-**TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PANTHEON FORGE LLC SHALL NOT BE LIABLE FOR ANY:**
+**TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, AVERY LOGIC WORKS SHALL NOT BE LIABLE FOR ANY:**
 - INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES
 - LOSS OF PROFITS, REVENUE, DATA, BUSINESS, OR ANTICIPATED SAVINGS
 - LOSS OF GOODWILL OR REPUTATION
@@ -217,7 +219,7 @@ From time to time, we may offer beta, preview, or early-access features ("Beta F
 **THIS LIMITATION APPLIES EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.**
 
 ### 8.2 Liability Cap
-**EXCEPT AS PROHIBITED BY LAW, THE TOTAL AGGREGATE LIABILITY OF PANTHEON FORGE LLC ARISING OUT OF OR RELATED TO THESE TERMS OR YOUR USE OF THE SOFTWARE SHALL NOT EXCEED THE GREATER OF:**
+**EXCEPT AS PROHIBITED BY LAW, THE TOTAL AGGREGATE LIABILITY OF AVERY LOGIC WORKS ARISING OUT OF OR RELATED TO THESE TERMS OR YOUR USE OF THE SOFTWARE SHALL NOT EXCEED THE GREATER OF:**
 - THE AMOUNT YOU PAID US FOR THE SOFTWARE DURING THE TWELVE (12) MONTH PERIOD IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO LIABILITY, OR
 - ONE HUNDRED UNITED STATES DOLLARS ($100.00)
 
@@ -231,7 +233,7 @@ The limitations in Sections 8.1 and 8.2 do not apply to:
 ## 9. INDEMNIFICATION
 
 ### 9.1 Your Indemnification Obligation
-**You agree to indemnify, defend, and hold harmless Pantheon Forge LLC and its officers, directors, employees, agents, successors, and assigns from and against any and all claims, liabilities, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to:**
+**You agree to indemnify, defend, and hold harmless Avery Logic Works and its officers, directors, employees, agents, successors, and assigns from and against any and all claims, liabilities, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to:**
 - Your use of the Software in violation of these Terms
 - Your violation of any applicable law or regulation
 - Your Input or Output, including any claim that your User Content infringes third-party rights
@@ -300,13 +302,13 @@ Your continued use of the Software after the effective date of any changes const
 ## 13. GENERAL PROVISIONS
 
 ### 13.1 Entire Agreement
-These Terms, together with any additional agreements or policies referenced herein, constitute the entire agreement between you and Pantheon Forge LLC regarding the Software and supersede all prior agreements, understandings, and communications.
+These Terms, together with any additional agreements or policies referenced herein, constitute the entire agreement between you and Avery Logic Works regarding the Software and supersede all prior agreements, understandings, and communications.
 
 ### 13.2 Severability
 If any provision of these Terms is held invalid, illegal, or unenforceable by a court of competent jurisdiction, such provision shall be modified to the minimum extent necessary to make it valid and enforceable, or if modification is not possible, severed from these Terms. All remaining provisions shall remain in full force and effect.
 
 ### 13.3 Waiver
-Our failure to enforce any right or provision of these Terms shall not constitute a waiver of such right or provision. Any waiver must be in writing and signed by an authorized representative of Pantheon Forge LLC.
+Our failure to enforce any right or provision of these Terms shall not constitute a waiver of such right or provision. Any waiver must be in writing and signed by an authorized representative of Avery Logic Works.
 
 ### 13.4 Assignment
 You may not assign or transfer these Terms or your rights under them without our prior written consent. We may assign these Terms without restriction. Any attempted assignment in violation of this section is void.
@@ -327,12 +329,12 @@ You consent to receive electronic communications from us and agree that all agre
 
 If you have questions about these Terms, please contact us:
 
-**Legal Inquiries:** legal@pantheonforge.io  
-**Support:** support@pantheonforge.io  
-**Address:** Pantheon Forge LLC, Delaware, USA
+**Legal Inquiries:** legal@averylogicworks.com  
+**Support:** support@averylogicworks.com  
+**Address:** Avery Logic Works, USA
 
 ---
 
 **BY USING COMMAND NEXUS, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS OF SERVICE.**
 
-© 2026 Pantheon Forge LLC. All rights reserved.
+© 2026 Avery Logic Works. All rights reserved.

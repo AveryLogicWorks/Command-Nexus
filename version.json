@@ -1,0 +1,6 @@
+{
+  "latest_version": "0.2.0",
+  "download_url": "https://averylogicworks.com/command-nexus/download",
+  "release_notes": "v0.2.0 — Enterprise Orchestrator + Enhanced Business Workflows\n\nNEW: Enterprise Orchestrator capability for cross-department coordination\n  - HR, Compliance, Policy Review, Operations, Analytics, Executive Brief\n  - Company Confidential classification with executive approval gates\n  - Audit trail references in all outputs\n\nENHANCED: Business Workflow with 10 sub-workflows\n  - Sales, Marketing, Finance, Legal, Operations, HR Draft\n  - SOP, Checklist, Support Draft, Handoff, Automation Plan\n  - Auto-detection of sub-workflow from chat messages\n  - Department selector in dialog\n  - Runtime integration with sub-workflow-specific prompts\n\nNEW: Update Checker — automatic notification when new versions are available\n\nIMPROVED: Intent classification — better separation of Enterprise vs Business\n  - Enterprise = cross-department, executive-level, company confidential\n  - Business = single-department, manager-level approval",
+  "critical": false
+}

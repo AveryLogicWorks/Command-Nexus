@@ -1,0 +1,25 @@
+=== COMMAND NEXUS - TRIAL (15 DAYS, 1 AI) KEYS ===
+Generated: 2026-06-27 16:27
+Tier: Trial (15 days, 1 AI)
+Duration: 15 days
+Total keys: 2
+
+--- READY TO DISTRIBUTE ---
+
+Key 01: TR00-6A54-22CC-BD15-8913-46E9-EF74-04C8-E750
+  Raw:  TR006A5422CCBD15891346E9EF7404C8E750
+  Expires: 2026-07-12
+
+Key 02: TR00-6A54-22CC-77CC-D835-AD3F-3096-950C-9F54
+  Raw:  TR006A5422CC77CCD835AD3F3096950C9F54
+  Expires: 2026-07-12
+
+=== HOW TO USE ===
+1. Give one key to each person
+2. They download CommandNexus.exe from averylogicworks.com
+3. On first launch, they paste the key to activate
+4. License valid for 15 days from activation
+
+=== SECURITY NOTE ===
+Each key is HMAC-signed and cannot be forged.
+Keep this file secure. Do not share publicly.

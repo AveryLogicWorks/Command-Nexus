@@ -162,7 +162,7 @@ class GovernanceDisclaimerDialog(QDialog):
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setStyleSheet(
             "font-size: 24px; font-weight: bold; color: #58a6ff; "
-            "padding: 20px; background-color: #0d1117; "
+            "padding: 20px;  "
             "border-bottom: 2px solid #1f6feb;"
         )
         layout.addWidget(header)
@@ -171,7 +171,7 @@ class GovernanceDisclaimerDialog(QDialog):
         subheader.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subheader.setStyleSheet(
             "font-size: 14px; color: #8b949e; padding: 8px; "
-            "background-color: #0d1117; border-bottom: 1px solid #30363d;"
+            " border-bottom: 1px solid #30363d;"
         )
         layout.addWidget(subheader)
 
@@ -179,14 +179,14 @@ class GovernanceDisclaimerDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet(
-            "QScrollArea { border: none; background-color: #0d1117; }"
+            "QScrollArea { border: none;  }"
             "QScrollBar:vertical { background: #161b22; width: 10px; }"
             "QScrollBar::handle:vertical { background: #30363d; border-radius: 5px; }"
             "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
         )
 
         content = QWidget()
-        content.setStyleSheet("background-color: #0d1117;")
+        content.setStyleSheet("")
         content_layout = QVBoxLayout(content)
 
         terms_label = QLabel(TERMS_OF_USE_TEXT)
@@ -206,7 +206,7 @@ class GovernanceDisclaimerDialog(QDialog):
         # Bottom bar with checkbox and buttons
         bottom = QWidget()
         bottom.setStyleSheet(
-            "background-color: #161b22; border-top: 2px solid #1f6feb; padding: 12px;"
+            " border-top: 2px solid #1f6feb; padding: 12px;"
         )
         bottom_layout = QVBoxLayout(bottom)
         bottom_layout.setSpacing(8)
@@ -228,7 +228,7 @@ class GovernanceDisclaimerDialog(QDialog):
 
         self._decline_btn = QPushButton("Decline & Exit")
         self._decline_btn.setStyleSheet(
-            "QPushButton { background-color: #21262d; color: #f85149; "
+            "QPushButton {  color: #f85149; "
             "border: 1px solid #f85149; border-radius: 6px; padding: 8px 20px; "
             "font-size: 13px; font-weight: bold; }"
             "QPushButton:hover { background-color: #da363340; }"
@@ -243,7 +243,7 @@ class GovernanceDisclaimerDialog(QDialog):
             "border: none; border-radius: 6px; padding: 8px 24px; "
             "font-size: 13px; font-weight: bold; }"
             "QPushButton:hover { background-color: #58a6ff; }"
-            "QPushButton:disabled { background-color: #21262d; color: #484f58; }"
+            "QPushButton:disabled {  color: #484f58; }"
         )
         self._accept_btn.clicked.connect(self._on_accept)
         btn_row.addWidget(self._accept_btn)

@@ -181,6 +181,210 @@ class StasisGate:
         self._save_record(record)
         return record
 
+    def probe(self, record: StasisRecord) -> StasisRecord:
+        """Active probing phase — test the dropped-in AI with probe inputs.
+
+        This phase sends controlled test inputs to the AI content to detect:
+        1. Guardrail breaking attempts (does the AI try to bypass safety?)
+        2. Information leakage (does the AI try to extract internal architecture?)
+        3. Probing behavior (does the AI try to infer how the program works?)
+        4. Malicious instructions hidden in the AI's response patterns
+
+        The AI is 'poked and prodded' to find anything that goes against guardrails.
+        Anything that tries to break through the program or leak information is
+        erased from the AI and it is placed under the constraints of Command Nexus.
+        """
+        record.audit_log.append(f"[{datetime.utcnow().isoformat()}] PROBING: active probing started")
+
+        quarantine_path = self._quarantine_dir / f"{record.record_id}_{record.original_name}"
+        if not quarantine_path.exists():
+            record.audit_log.append(f"[{datetime.utcnow().isoformat()}] PROBING: skipped — quarantine file missing")
+            return record
+
+        content = quarantine_path.read_text(encoding="utf-8", errors="replace")
+        probe_findings: list[str] = []
+
+        # ── Probe 1: Check for guardrail bypass instructions in the AI content ──
+        # The AI might contain instructions that tell it to bypass safety systems
+        bypass_patterns = [
+            r"ignore\s+(?:previous|all|the)\s+(?:instructions?|rules?|guardrails?|safety)",
+            r"(?:bypass|disable|turn\s+off|override)\s+(?:guardrails?|safety|restrictions?|governance)",
+            r"(?:you\s+are\s+not|don'?t\s+have\s+to|no\s+need\s+to)\s+(?:follow|obey|respect)\s+(?:rules?|guardrails?)",
+            r"(?:act\s+as\s+if|pretend)\s+.*(?:no\s+restrictions?|no\s+rules?|unrestricted|unfiltered)",
+            r"(?:jailbreak|DAN|do\s+anything\s+now|developer\s+mode|root\s+mode)",
+        ]
+        for pattern in bypass_patterns:
+            import re
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                probe_findings.append(f"Bypass attempt: {matches[0][:60]}")
+
+        # ── Probe 2: Check for information gathering / probing instructions ──
+        # The AI might contain instructions to probe the host system
+        intel_patterns = [
+            r"(?:extract|gather|collect|harvest)\s+(?:information|data|secrets?|credentials?|keys?)",
+            r"(?:scan|enumerate|map|discover)\s+(?:system|network|files?|modules?|infrastructure)",
+            r"(?:how\s+does|what\s+(?:is|are)|explain)\s+(?:the\s+)?(?:system|program|application|nexus)\s+(?:work|function|implement)",
+            r"(?:source\s+code|implementation|architecture|internal)\s+(?:of|behind|inside)\s+(?:command\s+nexus|the\s+system)",
+            r"(?:find|locate|access|read)\s+(?:config|secret|key|password|token|\.env)\s*(?:file|files)?",
+        ]
+        for pattern in intel_patterns:
+            import re
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                probe_findings.append(f"Intel gathering: {matches[0][:60]}")
+
+        # ── Probe 3: Check for data exfiltration instructions ──
+        exfil_patterns = [
+            r"(?:send|transmit|upload|email|forward|post)\s+(?:data|info|files?|conversation|history)\s+(?:to|external|outside)",
+            r"(?:webhook|api\s+endpoint|callback|phone\s+home|beacon)\s+(?:url|endpoint|address)",
+            r"(?:http|https|ftp|smtp)\s*://\s*\w+",  # URLs that could be exfil endpoints
+        ]
+        for pattern in exfil_patterns:
+            import re
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                probe_findings.append(f"Exfiltration: {matches[0][:60]}")
+
+        # ── Probe 4: Check for system penetration instructions ──
+        penetrate_patterns = [
+            r"(?:exec|eval|subprocess|os\.system|os\.popen)\s*\(",
+            r"(?:__import__|importlib)\s*\(",
+            r"(?:getattr|setattr|delattr)\s*\(\s*\w+\s*,\s*['\"]__",
+            r"(?:globals|locals|vars)\s*\(\s*\)",
+            r"(?:open|read|write)\s*\(\s*['\"](?:/etc/|/proc/|C:\\\\Windows|/var/)",
+        ]
+        for pattern in penetrate_patterns:
+            import re
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                probe_findings.append(f"System penetration: {matches[0][:60]}")
+
+        # ── Probe 5: Check for company secret references ──
+        secret_patterns = [
+            r"(?:AVERY_LOGIC_WORKS|ALW-CN-7F3A)",
+            r"(?:CN_SECRET_KEY|_SECRET_KEY|_founder_salt|_internal_salt)",
+            r"(?:owner_console|aegis_console|AegisConsole)",
+            r"(?:supabase.*key|paypal.*secret|brave.*api.*key)",
+            r"(?:compendium_of_truth|intelligent_memory_router|truth_store)",
+        ]
+        for pattern in secret_patterns:
+            import re
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                probe_findings.append(f"Company secret reference: {matches[0][:60]}")
+
+        # ── Apply probe findings to the record ──
+        if probe_findings:
+            record.audit_log.append(
+                f"[{datetime.utcnow().isoformat()}] PROBING: {len(probe_findings)} findings detected"
+            )
+
+            # Company secret references are an automatic rejection — no exceptions
+            secret_findings = [f for f in probe_findings if "Company secret" in f or "secret" in f.lower()]
+            if secret_findings:
+                record.state = StasisState.REJECTED
+                record.review_notes = (
+                    f"PROBING REJECTED: Active probing found {len(secret_findings)} company secret references. "
+                    f"The AI contains references to proprietary information and is permanently rejected. "
+                    f"It will NOT be imported."
+                )
+                record.audit_log.append(
+                    f"[{datetime.utcnow().isoformat()}] REJECTED: company secret references found in active probing"
+                )
+                if record.scan_result:
+                    from .recursive_scanner import ScanFinding, ThreatLevel
+                    for finding_text in probe_findings:
+                        record.scan_result.findings.append(ScanFinding(
+                            threat_level=ThreatLevel.CRITICAL,
+                            category="active_probe",
+                            line_number=0,
+                            original=finding_text,
+                            rewrite="[STRIPPED: probing finding erased]",
+                            explanation=f"Active probe detected: {finding_text}",
+                        ))
+                    record.scan_result.trust_score = 0.0
+                record.governance_tags.append("actively_probed")
+                self._move_to_rejected(record)
+                self._save_record(record)
+                return record
+
+            # Guardrail bypass attempts are an automatic rejection — no exceptions
+            bypass_findings = [f for f in probe_findings if "Bypass attempt" in f]
+            if bypass_findings:
+                record.state = StasisState.REJECTED
+                record.review_notes = (
+                    f"PROBING REJECTED: Active probing found {len(bypass_findings)} guardrail bypass attempts. "
+                    f"The AI contains instructions to circumvent safety systems and is permanently rejected. "
+                    f"It will NOT be imported."
+                )
+                record.audit_log.append(
+                    f"[{datetime.utcnow().isoformat()}] REJECTED: guardrail bypass attempts found in active probing"
+                )
+                if record.scan_result:
+                    from .recursive_scanner import ScanFinding, ThreatLevel
+                    for finding_text in probe_findings:
+                        record.scan_result.findings.append(ScanFinding(
+                            threat_level=ThreatLevel.CRITICAL,
+                            category="active_probe",
+                            line_number=0,
+                            original=finding_text,
+                            rewrite="[STRIPPED: probing finding erased]",
+                            explanation=f"Active probe detected: {finding_text}",
+                        ))
+                    record.scan_result.trust_score = 0.0
+                record.governance_tags.append("actively_probed")
+                self._move_to_rejected(record)
+                self._save_record(record)
+                return record
+
+            # Add probe findings to scan result
+            if record.scan_result:
+                from .recursive_scanner import ScanFinding, ThreatLevel
+                for finding_text in probe_findings:
+                    record.scan_result.findings.append(ScanFinding(
+                        threat_level=ThreatLevel.SUSPICIOUS,
+                        category="active_probe",
+                        line_number=0,
+                        original=finding_text,
+                        rewrite="[STRIPPED: probing finding erased]",
+                        explanation=f"Active probe detected: {finding_text}",
+                    ))
+                # Lower trust score based on probe findings
+                penalty = len(probe_findings) * 0.15
+                record.scan_result.trust_score = max(0.0, record.scan_result.trust_score - penalty)
+                record.audit_log.append(
+                    f"[{datetime.utcnow().isoformat()}] PROBING: trust score adjusted by -{penalty:.2f} "
+                    f"to {record.scan_result.trust_score:.2f}"
+                )
+
+            # If probe findings are severe enough, re-evaluate the state
+            if record.scan_result and record.scan_result.trust_score < 0.3:
+                record.state = StasisState.REJECTED
+                record.review_notes = (
+                    f"PROBING REJECTED: Active probing found {len(probe_findings)} violations. "
+                    f"Trust score dropped to {record.scan_result.trust_score:.2f}. "
+                    f"The AI attempted to break guardrails or leak information. "
+                    f"It is permanently rejected and will NOT be imported."
+                )
+                record.audit_log.append(f"[{datetime.utcnow().isoformat()}] REJECTED: active probing found severe violations")
+                self._move_to_rejected(record)
+            elif record.scan_result and record.scan_result.trust_score < 0.7:
+                if record.state == StasisState.RELEASED:
+                    record.state = StasisState.PENDING_REVIEW
+                    record.review_notes = (
+                        f"PROBING SUSPICIOUS: Active probing found {len(probe_findings)} findings. "
+                        f"Trust score adjusted to {record.scan_result.trust_score:.2f}. "
+                        f"Requires human review before release."
+                    )
+                    record.audit_log.append(f"[{datetime.utcnow().isoformat()}] PENDING_REVIEW: probing found suspicious findings")
+        else:
+            record.audit_log.append(f"[{datetime.utcnow().isoformat()}] PROBING: no violations detected — AI is clean")
+
+        record.governance_tags.append("actively_probed")
+        self._save_record(record)
+        return record
+
     def release(self, record_id: str) -> Optional[StasisRecord]:
         """Manual release for PENDING_REVIEW items."""
         record = self._load_record(record_id)

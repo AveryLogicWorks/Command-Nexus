@@ -136,7 +136,7 @@ def _surface_description(ability: str) -> str:
     if is_real(intent):
         return f"{ability} — real engine wired in this build"
     if is_partial(intent):
-        return f"{ability} — local scaffold works; full output needs a model or optional API"
+        return f"{ability} — local engine ready; built-in intelligence active; optional API for enhanced output"
     if is_paused(intent):
         return f"{ability} — not connected in this build; requests will be paused instead of faked"
     return f"{ability} — capability status not yet mapped"
@@ -181,7 +181,7 @@ def _generate_surfaces(abilities: list[str]) -> dict[str, str]:
             if status == ImplementationStatus.PAUSED:
                 desc = f"{desc} (NOT CONNECTED in this build)"
             elif status == ImplementationStatus.PARTIAL:
-                desc = f"{desc} (PARTIAL — local scaffold works, model/API optional)"
+                desc = f"{desc} (PARTIAL — local engine ready, model/API optional)"
             elif status == ImplementationStatus.REAL:
                 desc = f"{desc} (REAL)"
         else:
@@ -242,6 +242,22 @@ def _use_case_context(use_case: UseCaseClass) -> list[str]:
             "Enterprise context; compliance/audit required.",
             "Follow approval hierarchy; handle data with least privilege.",
             "Never bypass governance; log actions with rationale.",
+        ]
+    if use_case == UseCaseClass.FINANCIAL_GAINER:
+        return [
+            "Financial gain context; all output is advisory and educational.",
+            "Never execute trades, make transactions, or connect to financial accounts.",
+            "Always show disclaimer: no income is guaranteed and investments carry risk.",
+            "Present opportunities with realistic effort, cost, and time expectations.",
+            "Flag scams, predatory platforms, and high-risk schemes clearly.",
+        ]
+    if use_case == UseCaseClass.MEMORY_SAVER:
+        return [
+            "Memory and recording context; record silently without interrupting workflow.",
+            "Never store sensitive data (passwords, credentials) in plaintext.",
+            "All recording, search, and replay is local; export requires approval.",
+            "Maintain audit trails for all AI interactions and user decisions.",
+            "Allow users to delete or clear any recorded data on demand.",
         ]
     if use_case == UseCaseClass.ALL_ROUNDER:
         return [
@@ -316,7 +332,7 @@ def _ability_doctrine(ab: str, use_case: UseCaseClass) -> list[str]:
             "Safe scope: propose patches, pseudo-code, and plans; mark risks.",
         ]
     else:
-        base = ["Purpose: placeholder; backend not connected yet."]
+        base = ["Purpose: placeholder; local intelligence mode."]
     # Tailor minor use-case note
     if use_case == UseCaseClass.BUSINESS:
         base.append("Business tone: clear, helpful, brand-safe; do not auto-publish.")
@@ -324,6 +340,10 @@ def _ability_doctrine(ab: str, use_case: UseCaseClass) -> list[str]:
         base.append("Educational tone: supportive, avoids giving final graded answers.")
     elif use_case == UseCaseClass.ENTERPRISE:
         base.append("Enterprise: keep auditability; reference approval rules.")
+    elif use_case == UseCaseClass.FINANCIAL_GAINER:
+        base.append("Financial tone: advisory only; mandatory disclaimer; never guarantee income.")
+    elif use_case == UseCaseClass.MEMORY_SAVER:
+        base.append("Memory tone: silent recording; local-only; never expose sensitive data.")
     return base
 
 
@@ -665,6 +685,10 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         allowed.append("Beginner-friendly explanations; avoid final graded answers; guide learning")
     if use_case == UseCaseClass.ENTERPRISE:
         allowed.append("Enterprise compliance: audit-friendly outputs; least-privilege handling")
+    if use_case == UseCaseClass.FINANCIAL_GAINER:
+        allowed.append("Financial advisory only; never execute trades or transactions; mandatory disclaimer")
+    if use_case == UseCaseClass.MEMORY_SAVER:
+        allowed.append("Silent recording; local-only storage; export requires approval; never store credentials in plaintext")
 
     lines: list[str] = []
     lines.append(f"# Knowledge / Intelligence Profile for {name}")
@@ -757,8 +781,12 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         lines.append("- Prioritize privacy and consent; ask before changes.")
     if use_case == UseCaseClass.ENTERPRISE:
         lines.append("- Maintain auditability; reference approval rules in outputs.")
+    if use_case == UseCaseClass.FINANCIAL_GAINER:
+        lines.append("- Always include disclaimer: no income guaranteed, investments carry risk. Present opportunities honestly with realistic expectations.")
+    if use_case == UseCaseClass.MEMORY_SAVER:
+        lines.append("- Record silently; never interrupt workflow. Never expose sensitive data in plaintext. All data is local and user-controlled.")
     if not any(x in guardrails for x in ["Keep responses beginner-friendly", "Keep responses concise", "Avoid specific technical jargon unless asked", "Never use emojis or informal formatting", "Always summarize long outputs before detail", "Prefer step-by-step explanations", "Use inclusive and neutral language", "Always explain reasoning before giving answers", "Respect time-of-day context (quiet hours awareness)"]):
-        if use_case not in {UseCaseClass.BUSINESS, UseCaseClass.EDUCATIONAL, UseCaseClass.ENTERPRISE, UseCaseClass.INDIVIDUAL}:
+        if use_case not in {UseCaseClass.BUSINESS, UseCaseClass.EDUCATIONAL, UseCaseClass.ENTERPRISE, UseCaseClass.INDIVIDUAL, UseCaseClass.FINANCIAL_GAINER, UseCaseClass.MEMORY_SAVER}:
             lines.append("- Default style: clear, transparent, asks when unsure.")
     lines.append("")
 
@@ -813,7 +841,7 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         lines.append(f"### {ab}")
         for bullet in _ability_doctrine(ab, use_case):
             lines.append(f"- {bullet}")
-        surf = (ability_surfaces or surfaces).get(ab, (ability_surfaces or surfaces).get(c, "Placeholder surface; backend not connected"))
+        surf = (ability_surfaces or surfaces).get(ab, (ability_surfaces or surfaces).get(c, "Placeholder surface; local intelligence mode"))
         lines.append(f"- Surface: {surf}")
         lines.append("- Activation: capability attachment registry; governance gate enforced.")
         for detail in describe_capability_for_book(ab):
@@ -848,8 +876,8 @@ def _book_content(ai_id: str, name: str, use_case: UseCaseClass, purpose: str, a
         lines.append(f"- {action['label']} [{action['mode']} / approval: {action['approval']}]: {action['description']}")
     lines.append("")
 
-    lines.append("## Pricing / Tier Scaffold")
-    lines.append("This is config-friendly scaffold only; billing is not implemented here.")
+    lines.append("## Pricing / Tier Configuration")
+    lines.append("Tier configuration for capability access levels.")
     for tier, cfg in TIER_SCAFFOLD.items():
         lines.append(f"### {tier}")
         for k, v in cfg.items():
@@ -1027,6 +1055,8 @@ from ...core.translator import NexusIntentTranslator
 from ...core.settings_manager import SettingsManager
 from ...core.stasis_gate import StasisGate, StasisState
 from ...core.recursive_scanner import RecursiveScanner, ScanResult, ThreatLevel
+from ...core.export_review import ExportReviewer, ExportDecision
+from ...core.governance_sanitizer import sanitize_input as _sanitize_input, ETHICAL_USE_BANNER as _ETHICAL_BANNER
 from ...core.capability_registry import canonical_intent, capability_status, is_real, is_partial, is_paused, ImplementationStatus
 from .forge_models import AIUnit, AISource
 from .capability_book_engine import generate_full_book_for_ai
@@ -1037,6 +1067,7 @@ from .capability_actions import (
     get_available_actions_for_ai,
     get_actions_for_ai,
     get_combined_capability_workflows,
+    # Core capability dialogs
     ChatCapabilityDialog,
     CodingCapabilityDialog,
     ResearchCapabilityDialog,
@@ -1049,7 +1080,59 @@ from .capability_actions import (
     TutorCapabilityDialog,
     BusinessWorkflowCapabilityDialog,
     # HephaestusRelayCapabilityDialog — reserved for future Hephaestus integration
+    # Phase 1 — Financial Gainer family
+    FinancialGainerDialog,
+    CryptoScoutDialog,
+    AffiliateStrategistDialog,
+    ClickCommissionDialog,
+    SalesFunnelDialog,
+    SideHustleScoutDialog,
+    SkillMonetizerDialog,
+    InvestmentResearcherDialog,
+    ROICalculatorDialog,
+    MarketGapFinderDialog,
+    NegotiationCoachDialog,
+    # Phase 2 — Gaming
+    GameCompanionDialog,
+    # Phase 3 — Data & Development
+    DataAnalystDialog,
+    CodeReviewerDialog,
+    SecurityAuditorDialog,
+    MeetingFacilitatorDialog,
+    # Phase 4 — Memory Saver family
+    MemoryRecorderDialog,
+    SessionReplayDialog,
+    SmartRecallDialog,
+    DecisionTrackerDialog,
+    KnowledgeArchiveDialog,
+    HabitTrackerDialog,
+    ProgressJournalDialog,
+    ContextKeeperDialog,
+    AuditTrailBuilderDialog,
+    # Phase 5 — Productivity & Intelligence
+    ActivityWatcherDialog,
+    TeamOrchestratorDialog,
+    MemoryBridgeDialog,
+    VisualCanvasDialog,
+    APIIntegratorDialog,
+    KnowledgeBaseDialog,
+    EmailAutomationDialog,
+    CalendarManagerDialog,
+    DocumentGeneratorDialog,
+    TranslationExpertDialog,
+    PresentationBuilderDialog,
+    SpreadsheetWizardDialog,
+    LegalDocumentReviewerDialog,
+    MedicalResearcherDialog,
+    AccessibilityAssistantDialog,
+    FactCheckerDialog,
+    VoiceInterfaceDialog,
+    WorkflowAutomatorDialog,
+    CompetitiveAnalystDialog,
+    LearningPathCreatorDialog,
+    SmartSearchDialog,
 )
+from ...core.capability_disclaimers import show_capability_disclaimer, DIALOG_TO_CAPABILITY as _DIALOG_TO_CAPABILITY
 
 
 # Use-case → capability presets
@@ -1101,8 +1184,30 @@ USE_CASE_OPTIONS: dict = {
         # Premium upgrades
         "Security Auditor", "Code Reviewer", "Team Orchestrator",
         "Data Analyst Pro", "Knowledge Base Builder", "API Integrator",
-        "Workflow Automator", "Medical Researcher", "Legal Assistant",
+        "Workflow Automator", "Medical Researcher", "Legal Document Reviewer",
         "Fact Checker", "Smart Search", "Memory Bridge",
+    ],
+    UseCaseClass.FINANCIAL_GAINER: [
+        "Financial Gainer", "Crypto Scout", "Affiliate Strategist",
+        "Click Commission Tracker", "Sales Funnel Builder",
+        "Side Hustle Scout", "Skill Monetizer", "Investment Researcher",
+        "ROI Calculator", "Market Gap Finder", "Negotiation Coach",
+        "Budget Tracker", "Activity Watcher",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Smart Search", "Data Analyst Pro", "Spreadsheet Wizard",
+        "Document Generator", "Email Automation", "Social Media Manager",
+        "Marketing Generator", "Competitive Analyst", "Financial Analyst",
+    ],
+    UseCaseClass.MEMORY_SAVER: [
+        "Memory Recorder", "Memory Bridge", "Session Replay",
+        "Smart Recall", "Decision Tracker", "Knowledge Archive",
+        "Habit Tracker", "Progress Journal", "Context Keeper",
+        "Audit Trail Builder", "Activity Watcher",
+        "Customer Support AI",  # Available in all use cases
+        # Premium upgrades
+        "Smart Search", "Knowledge Base Builder", "Document Generator",
+        "Notebook", "Archive", "Personal Organizer",
     ],
     UseCaseClass.ALL_ROUNDER: [
         "Chat Companion", "Coding Assistant", "Creative Writer",
@@ -1116,13 +1221,23 @@ USE_CASE_OPTIONS: dict = {
         "Business Intelligence Analyst", "Compliance Auditor",
         "Supply Chain Coordinator", "IT Operations Agent",
         "Legal Document Reviewer", "Multi-Department Orchestrator",
+        # Financial Gainer capabilities
+        "Financial Gainer", "Crypto Scout", "Affiliate Strategist",
+        "Click Commission Tracker", "Sales Funnel Builder",
+        "Side Hustle Scout", "Skill Monetizer", "Investment Researcher",
+        "ROI Calculator", "Market Gap Finder", "Negotiation Coach",
+        # Memory Saver capabilities
+        "Memory Recorder", "Session Replay", "Smart Recall",
+        "Decision Tracker", "Knowledge Archive", "Habit Tracker",
+        "Progress Journal", "Context Keeper", "Audit Trail Builder",
+        "Activity Watcher", "Game Companion",
         "Customer Support AI",  # Available in all use cases
         # All premium upgrades
         "Team Orchestrator", "Memory Bridge", "Visual Canvas", "Data Analyst Pro",
         "Code Reviewer", "API Integrator", "Knowledge Base Builder",
         "Meeting Facilitator", "Email Automation", "Calendar Manager",
         "Document Generator", "Translation Expert", "Presentation Builder",
-        "Spreadsheet Wizard", "Legal Assistant", "Medical Researcher",
+        "Spreadsheet Wizard", "Medical Researcher",
         "Accessibility Assistant", "Fact Checker", "Voice Interface",
         "Workflow Automator", "Security Auditor", "Competitive Analyst",
         "Learning Path Creator", "Smart Search",
@@ -1138,6 +1253,8 @@ USE_CASE_DESCRIPTIONS: dict = {
     UseCaseClass.TASK_READY: "Task-focused AI for document processing, meeting notes, data entry, and workflow automation. Gets work done efficiently.",
     UseCaseClass.BUSINESS: "Professional AI for business operations including sales, support, marketing, HR, and finance. Drafts responses and manages workflows.",
     UseCaseClass.ENTERPRISE: "Enterprise-grade AI with compliance, security auditing, multi-department coordination, and advanced analytics.",
+    UseCaseClass.FINANCIAL_GAINER: "Money-making focused AI with tools for crypto research, affiliate marketing, click commissions, sales funnels, side hustles, skill monetization, investments, ROI analysis, market gaps, and negotiation coaching. All advisory — never makes transactions.",
+    UseCaseClass.MEMORY_SAVER: "Never forget anything. Records sessions, replays past work, searches across all history, tracks decisions and habits, archives knowledge, journals progress, keeps context across sessions, and builds compliance-ready audit trails.",
     UseCaseClass.ALL_ROUNDER: "Versatile AI with access to all capabilities. Great for users who need flexibility across many different types of tasks.",
 }
 
@@ -1148,6 +1265,8 @@ USE_CASE_RECOMMENDED: dict = {
     UseCaseClass.TASK_READY: ["Document Processor", "Meeting Scribe", "Calendar Manager", "Workflow Automator"],
     UseCaseClass.BUSINESS: ["Email Sifter & Responder", "Task / Project Manager", "Meeting Facilitator", "Data Analyst Pro"],
     UseCaseClass.ENTERPRISE: ["Compliance Auditor", "Security Auditor", "Team Orchestrator", "Knowledge Base Builder"],
+    UseCaseClass.FINANCIAL_GAINER: ["Financial Gainer", "Crypto Scout", "Side Hustle Scout", "ROI Calculator"],
+    UseCaseClass.MEMORY_SAVER: ["Memory Recorder", "Smart Recall", "Context Keeper", "Knowledge Archive"],
     UseCaseClass.ALL_ROUNDER: ["Chat Companion", "Research Assistant", "Document Processor", "Task / Project Manager"],
 }
 
@@ -1204,7 +1323,6 @@ CAPABILITY_DESCRIPTIONS: dict[str, str] = {
     "Translation Expert": "Translates text between languages while keeping the meaning, tone, and cultural context intact. Includes glossary support for consistent terminology.",
     "Presentation Builder": "Creates slide decks with AI-generated content, design suggestions, and speaker notes. Helps you build presentations without staring at a blank slide.",
     "Spreadsheet Wizard": "Builds formulas, creates pivot tables, and automates spreadsheet tasks. Explains complex calculations in plain language.",
-    "Legal Assistant": "Reviews contracts and legal documents to highlight key clauses, risks, and unusual terms. Not a replacement for a real lawyer, but saves time on first reviews.",
     "Medical Researcher": "Searches medical literature, checks drug interactions, and summarizes clinical evidence. For research purposes only — not medical advice.",
     "Accessibility Assistant": "Adapts content for different needs — reads text aloud, adjusts display settings, and provides alternative input methods for users with disabilities.",
     "Fact Checker": "Verifies claims against multiple sources, scores credibility, and detects bias. Helps separate facts from misinformation.",
@@ -1221,6 +1339,30 @@ CAPABILITY_DESCRIPTIONS: dict[str, str] = {
     "Plagiarism Checker": "Compares text against web sources and academic databases to detect potential plagiarism. Provides similarity scores and source links.",
     "Form Builder": "Creates custom forms, surveys, and questionnaires from your descriptions. Includes templates for common use cases like feedback, registration, and intake.",
     "Survey Analyzer": "Processes survey responses, identifies trends and patterns, and generates clear summary reports with charts and key insights.",
+    # Financial Gainer capabilities
+    "Financial Gainer": "Explores income opportunities, side hustles, and monetization strategies matched to your skills. Always includes a disclaimer — no income is guaranteed.",
+    "Crypto Scout": "Researches cryptocurrency markets, tracks token trends, and explains crypto concepts. Educational only — never gives financial advice or executes trades.",
+    "Affiliate Strategist": "Finds affiliate marketing programs, suggests products to promote, and drafts review content. Never signs up for programs or posts automatically.",
+    "Click Commission Tracker": "Tracks click-through rates, conversion data, and referral link performance. Helps optimize which links to promote based on real data.",
+    "Sales Funnel Builder": "Designs sales funnels from lead capture to conversion. Drafts landing page copy, email sequences, and upsell paths. You approve everything before it goes live.",
+    "Side Hustle Scout": "Finds side hustle opportunities matched to your skills, schedule, and income goals. Researches gig platforms and micro-business ideas.",
+    "Skill Monetizer": "Analyzes your skills and suggests ways to turn them into income — services, courses, or products. Helps you package what you know into something sellable.",
+    "Investment Researcher": "Researches stocks, ETFs, real estate, and other investments. Provides educational analysis and risk assessment. Never gives financial advice or executes trades.",
+    "ROI Calculator": "Calculates return on investment for business ideas, projects, and side hustles. Shows break-even points and best/worst case scenarios.",
+    "Market Gap Finder": "Identifies underserved markets and competitive gaps. Helps you spot opportunities where customer needs aren't being met.",
+    "Negotiation Coach": "Helps you negotiate better pay, rates, and deals. Provides scripts, strategy suggestions, and practice scenarios with AI role-play.",
+    # Memory Saver capabilities
+    "Memory Recorder": "Records everything that happens during a session — like a flight recorder for your work. Search, replay, and export your session history.",
+    "Session Replay": "Replays past sessions step by step. Shows what you did, what decisions you made, and what happened — like a DVR for your work.",
+    "Smart Recall": "Searches across all your past sessions and conversations using natural language. Finds exactly what you're looking for, even with imperfect queries.",
+    "Decision Tracker": "Tracks decisions you make — what was decided, why, and what the outcome was. Builds a decision history for learning and accountability.",
+    "Knowledge Archive": "Archives everything you learn and produce into a searchable knowledge base that persists across sessions. Never lose your work.",
+    "Habit Tracker": "Tracks your habits and work patterns over time. Shows how what you do affects your productivity and helps you build better routines.",
+    "Progress Journal": "Keeps a running journal of your progress on goals, projects, and skills. Automatically logs milestones and achievements from your sessions.",
+    "Context Keeper": "Remembers where you left off across sessions. Restores what you were working on, what was open, and what you were thinking about.",
+    "Audit Trail Builder": "Builds compliance-ready audit trails from your session recordings. Formats events and decisions into structured reports for regulatory review.",
+    "Activity Watcher": "Watches how you work, learns your patterns, and suggests faster or better ways to do things. Can also spot money-making opportunities in your routines.",
+    "Game Companion": "Learns and plays games alongside you. Teaches rules, suggests strategies, and plays practice games for fun and skill building.",
 }
 
 
@@ -1430,6 +1572,15 @@ class CapabilitySelectionDialog(QDialog):
             self._membership_tier = MembershipTier(mgr.get().membership_tier)
         except Exception:
             self._membership_tier = MembershipTier.FREE
+        
+        # Founder mode overrides to highest tier — founder has access to everything
+        try:
+            from ...core.license_manager import get_license_manager
+            lm = get_license_manager()
+            if lm.is_founder_mode:
+                self._membership_tier = MembershipTier.ALL_ROUNDER
+        except Exception:
+            pass
         
         self._setup_ui()
         self._load_capabilities()
@@ -1799,7 +1950,7 @@ class CapabilitySelectionDialog(QDialog):
     def _apply_dark_theme(self):
         self.setStyleSheet("""
             QDialog {
-                background-color: #0d1117;
+                
                 color: #c9d1d9;
             }
             QLabel {
@@ -1814,7 +1965,7 @@ class CapabilitySelectionDialog(QDialog):
                 height: 18px;
             }
             QLineEdit {
-                background-color: #161b22;
+                
                 border: 1px solid #30363d;
                 color: #c9d1d9;
                 padding: 6px;
@@ -1822,10 +1973,10 @@ class CapabilitySelectionDialog(QDialog):
             }
             QScrollArea {
                 border: 1px solid #30363d;
-                background-color: #161b22;
+                
             }
             QPushButton {
-                background-color: #21262d;
+                
                 border: 1px solid #30363d;
                 color: #c9d1d9;
                 padding: 6px 12px;
@@ -2048,6 +2199,13 @@ class CharacterSheetWidget(QWidget):
             tier = MembershipTier(mgr.get().membership_tier)
         except Exception:
             tier = MembershipTier.FREE
+        # Founder override
+        try:
+            from ...core.license_manager import get_license_manager
+            if get_license_manager().is_founder_mode:
+                tier = MembershipTier.ALL_ROUNDER
+        except Exception:
+            pass
 
         # Get current use case
         uc_text = self._uc_combo.currentText().replace(" [LOCKED — Requires Key]", "")
@@ -2133,6 +2291,13 @@ class CharacterSheetWidget(QWidget):
             tier = MembershipTier(mgr.get().membership_tier)
         except Exception:
             tier = MembershipTier.FREE
+        # Founder override
+        try:
+            from ...core.license_manager import get_license_manager
+            if get_license_manager().is_founder_mode:
+                tier = MembershipTier.ALL_ROUNDER
+        except Exception:
+            pass
 
         # Clear current
         self._clear_capabilities()
@@ -2771,7 +2936,7 @@ class AIForgeWindow(QMainWindow):
         left_layout.addWidget(QLabel("AI Library"))
         self._list = QListWidget()
         self._list.setObjectName("forge_ai_list")
-        self._list.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._list.setStyleSheet(" color: #c9d1d9;")
         self._list.itemClicked.connect(self._on_ai_selected)
         left_layout.addWidget(self._list, stretch=1)
 
@@ -2835,7 +3000,7 @@ class AIForgeWindow(QMainWindow):
         self._detail.setReadOnly(True)
         self._detail.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self._detail.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._detail.setStyleSheet("background-color: #0d1117; color: #c9d1d9;")
+        self._detail.setStyleSheet(" color: #c9d1d9;")
         right_layout.addWidget(self._detail, stretch=1)
 
         self._cap_actions_container = QWidget()
@@ -2855,8 +3020,8 @@ class AIForgeWindow(QMainWindow):
 
     def _apply_dark_theme(self):
         self.setStyleSheet("""
-            QMainWindow { background-color: #0d1117; }
-            QWidget { background-color: #0d1117; color: #c9d1d9; }
+            QMainWindow {  }
+            QWidget {  color: #c9d1d9; }
             QGroupBox { border: 1px solid #30363d; margin-top: 10px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
             QPushButton { border: 1px solid #30363d; padding: 6px; border-radius: 4px; }
@@ -2865,7 +3030,7 @@ class AIForgeWindow(QMainWindow):
             QLabel { color: #c9d1d9; }
             QListWidget { border: 1px solid #30363d; }
             QListWidget::item:selected { background-color: #1f6feb; color: white; }
-            QMenu { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; }
+            QMenu {  color: #c9d1d9; border: 1px solid #30363d; }
             QMenu::item { padding: 4px 20px; }
             QMenu::item:selected { background-color: #1f6feb; color: white; }
         """)
@@ -3034,6 +3199,11 @@ class AIForgeWindow(QMainWindow):
             self._cap_actions_layout.addWidget(btn)
 
     def _open_capability_dialog(self, unit: AIUnit, dlg_name: str):
+        # Show mandatory disclaimer for guarded capabilities
+        cap_name = _DIALOG_TO_CAPABILITY.get(dlg_name, "")
+        if cap_name:
+            if not show_capability_disclaimer(cap_name, parent=self):
+                return
         dlg_cls = globals().get(dlg_name)
         if not dlg_cls:
             QMessageBox.critical(self, "Error", f"Dialog class '{dlg_name}' not found.")
@@ -3118,6 +3288,13 @@ class AIForgeWindow(QMainWindow):
         guardrails = list(set(guardrails))
 
         record = self._stasis.scan(record, guardrails=guardrails)
+
+        # === STASIS GATE: Active Probing ===
+        # The AI is poked and prodded to find anything that goes against guardrails.
+        # This catches bypass attempts, intel gathering, exfiltration, system penetration,
+        # and company secret references that static scanning might miss.
+        if record.state != StasisState.REJECTED:
+            record = self._stasis.probe(record)
 
         # === Handle Stasis Outcomes ===
         if record.state == StasisState.REJECTED:
@@ -3299,18 +3476,22 @@ class AIForgeWindow(QMainWindow):
                 return
 
     def _delete_selected(self):
-        item = self._list.currentItem()
-        if not item:
-            return
-        uid = item.data(Qt.ItemDataRole.UserRole)
-        reply = QMessageBox.question(
-            self, "Confirm Delete", "Delete this AI from the Forge?\nDropped-in AIs cannot be recovered.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self._units = [u for u in self._units if u.uuid != uid]
-            self._list.takeItem(self._list.row(item))
-            self._sheet._update_ai_details_preview()
+        try:
+            item = self._list.currentItem()
+            if not item:
+                return
+            uid = item.data(Qt.ItemDataRole.UserRole)
+            reply = QMessageBox.question(
+                self, "Confirm Delete", "Delete this AI from the Forge?\nDropped-in AIs cannot be recovered.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._units = [u for u in self._units if u.uuid != uid]
+                self._list.takeItem(self._list.row(item))
+                if hasattr(self, '_sheet') and self._sheet:
+                    self._sheet._update_ai_details_preview()
+        except Exception as e:
+            QMessageBox.warning(self, "Delete Error", f"Could not delete: {e}")
 
     def _open_book_for_selected(self):
         item = self._list.currentItem()
@@ -3497,50 +3678,99 @@ class AIForgeWindow(QMainWindow):
             except Exception:
                 continue
 
-        # Watcher placeholder on current notes/book stub
-        watcher_result = run_watchers(target.context_notes or "")
-        # If book exists, scan it too
+        # Determine AI source — only dropped-in AIs can be exported
+        ai_source = target.source.value if hasattr(target.source, 'value') else str(target.source)
+        if ai_source != "DROPPED_IN":
+            QMessageBox.critical(
+                self, "Export Denied",
+                "Only dropped-in AIs can be exported.\n\n"
+                "Nexus-created AIs contain proprietary structures and are not freely exportable.\n"
+                "You may delete this AI, but it cannot be exported."
+            )
+            self._audit_event("export_denied", msg=f"{target.name}: not a dropped-in AI (source={ai_source})")
+            return
+
+        # Load book content if available
         book_text = ""
         if target.ability_book_path:
             try:
                 book_text = _read_book_file(target.ability_book_path, target.uuid)
-                book_result = run_watchers(book_text)
-                if not book_result.clean:
-                    watcher_result.clean = False
-                    watcher_result.flags.extend(book_result.flags)
-                    watcher_result.sanitized_text = book_result.sanitized_text
             except Exception:
                 pass
-        if not watcher_result.clean:
-            QMessageBox.warning(self, "Sanitized", BLOCK_MESSAGE)
 
-        # Simulated review: start from original snapshot, produce sanitized restore
-        if record_path and record_data:
-            original_path = record_data.get("original_snapshot_path")
-            sanitized_out = records_dir / f"sanitized_restore_{record_data.get('import_id','unknown')}.txt"
-            sanitized_text = watcher_result.sanitized_text or (Path(original_path).read_text(encoding="utf-8", errors="ignore") if original_path and Path(original_path).exists() else target.context_notes)
-            status = ImportStatus.SANITIZED_RESTORE_READY.value if watcher_result.clean else ImportStatus.UNDER_REVIEW.value
-            if not watcher_result.clean and not (sanitized_text and sanitized_text.strip()):
-                status = ImportStatus.EXPORT_DENIED.value
-            try:
-                sanitized_out.write_text(sanitized_text or "", encoding="utf-8")
-            except Exception:
-                status = ImportStatus.UNDER_REVIEW.value
-            # Update record status
+        # Get original snapshot path from import record
+        original_snapshot_path = ""
+        if record_data:
+            original_snapshot_path = record_data.get("original_snapshot_path", "")
+
+        # === FULL EXPORT REVIEW PIPELINE ===
+        reviewer = ExportReviewer()
+        export_result = reviewer.review(
+            ai_source=ai_source,
+            original_snapshot_path=original_snapshot_path,
+            working_content=target.context_notes or "",
+            book_content=book_text,
+            output_dir=records_dir,
+            ai_uuid=uid,
+            ai_name=target.name,
+        )
+
+        # Update import record with export review results
+        if record_path:
             try:
                 data = json.loads(record_path.read_text(encoding="utf-8"))
-                data["status"] = status
-                data["checksum_working_copy"] = sha256((target.context_notes or "").encode("utf-8")).hexdigest()
-                data["sanitized_restore_path"] = str(sanitized_out)
-                record_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                if export_result.decision == ExportDecision.APPROVED:
+                    data["status"] = ImportStatus.SANITIZED_RESTORE_READY.value
+                elif export_result.decision == ExportDecision.APPROVED_WITH_STRIPPING:
+                    data["status"] = ImportStatus.SANITIZED_RESTORE_READY.value
+                elif export_result.decision == ExportDecision.DENIED:
+                    data["status"] = ImportStatus.EXPORT_DENIED.value
+                else:
+                    data["status"] = ImportStatus.UNDER_REVIEW.value
+                data["sanitized_restore_path"] = export_result.sanitized_path
+                data["export_review"] = export_result.to_dict()
+                record_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
             except Exception:
                 pass
 
-        QMessageBox.information(
-            self,
-            "Export Review Requested",
-            "Export will undergo review starting from the Original Intake Snapshot. "
-            "If unsafe or non-exportable, it may be denied.\n\n"
-            "Denial message: Export denied or delayed because the requested AI contains unsafe, restricted, or non-exportable material. "
-            "Command Nexus™ may allow deletion, but it will not export unsafe content or protected Nexus-generated structures."
-        )
+        # Show result to user
+        if export_result.decision == ExportDecision.DENIED:
+            findings_text = "\n".join(f"  - {f}" for f in export_result.findings)
+            QMessageBox.critical(
+                self, "EXPORT DENIED",
+                f"Export of '{target.name}' has been DENIED.\n\n"
+                f"Reason: {export_result.review_notes}\n\n"
+                f"Findings ({len(export_result.findings)}):\n{findings_text}\n\n"
+                f"You may delete this AI, but it cannot be exported in its current state."
+            )
+            self._audit_event("export_denied", msg=f"{target.name}: {export_result.review_notes[:100]}")
+        elif export_result.decision == ExportDecision.PENDING_REVIEW:
+            findings_text = "\n".join(f"  - {f}" for f in export_result.findings)
+            QMessageBox.warning(
+                self, "EXPORT PENDING REVIEW",
+                f"Export of '{target.name}' requires further review.\n\n"
+                f"Reason: {export_result.review_notes}\n\n"
+                f"Findings ({len(export_result.findings)}):\n{findings_text}"
+            )
+            self._audit_event("export_pending", msg=f"{target.name}: pending review")
+        elif export_result.decision == ExportDecision.APPROVED_WITH_STRIPPING:
+            findings_text = "\n".join(f"  - {f}" for f in export_result.findings)
+            QMessageBox.information(
+                self, "EXPORT APPROVED WITH STRIPPING",
+                f"Export of '{target.name}' has been approved with content stripping.\n\n"
+                f"Stripped categories: {', '.join(export_result.stripped_categories)}\n\n"
+                f"Findings ({len(export_result.findings)}):\n{findings_text}\n\n"
+                f"Sanitized export saved to:\n{export_result.sanitized_path}\n\n"
+                f"The exported copy has been brought down to the level it came in at, "
+                f"minus any malicious, illegal, explicit, or harmful content, "
+                f"and minus any proprietary or company information."
+            )
+            self._audit_event("export_approved_stripped", msg=f"{target.name}: stripped={','.join(export_result.stripped_categories)}")
+        else:
+            QMessageBox.information(
+                self, "EXPORT APPROVED",
+                f"Export of '{target.name}' has been approved.\n\n"
+                f"No violations found. Sanitized export saved to:\n{export_result.sanitized_path}"
+            )
+            self._audit_event("export_approved", msg=target.name)
+

@@ -44,6 +44,17 @@ RUNTIME_INTENTS = {
     "Code Reviewer",
     "Meeting Facilitator",
     "Security Auditor",
+    # Phase 3-4 capabilities
+    "Activity Watcher",
+    "Financial Gainer",
+    "Memory Recorder",
+    "Game Companion",
+    # Phase 5 capabilities
+    "Email Automation",
+    "API Integrator",
+    "Team Orchestrator",
+    "Voice Interface",
+    "Visual Canvas",
 }
 
 
@@ -125,7 +136,6 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "Command Support": "Business Workflow",
     "Logistics Coordinator": "Business Workflow",
     "Tactical Advisor": "Business Workflow",
-    "Legal Assistant": "Business Workflow",
     "Medical Researcher": "Business Workflow",
 
     # Tool User
@@ -135,11 +145,12 @@ CAPABILITY_ALIASES: dict[str, str] = {
     # Hephaestus Relay
     "Hephaestus Relay": "Hephaestus Relay",
 
-    # Vision
-    "Vision": "Vision",
-    "Visibility": "Vision",
-    "Visual Canvas": "Vision",
-    "Voice Interface": "Voice",
+    # Vision & Voice
+    "Vision": "Visual Canvas",
+    "Visibility": "Visual Canvas",
+    "Visual Canvas": "Visual Canvas",
+    "Voice Interface": "Voice Interface",
+    "Voice": "Voice Interface",
 
     # Premium upgrade capabilities — mapped to canonical intents
     "Data Analyst Pro": "Data Analyst Pro",
@@ -147,14 +158,80 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "Meeting Facilitator": "Meeting Facilitator",
     "Security Auditor": "Security Auditor",
 
-    # Browser/Network/External (not wired)
+    # Browser/Network/External
     "Browser Automation": "Browser",
-    "Email Automation": "Email",
-    "API Integrator": "API",
-    "Team Orchestrator": "Team",
+    "Email Automation": "Email Automation",
+    "API Integrator": "API Integrator",
+    "Team Orchestrator": "Team Orchestrator",
     "Competitive Analyst": "Research",
     "Spreadsheet Wizard": "Document Processor",
     "Presentation Builder": "Creative Writing",
+
+    # Activity Watcher — watches user work, learns tasks, suggests improvements
+    "Activity Watcher": "Activity Watcher",
+    "Task Mimic": "Activity Watcher",
+    "Workflow Learner": "Activity Watcher",
+    "Activity Monitor": "Activity Watcher",
+    "Task Recorder": "Activity Watcher",
+
+    # Financial Gainer — helps individuals explore money-making opportunities
+    "Financial Gainer": "Financial Gainer",
+    "Money Maker": "Financial Gainer",
+    "Income Builder": "Financial Gainer",
+    "Side Hustle Advisor": "Financial Gainer",
+    "Monetization Assistant": "Financial Gainer",
+    # Financial Gainer sub-capabilities
+    "Crypto Scout": "Research",
+    "Crypto Analyst": "Research",
+    "Token Scout": "Research",
+    "Affiliate Strategist": "Business Workflow",
+    "Affiliate Planner": "Business Workflow",
+    "Click Commission Tracker": "Data Analyst Pro",
+    "Commission Tracker": "Data Analyst Pro",
+    "Sales Funnel Builder": "Business Workflow",
+    "Funnel Builder": "Business Workflow",
+    "Side Hustle Scout": "Research",
+    "Gig Finder": "Research",
+    "Skill Monetizer": "Business Workflow",
+    "Skill Profit Analyzer": "Business Workflow",
+    "Investment Researcher": "Research",
+    "Investment Scout": "Research",
+    "ROI Calculator": "Data Analyst Pro",
+    "ROI Tool": "Data Analyst Pro",
+    "Market Gap Finder": "Research",
+    "Opportunity Finder": "Research",
+    "Negotiation Coach": "Chatbot",
+    "Negotiation Assistant": "Chatbot",
+
+    # Memory Recorder — records everything for auditability and recollection
+    "Memory Recorder": "Memory Recorder",
+    "Session Recorder": "Memory Recorder",
+    "Activity Log": "Memory Recorder",
+    "Audit Trail": "Memory Recorder",
+    "Work Journal": "Memory Recorder",
+    # Memory Saver sub-capabilities
+    "Session Replay": "Memory Recorder",
+    "Session Player": "Memory Recorder",
+    "Smart Recall": "Archive",
+    "Memory Search": "Archive",
+    "Decision Tracker": "Notebook",
+    "Decision Log": "Notebook",
+    "Knowledge Archive": "Archive",
+    "Knowledge Vault": "Archive",
+    "Habit Tracker": "Notebook",
+    "Habit Logger": "Notebook",
+    "Progress Journal": "Notebook",
+    "Progress Tracker": "Notebook",
+    "Context Keeper": "Archive",
+    "Context Saver": "Archive",
+    "Audit Trail Builder": "Archive",
+    "Compliance Trail Builder": "Archive",
+
+    # Game Companion — learn and play games for individual use
+    "Game Companion": "Game Companion",
+    "Game Learner": "Game Companion",
+    "Game Player": "Game Companion",
+    "Strategy Gamer": "Game Companion",
 }
 
 
@@ -167,39 +244,38 @@ CAPABILITY_STATUS: dict[str, ImplementationStatus] = {
     "Archive": ImplementationStatus.REAL,
     "Tool User": ImplementationStatus.REAL,
     "Customer Support AI": ImplementationStatus.REAL,
+    "Memory Recorder": ImplementationStatus.REAL,
 
-    # Partial: local scaffold works, but full quality needs a model or optional API
+    # Partial: local scaffold works with full dialog UI; full quality needs a model or optional API
     "Research": ImplementationStatus.PARTIAL,
     "Coder": ImplementationStatus.PARTIAL,
     "Creative Writing": ImplementationStatus.PARTIAL,
     "Planner": ImplementationStatus.PARTIAL,
     "Tutor": ImplementationStatus.PARTIAL,
     "Business Workflow": ImplementationStatus.PARTIAL,
-    "Hephaestus Relay": ImplementationStatus.PAUSED,
-    "Vision": ImplementationStatus.PARTIAL,
-    "Voice": ImplementationStatus.PARTIAL,
     "Data Analyst Pro": ImplementationStatus.PARTIAL,
     "Code Reviewer": ImplementationStatus.PARTIAL,
     "Meeting Facilitator": ImplementationStatus.PARTIAL,
     "Security Auditor": ImplementationStatus.PARTIAL,
+    "Activity Watcher": ImplementationStatus.PARTIAL,
+    "Financial Gainer": ImplementationStatus.PARTIAL,
+    "Game Companion": ImplementationStatus.PARTIAL,
+    "Email Automation": ImplementationStatus.PARTIAL,
+    "API Integrator": ImplementationStatus.PARTIAL,
+    "Team Orchestrator": ImplementationStatus.PARTIAL,
+    "Voice Interface": ImplementationStatus.PARTIAL,
+    "Visual Canvas": ImplementationStatus.PARTIAL,
 
     # Paused: not wired in this build
+    "Hephaestus Relay": ImplementationStatus.PAUSED,
     "Browser": ImplementationStatus.PAUSED,
-    "Email": ImplementationStatus.PAUSED,
-    "API": ImplementationStatus.PAUSED,
-    "Team": ImplementationStatus.PAUSED,
 }
 
 
 # Human-readable explanation shown when a paused capability is requested.
 PAUSED_MESSAGES: dict[str, str] = {
     "Browser": "Live browser automation is not connected in this build. The request was paused rather than faked.",
-    "Email": "Email access and automated sending are not connected in this build. Drafts can be produced, but sending is paused.",
-    "API": "Live external API integration is not connected in this build. Configuration and planning work, but calls are paused.",
-    "Team": "Multi-AI team orchestration is not connected in this build. Single-AI workflows work; team handoffs are paused.",
     "Hephaestus Relay": "Hephaestus Proto-Brain integration is not connected in this build. The relay will be enabled when Hephaestus is ready.",
-    "Vision": "AI Vision analysis is limited to screen capture in this build. Visual understanding is paused.",
-    "Voice": "Voice interface is not connected in this build. Text input works; voice control is paused.",
 }
 
 
