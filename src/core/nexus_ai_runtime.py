@@ -1,4 +1,4 @@
-﻿
+
 from __future__ import annotations
 
 # --- IP Watermark ---
@@ -1299,7 +1299,7 @@ class NexusAIRuntime:
         if any(x in t for x in ["hephaestus", "design brief", "prototype", "material spec", "handoff brief"]):
             return "Hephaestus Relay"
 
-        if any(x in t for x in ["analyze data", "data analyst", "dataset", "statistics", "chart", "pivot", "data trend", "data visualization"]):
+        if any(x in t for x in ["analyze data", "data analyst", "dataset", "statistics", "chart", "pivot", "data trend", "data visualization", "survey analysis", "analyze survey", "survey response", "survey result"]):
             return "Data Analyst Pro"
 
         if any(x in t for x in ["code review", "review code", "security scan", "quality check", "lint", "best practice"]):
@@ -2831,6 +2831,202 @@ class NexusAIRuntime:
 
         result = "\n".join(parts)
         return RuntimeResult(RuntimeStatus.COMPLETED, "Visual canvas completed (local fallback)", thought + [f"[{ai_name}] Visual Canvas executed locally (local mode)."], [f"[{ai_name}] Produced visual framework with text-based diagram representation."], ["Next: use framework in Visual Canvas workspace. "], result)
+
+    def _run_medical_researcher(self, task, ai_name, meta, knowledge, thought):
+        ai_uuid = str(meta.get("uuid", ""))
+
+        if ai_uuid:
+            self._memory.add(ai_uuid, f"Medical research: {task}", tags=["medical", "research"], source="medical_researcher", importance=0.8)
+
+        self._tier_audit.log_past(
+            category=AuditCategory.LOCAL_RESPONSE,
+            action="Medical research triggered",
+            detail=f"Query: {task[:100]}",
+            source="user",
+            capability="Medical Researcher",
+            confidence="medium",
+        )
+
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "medical_research"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Medical research completed", thought + [f"[{ai_name}] Model backend produced medical research output using Knowledge context."], [f"[{ai_name}] Returned medical literature summary with disclaimers."], ["Next: verify findings with a qualified healthcare professional."], model.text)
+
+        t = task.lower()
+        parts = [f"Medical Research for: {task}\n"]
+
+        if any(x in t for x in ["drug interaction", "medication", "side effect", "dosage", "prescription"]):
+            parts.append(
+                "Drug Information & Interaction Framework:\n"
+                "1. Identify the medication(s): Name, dosage, route, frequency.\n"
+                "2. Check interactions:\n"
+                "   - Drug-drug interactions (use Drugs.com, RxList, or MedlinePlus)\n"
+                "   - Drug-food interactions (grapefruit, dairy, etc.)\n"
+                "   - Drug-condition interactions (pregnancy, liver/kidney disease)\n"
+                "3. Side effects: Common, rare, and serious adverse reactions.\n"
+                "4. Contraindications: Who should NOT take this medication.\n"
+                "5. Monitoring: What lab values or symptoms to watch.\n\n"
+                "Resources for verification:\n"
+                "  - PubMed: pubmed.ncbi.nlm.nih.gov\n"
+                "  - MedlinePlus: medlineplus.gov\n"
+                "  - FDA: fda.gov/drugs\n"
+                "  - Drugs.com interaction checker\n\n"
+                "DISCLAIMER: For research purposes only. NOT medical advice. "
+                "Always consult a licensed healthcare provider before making "
+                "any decisions about medications.\n"
+            )
+        elif any(x in t for x in ["clinical trial", "study", "evidence", "treatment", "therapy"]):
+            parts.append(
+                "Clinical Evidence Research Framework:\n"
+                "1. Define the question: Population, Intervention, Comparison, Outcome (PICO).\n"
+                "2. Search databases:\n"
+                "   - PubMed (biomedical literature)\n"
+                "   - Cochrane Library (systematic reviews)\n"
+                "   - ClinicalTrials.gov (ongoing/completed trials)\n"
+                "3. Evaluate evidence quality:\n"
+                "   - Level I: Systematic reviews, meta-analyses\n"
+                "   - Level II: Randomized controlled trials\n"
+                "   - Level III: Cohort/case-control studies\n"
+                "   - Level IV: Expert opinion, case reports\n"
+                "4. Key findings: Efficacy, safety, effect size, confidence intervals.\n"
+                "5. Limitations: Sample size, bias, conflicts of interest, generalizability.\n\n"
+                "DISCLAIMER: For research purposes only. NOT medical advice. "
+                "Always consult a licensed healthcare provider.\n"
+            )
+        elif any(x in t for x in ["disease", "condition", "symptom", "diagnos", "health condition"]):
+            parts.append(
+                "Disease & Condition Research Framework:\n"
+                "1. Condition overview: Definition, prevalence, pathophysiology.\n"
+                "2. Symptoms: Primary, secondary, red-flag symptoms.\n"
+                "3. Risk factors: Genetic, environmental, lifestyle.\n"
+                "4. Diagnosis: Diagnostic criteria, tests, differential diagnosis.\n"
+                "5. Treatment options:\n"
+                "   - First-line treatments (guideline-recommended)\n"
+                "   - Alternative/adjunctive therapies\n"
+                "   - Emerging treatments (clinical trials)\n"
+                "6. Prognosis: Expected outcomes, complications, quality of life.\n"
+                "7. Patient resources: Support groups, educational materials.\n\n"
+                "Resources:\n"
+                "  - Mayo Clinic, WebMD (patient-friendly overviews)\n"
+                "  - PubMed, UpToDate (clinical detail)\n"
+                "  - CDC, WHO (epidemiology and guidelines)\n\n"
+                "DISCLAIMER: For research purposes only. NOT medical advice. "
+                "Always consult a licensed healthcare provider for diagnosis and treatment.\n"
+            )
+        else:
+            parts.append(
+                "Medical Research Framework:\n"
+                "  - Drug information and interaction checking\n"
+                "  - Clinical evidence and trial research\n"
+                "  - Disease/condition information gathering\n"
+                "  - Literature search and summarization\n"
+                "  - Treatment option comparison\n\n"
+                "Commands:\n"
+                "  - 'research [medication name] interactions'\n"
+                "  - 'find clinical trials for [condition]'\n"
+                "  - 'summarize evidence for [treatment]'\n"
+                "  - 'what is [disease/condition]'\n\n"
+                "DISCLAIMER: For research purposes only. NOT medical advice. "
+                "Always consult a licensed healthcare provider.\n"
+            )
+
+        result = "\n".join(parts)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Medical research completed (local fallback)", thought + [f"[{ai_name}] Medical Researcher executed locally (local mode)."], [f"[{ai_name}] Produced medical research framework with verification resources and disclaimers."], ["Next: verify findings with a healthcare professional. "], result)
+
+    def _run_legal_document_reviewer(self, task, ai_name, meta, knowledge, thought):
+        ai_uuid = str(meta.get("uuid", ""))
+
+        if ai_uuid:
+            self._memory.add(ai_uuid, f"Legal review: {task}", tags=["legal", "review"], source="legal_reviewer", importance=0.8)
+
+        self._tier_audit.log_past(
+            category=AuditCategory.LOCAL_RESPONSE,
+            action="Legal document review triggered",
+            detail=f"Query: {task[:100]}",
+            source="user",
+            capability="Legal Document Reviewer",
+            confidence="medium",
+        )
+
+        model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "legal_review"))
+        if model.text and not model.error:
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Legal review completed", thought + [f"[{ai_name}] Model backend produced legal analysis using Knowledge context."], [f"[{ai_name}] Returned contract analysis with risk flags and recommendations."], ["Next: have a qualified attorney review before acting."], model.text)
+
+        t = task.lower()
+        parts = [f"Legal Document Review for: {task}\n"]
+
+        if any(x in t for x in ["contract", "agreement", "nda", "non-compete", "non-disclosure"]):
+            parts.append(
+                "Contract Review Framework:\n"
+                "1. Parties: Who is bound? Are all parties correctly identified?\n"
+                "2. Obligations: What must each party do? Are obligations clear and measurable?\n"
+                "3. Term & termination: Duration, renewal terms, early termination clauses.\n"
+                "4. Payment: Amount, schedule, late payment penalties, currency.\n"
+                "5. Intellectual property: Who owns created work? License terms?\n"
+                "6. Confidentiality: What's protected, for how long, penalties for breach.\n"
+                "7. Liability & indemnification: Who bears risk? Caps on liability?\n"
+                "8. Dispute resolution: Arbitration, mediation, or litigation? Jurisdiction?\n"
+                "9. Force majeure: What happens in unforeseen circumstances?\n"
+                "10. Red flags:\n"
+                "    - Vague or ambiguous language\n"
+                "    - Unilateral modification rights\n"
+                "    - Auto-renewal without notice\n"
+                "    - Excessive liability or indemnification\n"
+                "    - No exit clause or termination without cause\n\n"
+                "DISCLAIMER: For review purposes only. NOT legal advice. "
+                "Always consult a qualified attorney before signing.\n"
+            )
+        elif any(x in t for x in ["terms of service", "tos", "privacy policy", "terms of use"]):
+            parts.append(
+                "Terms of Service Review Framework:\n"
+                "1. User rights: What can users do? What's prohibited?\n"
+                "2. Data usage: What data is collected, how it's used, shared, stored.\n"
+                "3. Intellectual property: Content ownership, license grants to the platform.\n"
+                "4. Liability: Disclaimers, limitation of liability, indemnification.\n"
+                "5. Termination: Account suspension/deletion conditions.\n"
+                "6. Dispute resolution: Mandatory arbitration, class action waivers.\n"
+                "7. Changes: Can terms change without notice? Opt-out options?\n"
+                "8. Red flags:\n"
+                "    - Broad license to user content\n"
+                "    - No data deletion mechanism\n"
+                "    - One-sided termination rights\n"
+                "    - Mandatory arbitration with no opt-out\n"
+                "    - Unilateral term changes without notice\n\n"
+                "DISCLAIMER: For review purposes only. NOT legal advice. "
+                "Always consult a qualified attorney.\n"
+            )
+        elif any(x in t for x in ["clause", "provision", "liability", "indemnif", "warranty", "arbitration"]):
+            parts.append(
+                "Legal Clause Analysis Framework:\n"
+                "1. Clause type: Identify the legal purpose (indemnification, warranty, etc.).\n"
+                "2. Scope: What does it cover? Is it overly broad or narrow?\n"
+                "3. Enforceability: Is it likely enforceable in the relevant jurisdiction?\n"
+                "4. Risk allocation: Who bears the risk? Is it balanced?\n"
+                "5. Standard vs non-standard: How does it compare to industry norms?\n"
+                "6. Negotiation points: What could be modified for better balance?\n"
+                "7. Missing provisions: What standard clauses are absent?\n\n"
+                "DISCLAIMER: For analysis purposes only. NOT legal advice. "
+                "Always consult a qualified attorney.\n"
+            )
+        else:
+            parts.append(
+                "Legal Document Review Framework:\n"
+                "  - Contract review (NDAs, service agreements, non-competes)\n"
+                "  - Terms of Service and Privacy Policy analysis\n"
+                "  - Clause-level risk assessment\n"
+                "  - Liability and indemnification review\n"
+                "  - Dispute resolution clause analysis\n"
+                "  - IP ownership and license review\n\n"
+                "Commands:\n"
+                "  - 'review this contract: [text or file path]'\n"
+                "  - 'analyze [clause type] clause'\n"
+                "  - 'check terms of service for [concern]'\n"
+                "  - 'what are the red flags in [document type]'\n\n"
+                "DISCLAIMER: For review purposes only. NOT legal advice. "
+                "Always consult a qualified attorney before signing or acting.\n"
+            )
+
+        result = "\n".join(parts)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Legal review completed (local fallback)", thought + [f"[{ai_name}] Legal Document Reviewer executed locally (local mode)."], [f"[{ai_name}] Produced legal review framework with risk flags and disclaimers."], ["Next: have a qualified attorney review. "], result)
 
     def _classify_tool_risk(self, action_type: str):
         """Return RiskLevel for a tool action."""

@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.settings_manager import SettingsManager
 from ...core.backend_manager import BackendManager, BackendResponse
+from ...core.capability_registry import canonical_intent as _registry_canonical_intent
 
 
 @dataclass(frozen=True)
@@ -43,39 +44,9 @@ class CapabilityAction:
 ALL_USE_CASES = ["Individual", "Educational", "Task-Ready", "Business", "Enterprise", "Financial Gainer", "Memory Saver", "All-Rounder"]
 
 
-CAPABILITY_ALIASES = {
-    "Chat Companion": "Chatbot",
-    "Customer Support Agent": "Chatbot",
-    "Customer Support AI": "Customer Support AI",  # Direct mapping - no alias needed
-    "Email Sifter & Responder": "Chatbot",
-    "Creative Writer": "Creative Writing",
-    "Research Assistant": "Research",
-    "Academic Researcher": "Research",
-    "Business Intelligence Analyst": "Research",
-    "Personal Organizer": "Notebook",
-    "Meeting Scribe": "Notebook",
-    "Task / Project Manager": "Planner",
-    "Strategic Planner": "Planner",
-    "Workflow Automator": "Planner",
-    "Coding Assistant": "Coder",
-    "IT Operations Agent": "Coder",
-    "Learning Tutor": "Tutor",
-    "Classroom Tutor": "Tutor",
-    "Assignment Grader": "Tutor",
-    "Lesson Planner": "Tutor",
-    "Language Coach": "Tutor",
-    "Accessibility Aide": "Tutor",
-    "Sales Assistant": "Business Workflow",
-    "Marketing Generator": "Business Workflow",
-    "Financial Analyst": "Business Workflow",
-    "HR Assistant": "Business Workflow",
-    "Compliance Auditor": "Business Workflow",
-    "Supply Chain Coordinator": "Business Workflow",
-    "Legal Document Reviewer": "Business Workflow",
-    "Multi-Department Orchestrator": "Business Workflow",
-    "Data Entry Agent": "Business Workflow",
-    "Content Moderator": "Business Workflow",
-}
+# Use canonical_intent from the central registry (single source of truth)
+# This ensures the Forge UI, runtime, and classifier all use the same mappings.
+CAPABILITY_ALIASES = None  # Deprecated — use _canonical_ability() which delegates to capability_registry
 
 
 def _action(
@@ -1335,57 +1306,8 @@ CAPABILITY_REGISTRY: dict[str, CapabilityAction] = {
     ),
 }
 
-# Alias mappings for new premium capabilities
-CAPABILITY_ALIASES.update({
-    "AI Team Lead": "Team Orchestrator",
-    "Project Coordinator": "Team Orchestrator",
-    "Memory Persistence": "Memory Bridge",
-    "Context Memory": "Memory Bridge",
-    "Image Generator": "Visual Canvas",
-    "AI Artist": "Visual Canvas",
-    "Data Science": "Data Analyst Pro",
-    "Analytics Pro": "Data Analyst Pro",
-    "Code Inspector": "Code Reviewer",
-    "Quality Assurance": "Code Reviewer",
-    "API Connector": "API Integrator",
-    "Integration Builder": "API Integrator",
-    "Wiki Builder": "Knowledge Base Builder",
-    "Documentation Center": "Knowledge Base Builder",
-    "Meeting Assistant": "Meeting Facilitator",
-    "Conference Manager": "Meeting Facilitator",
-    "Email Assistant": "Email Automation",
-    "Inbox Manager": "Email Automation",
-    "Schedule Optimizer": "Calendar Manager",
-    "Time Manager": "Calendar Manager",
-    "Report Builder": "Document Generator",
-    "PDF Creator": "Document Generator",
-    "Language Translator": "Translation Expert",
-    "Multi-language": "Translation Expert",
-    "Slide Deck Builder": "Presentation Builder",
-    "Keynote Assistant": "Presentation Builder",
-    "Excel Wizard": "Spreadsheet Wizard",
-    "Sheets Expert": "Spreadsheet Wizard",
-    "Contract Reviewer": "Legal Document Reviewer",
-    "Compliance Checker": "Legal Document Reviewer",
-    "Medical Search": "Medical Researcher",
-    "Clinical Research": "Medical Researcher",
-    "ADA Assistant": "Accessibility Assistant",
-    "Universal Access": "Accessibility Assistant",
-    "Truth Checker": "Fact Checker",
-    "Verification Tool": "Fact Checker",
-    "Speech Interface": "Voice Interface",
-    "Talk to AI": "Voice Interface",
-    "No-Code Automation": "Workflow Automator",
-    "Process Builder": "Workflow Automator",
-    "Vulnerability Scanner": "Security Auditor",
-    "Penetration Testing": "Security Auditor",
-    "Market Research": "Competitive Analyst",
-    "Strategy Assistant": "Competitive Analyst",
-    "Course Builder": "Learning Path Creator",
-    "Training Designer": "Learning Path Creator",
-    "Enterprise Search": "Smart Search",
-    "AI Search": "Smart Search",
-})
+# Additional alias mappings for premium capabilities — now in central registry
+# (see capability_registry.py CAPABILITY_ALIASES)
 
 
 TIER_SCAFFOLD = {
@@ -1414,7 +1336,8 @@ TIER_SCAFFOLD = {
 
 
 def _canonical_ability(name: str) -> str:
-    return CAPABILITY_ALIASES.get(name.strip(), name.strip())
+    """Delegate to the central registry's canonical_intent for consistency."""
+    return _registry_canonical_intent(name)
 
 
 def get_capability_action(capability_name: str) -> CapabilityAction | None:

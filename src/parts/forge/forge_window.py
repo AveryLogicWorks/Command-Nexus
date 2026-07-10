@@ -1566,12 +1566,13 @@ class CapabilitySelectionDialog(QDialog):
         
         # Get current membership tier from settings
         from ...core.settings_manager import SettingsManager
-        from ...core.membership_tiers import MembershipTier
+        from ...core.membership_tiers import MembershipTier, load_purchased_capabilities
         try:
             mgr = SettingsManager()
             self._membership_tier = MembershipTier(mgr.get().membership_tier)
         except Exception:
             self._membership_tier = MembershipTier.FREE
+        self._purchased_caps = load_purchased_capabilities()
         
         # Founder mode overrides to highest tier — founder has access to everything
         try:
@@ -1691,7 +1692,7 @@ class CapabilitySelectionDialog(QDialog):
             cap_layout.setSpacing(8)
             
             # Check if locked by membership
-            unlocked = is_capability_unlocked(opt, self._membership_tier)
+            unlocked = is_capability_unlocked(opt, self._membership_tier, self._purchased_caps)
             lock_prompt = get_upgrade_prompt_for_capability(opt) if not unlocked else ""
             
             # Checkbox
@@ -1806,10 +1807,10 @@ class CapabilitySelectionDialog(QDialog):
 
     def _get_compatible_caps(self, capability: str) -> list:
         """Get list of capabilities that work well with this one."""
-        from .capability_actions import CAPABILITY_REGISTRY, CAPABILITY_ALIASES
+        from .capability_actions import CAPABILITY_REGISTRY, _canonical_ability
         
         # Resolve alias if needed
-        canonical = CAPABILITY_ALIASES.get(capability, capability)
+        canonical = _canonical_ability(capability)
         
         # Get from registry
         cap_data = CAPABILITY_REGISTRY.get(canonical)
@@ -1821,9 +1822,9 @@ class CapabilitySelectionDialog(QDialog):
     def _show_capability_details(self, capability: str):
         """Show detailed info dialog for a capability."""
         try:
-            from .capability_actions import CAPABILITY_REGISTRY, CAPABILITY_ALIASES
+            from .capability_actions import CAPABILITY_REGISTRY, _canonical_ability
             
-            canonical = CAPABILITY_ALIASES.get(capability, capability)
+            canonical = _canonical_ability(capability)
             cap_data = CAPABILITY_REGISTRY.get(canonical)
             
             if not cap_data:

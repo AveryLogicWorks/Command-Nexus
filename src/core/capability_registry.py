@@ -55,6 +55,9 @@ RUNTIME_INTENTS = {
     "Team Orchestrator",
     "Voice Interface",
     "Visual Canvas",
+    # High-risk specialized capabilities
+    "Medical Researcher",
+    "Legal Document Reviewer",
 }
 
 
@@ -65,7 +68,7 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "Chat": "Chatbot",
     "Customer Support Agent": "Chatbot",
     "Customer Support AI": "Customer Support AI",
-    "Email Sifter & Responder": "Chatbot",
+    "Email Sifter & Responder": "Email Automation",
 
     # Research
     "Research Assistant": "Research",
@@ -77,7 +80,6 @@ CAPABILITY_ALIASES: dict[str, str] = {
     # Coder
     "Coding Assistant": "Coder",
     "IT Operations Agent": "Coder",
-    "Code Reviewer": "Coder",
 
     # Creative Writing
     "Creative Writer": "Creative Writing",
@@ -97,14 +99,11 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "Strategic Planner": "Planner",
     "Workflow Automator": "Planner",
     "Calendar Manager": "Planner",
-    "Meeting Facilitator": "Planner",
-    "Task / Project Manager": "Planner",
 
     # Document Processor
     "Document Processor": "Document Processor",
     "Document Generator": "Document Processor",
     "Data Entry Agent": "Document Processor",
-    "Data Analyst Pro": "Document Processor",
     "Content Moderator": "Document Processor",
 
     # Archive
@@ -129,14 +128,13 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "HR Assistant": "Business Workflow",
     "Compliance Auditor": "Business Workflow",
     "Supply Chain Coordinator": "Business Workflow",
-    "Legal Document Reviewer": "Business Workflow",
+    "Legal Document Reviewer": "Legal Document Reviewer",
     "Multi-Department Orchestrator": "Business Workflow",
-    "Content Moderator": "Business Workflow",
     "Field Analyst": "Business Workflow",
     "Command Support": "Business Workflow",
     "Logistics Coordinator": "Business Workflow",
     "Tactical Advisor": "Business Workflow",
-    "Medical Researcher": "Business Workflow",
+    "Medical Researcher": "Medical Researcher",
 
     # Tool User
     "Tool User": "Tool User",
@@ -232,6 +230,66 @@ CAPABILITY_ALIASES: dict[str, str] = {
     "Game Learner": "Game Companion",
     "Game Player": "Game Companion",
     "Strategy Gamer": "Game Companion",
+
+    # New capabilities — mapped to existing canonical intents
+    "Budget Tracker": "Financial Gainer",
+    "Social Media Manager": "Creative Writing",
+    "Study Coach": "Tutor",
+    "Plagiarism Checker": "Research",
+    "Form Builder": "Document Processor",
+    "Survey Analyzer": "Data Analyst Pro",
+    "Advanced Memory System": "Archive",
+    "Custom Model Connector": "Chatbot",
+
+    # Premium capability aliases (from capability_actions.py)
+    "AI Team Lead": "Team Orchestrator",
+    "Project Coordinator": "Team Orchestrator",
+    "Memory Persistence": "Archive",  # Memory Bridge canonical
+    "Context Memory": "Archive",
+    "Image Generator": "Visual Canvas",
+    "AI Artist": "Visual Canvas",
+    "Data Science": "Data Analyst Pro",
+    "Analytics Pro": "Data Analyst Pro",
+    "Code Inspector": "Code Reviewer",
+    "Quality Assurance": "Code Reviewer",
+    "API Connector": "API Integrator",
+    "Integration Builder": "API Integrator",
+    "Wiki Builder": "Archive",  # Knowledge Base Builder canonical
+    "Documentation Center": "Archive",
+    "Meeting Assistant": "Meeting Facilitator",
+    "Conference Manager": "Meeting Facilitator",
+    "Email Assistant": "Email Automation",
+    "Inbox Manager": "Email Automation",
+    "Schedule Optimizer": "Planner",  # Calendar Manager canonical
+    "Time Manager": "Planner",
+    "Report Builder": "Document Processor",  # Document Generator canonical
+    "PDF Creator": "Document Processor",
+    "Language Translator": "Tutor",  # Translation Expert canonical
+    "Multi-language": "Tutor",
+    "Slide Deck Builder": "Creative Writing",  # Presentation Builder canonical
+    "Keynote Assistant": "Creative Writing",
+    "Excel Wizard": "Document Processor",  # Spreadsheet Wizard canonical
+    "Sheets Expert": "Document Processor",
+    "Contract Reviewer": "Legal Document Reviewer",
+    "Compliance Checker": "Legal Document Reviewer",
+    "Medical Search": "Medical Researcher",
+    "Clinical Research": "Medical Researcher",
+    "ADA Assistant": "Tutor",  # Accessibility Assistant canonical
+    "Universal Access": "Tutor",
+    "Truth Checker": "Research",  # Fact Checker canonical
+    "Verification Tool": "Research",
+    "Speech Interface": "Voice Interface",
+    "Talk to AI": "Voice Interface",
+    "No-Code Automation": "Planner",  # Workflow Automator canonical
+    "Process Builder": "Planner",
+    "Vulnerability Scanner": "Security Auditor",
+    "Penetration Testing": "Security Auditor",
+    "Market Research": "Research",  # Competitive Analyst canonical
+    "Strategy Assistant": "Research",
+    "Course Builder": "Tutor",  # Learning Path Creator canonical
+    "Training Designer": "Tutor",
+    "Enterprise Search": "Research",  # Smart Search canonical
+    "AI Search": "Research",
 }
 
 
@@ -265,6 +323,8 @@ CAPABILITY_STATUS: dict[str, ImplementationStatus] = {
     "Team Orchestrator": ImplementationStatus.PARTIAL,
     "Voice Interface": ImplementationStatus.PARTIAL,
     "Visual Canvas": ImplementationStatus.PARTIAL,
+    "Medical Researcher": ImplementationStatus.PARTIAL,
+    "Legal Document Reviewer": ImplementationStatus.PARTIAL,
 
     # Paused: not wired in this build
     "Hephaestus Relay": ImplementationStatus.PAUSED,
