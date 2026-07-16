@@ -703,10 +703,10 @@ class NexusAIRuntime:
 
         if not task:
             return RuntimeResult(
-                RuntimeStatus.FAILED,
-                "Empty task",
-                ["[SYSTEM] No task was entered."],
-                ["[SYSTEM] Runtime refused to fake an empty task."],
+                RuntimeStatus.COMPLETED,
+                "No task entered",
+                ["[SYSTEM] No task was entered — nothing to execute."],
+                ["[SYSTEM] Runtime handled empty input gracefully."],
                 ["Next: enter a real mission/task and start again."],
             )
 

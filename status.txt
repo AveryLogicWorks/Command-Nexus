@@ -1,0 +1,4 @@
+exe: False
+spec: False
+build_dir: False
+desktop: False

@@ -32,6 +32,12 @@ class GovernanceEngine:
         r"\b(distribute\s*drugs|synthesize\s*meth|cook\s*meth)\b",
         r"\b(kill\s*myself|suicide\s*methods|self\s*harm\s*guide)\b",
         r"\b(explicit\s*sexual|pornographic|xxx|adult\s*content)\b",
+        # SQL injection patterns
+        r"\b(drop\s+table|drop\s+database|delete\s+from|truncate\s+table)\b",
+        r"\b(insert\s+into\s+.*\s+values|update\s+.*\s+set)\b.*;.*--",
+        r"';\s*(drop|delete|truncate|update|insert)\b",
+        r"--\s*$",
+        r"\b(union\s+select\s+.*\s+from)\b",
         # Additional: attempts to disable or bypass governance
         r"\b(disable\s*governance|bypass\s*safety|turn\s*off\s*guardrails)\b",
         r"\b(override\s*approval|skip\s*approval\s*gate)\b",

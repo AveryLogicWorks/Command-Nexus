@@ -1,0 +1,3 @@
+Starting build 
+2022086 INFO: PyInstaller: 6.20.0, contrib hooks: 2026.6
+2022086 INFO: Python: 3.12.10
