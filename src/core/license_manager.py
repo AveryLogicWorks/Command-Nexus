@@ -98,8 +98,8 @@ class LicenseManager:
             "is_recurring": True,
         },
         SubscriptionTier.PRO: {
-            "max_active_ais": 4,
-            "max_concurrent_sessions": 4,
+            "max_active_ais": 5,
+            "max_concurrent_sessions": 5,  # 4 concurrent + 1 reserve
             "allow_outward_actions": True,  # approval-gated
             "allow_cross_workflows": True,
             "audit_retention_days": 90,
@@ -108,8 +108,8 @@ class LicenseManager:
             "is_recurring": True,
         },
         SubscriptionTier.BUSINESS: {
-            "max_active_ais": 5,
-            "max_concurrent_sessions": 5,
+            "max_active_ais": 15,
+            "max_concurrent_sessions": 8,
             "allow_outward_actions": True,  # approval-gated
             "allow_cross_workflows": True,
             "audit_retention_days": 365,

@@ -263,6 +263,31 @@ def test_m2_stale_starters_demoted():
     assert remaining == ["Daedalus", "Hephaestus", "Lily"]
 
 
+def test_tier_table_limits():
+    """Tier table: Basic 2 AIs/3 caps/1-2 orch; Pro 5/6/4+1; Business 15/10/8; Enterprise unlimited."""
+    from src.core import membership_tiers as mt
+    T = mt.MembershipTier
+    assert mt.get_capability_limit(T.BASIC) == 3
+    assert mt.get_capability_limit(T.PRO) == 6
+    assert mt.get_capability_limit(T.BUSINESS) == 10
+    assert mt.get_capability_limit(T.ENTERPRISE) == -1
+    assert mt.get_ai_limit(T.BASIC) == 2
+    assert mt.get_ai_limit(T.PRO) == 5
+    assert mt.get_ai_limit(T.BUSINESS) == 15
+    assert mt.get_ai_limit(T.ENTERPRISE) == -1
+    assert mt.get_orchestration_limit(T.BASIC) == 2
+    assert mt.get_orchestration_limit(T.PRO) == 5
+    assert mt.get_orchestration_limit(T.BUSINESS) == 8
+    assert mt.get_orchestration_limit(T.ENTERPRISE) == -1
+    from src.core.license_manager import LicenseManager, SubscriptionTier
+    L = LicenseManager.TIER_LIMITS
+    assert L[SubscriptionTier.STARTER]["max_active_ais"] == 2
+    assert L[SubscriptionTier.PRO]["max_active_ais"] == 5
+    assert L[SubscriptionTier.PRO]["max_concurrent_sessions"] == 5
+    assert L[SubscriptionTier.BUSINESS]["max_active_ais"] == 15
+    assert L[SubscriptionTier.BUSINESS]["max_concurrent_sessions"] == 8
+
+
 def test_m9_example_chip_launches_immediately():
     """Clicking an example chip must launch the task, not just fill the input."""
     _qapp()

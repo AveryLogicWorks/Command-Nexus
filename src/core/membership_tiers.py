@@ -62,9 +62,9 @@ TIER_PRICES = {
 TIER_DESCRIPTIONS = {
     MembershipTier.FREE: "All common capabilities available. Select up to 3 per AI agent. No cost, no commitment — just create and go.",
     MembershipTier.TRIAL: "15-day trial. Select up to 3 capabilities per AI agent, including a few premium capabilities to try out. After the trial, upgrade to Basic or higher to keep premium access.",
-    MembershipTier.BASIC: "Select up to 5 capabilities per AI agent. Unlocks premium capabilities like Memory Bridge, Voice Interface, and Visual Canvas. Best for personal users and students.",
-    MembershipTier.PRO: "Select up to 8 capabilities per AI agent. Unlocks business-tier capabilities like Team Orchestrator, Data Analyst Pro, and API Integrator. Best for small to mid-size businesses.",
-    MembershipTier.BUSINESS: "Unlimited capabilities per AI agent. Unlocks enterprise capabilities like Security Auditor, Code Reviewer, Medical Researcher, and Legal Document Reviewer. Best for large organizations.",
+    MembershipTier.BASIC: "Create up to 2 AIs with up to 3 capabilities each, orchestrate 1-2 at once. Unlocks premium capabilities like Memory Bridge, Voice Interface, and Visual Canvas. Best for personal users and students.",
+    MembershipTier.PRO: "Create up to 5 AIs with up to 6 capabilities each, orchestrate 4 at once plus 1 reserve. Unlocks business-tier capabilities like Team Orchestrator, Data Analyst Pro, and API Integrator. Best for small to mid-size businesses.",
+    MembershipTier.BUSINESS: "Create up to 15 AIs with up to 10 capabilities each, orchestrate up to 8 at once. Unlocks enterprise capabilities like Security Auditor, Code Reviewer, Medical Researcher, and Legal Document Reviewer. Best for large organizations.",
     MembershipTier.ENTERPRISE: "Everything in Business, plus priority support, advanced compliance tooling, and multi-site deployment capabilities. Best for enterprise-scale organizations with dedicated IT teams.",
 }
 
@@ -86,12 +86,45 @@ TIER_UPGRADE_IDS = {
 TIER_CAPABILITY_LIMITS: dict[MembershipTier, int] = {
     MembershipTier.FREE: 3,
     MembershipTier.TRIAL: 3,
-    MembershipTier.BASIC: 5,
-    MembershipTier.PRO: 8,
-    MembershipTier.BUSINESS: -1,  # unlimited
-    MembershipTier.ENTERPRISE: -1,  # unlimited
+    MembershipTier.BASIC: 3,
+    MembershipTier.PRO: 6,
+    MembershipTier.BUSINESS: 10,
+    MembershipTier.ENTERPRISE: -1,  # all compatible
     MembershipTier.ALL_ROUNDER: -1,  # unlimited
 }
+
+# Max user-created AIs per tier (-1 = hardware-limited / unlimited)
+TIER_AI_LIMITS: dict[MembershipTier, int] = {
+    MembershipTier.FREE: 2,
+    MembershipTier.TRIAL: 2,
+    MembershipTier.BASIC: 2,
+    MembershipTier.PRO: 5,
+    MembershipTier.BUSINESS: 15,
+    MembershipTier.ENTERPRISE: -1,
+    MembershipTier.ALL_ROUNDER: -1,
+}
+
+# Max simultaneously orchestrated AIs per tier (-1 = administrator-configurable)
+# Pro = 4 concurrent + 1 reserve
+TIER_ORCHESTRATION_LIMITS: dict[MembershipTier, int] = {
+    MembershipTier.FREE: 1,
+    MembershipTier.TRIAL: 1,
+    MembershipTier.BASIC: 2,
+    MembershipTier.PRO: 5,
+    MembershipTier.BUSINESS: 8,
+    MembershipTier.ENTERPRISE: -1,
+    MembershipTier.ALL_ROUNDER: -1,
+}
+
+
+def get_ai_limit(tier: MembershipTier) -> int:
+    """Max user-created AIs for a tier (-1 = unlimited)."""
+    return TIER_AI_LIMITS.get(tier, 2)
+
+
+def get_orchestration_limit(tier: MembershipTier) -> int:
+    """Max simultaneously orchestrated AIs for a tier (-1 = admin-configurable)."""
+    return TIER_ORCHESTRATION_LIMITS.get(tier, 1)
 
 
 def get_capability_limit(tier: MembershipTier) -> int:
