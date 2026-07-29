@@ -199,8 +199,9 @@ class TTSEngine:
                 voice.Speak(text, 0)
             finally:
                 pythoncom.CoUninitialize()
-        except ImportError:
-            # win32com not available — try ctypes COM approach (no subprocess, no window)
+        except Exception:
+            # pywin32 missing OR broken (e.g. FileNotFoundError from a bad install)
+            # — try ctypes COM approach (no subprocess, no window)
             if self._speak_windows_ctypes(text):
                 return
             # Final fallback: PowerShell System.Speech (built into Windows)
