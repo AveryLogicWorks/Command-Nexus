@@ -1333,21 +1333,25 @@ class DemoTourController(QWidget):
         ('down a notch'); restore it once all popups are gone. Application-modal
         popups are also downgraded to window-modal so Next is never blocked.
         """
-        popup_open = any(
-            w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible()
-            for w in QApplication.topLevelWidgets()
-        )
-        self._set_topmost(not popup_open)
-        for w in QApplication.topLevelWidgets():
-            if w in (self._overlay, self._tooltip, self._main_window) or not w.isVisible():
-                continue
-            w.raise_()
+        from PyQt6.QtWidgets import QDialog
+        tops = [w for w in QApplication.topLevelWidgets()
+                if w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible()]
+        dialogs = [w for w in tops if isinstance(w, QDialog)]
+        windows = [w for w in tops if not isinstance(w, QDialog)]
+        # Work windows (AI Forge, panels): the OVERLAY goes under them so the user
+        # can work, but the tooltip KEEPS its topmost band and stays visible.
+        for w in windows:
+            self._overlay.stackUnder(w)
+        # Dialogs (notifications, disclaimers, pickers): the tour drops its
+        # always-on-top band entirely so the dialog rises above everything.
+        self._set_topmost(not dialogs)
+        for w in dialogs:
             if w.isModal() and not getattr(w, "_tour_windowmodal", False):
                 w._tour_windowmodal = True
                 w.hide()
                 w.setWindowModality(Qt.WindowModality.WindowModal)
                 w.show()
-                w.raise_()
+            w.raise_()
 
     def _set_topmost(self, on: bool):
         """Add or remove WindowStaysOnTopHint on the overlay and tooltip."""
