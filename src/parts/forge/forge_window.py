@@ -2616,11 +2616,26 @@ class CharacterSheetWidget(QWidget):
                 if reply == QMessageBox.StandardButton.No:
                     return
 
-            # Same-name save = EDIT: update the existing unit in place (keeps its
-            # uuid, so the store file is overwritten) instead of creating a new AI.
-            existing = next((u for u in self._units
-                             if u.name == name and not getattr(u, "is_starter", False)), None)
+            # EDIT detection: stable internal ID first (the form remembers which AI
+            # was loaded into it — a rename still overwrites the SAME unit), then
+            # same-name fallback. Either way the existing uuid is kept so the store
+            # file is overwritten instead of duplicated.
+            edit_uuid = getattr(self, "_editing_uuid", None)
+            existing = None
+            if edit_uuid:
+                existing = next((u for u in self._units if u.uuid == edit_uuid), None)
+            if existing is None:
+                existing = next((u for u in self._units
+                                 if u.name == name and not getattr(u, "is_starter", False)), None)
             if existing is not None:
+                if existing.name != name:  # renamed via stable ID: drop old store file
+                    try:
+                        old_path = self._store_path(existing)
+                        if old_path.exists():
+                            old_path.unlink()
+                    except Exception:
+                        pass
+                    existing.name = name
                 existing.use_case = use_case
                 existing.capabilities = capabilities
                 existing.abilities = abilities
@@ -2655,6 +2670,7 @@ class CharacterSheetWidget(QWidget):
             )
 
     def _reset_form(self):
+        self._editing_uuid = None
         self._name_input.clear()
         self._notes.clear()
         self._creativity.setValue(50)
@@ -2672,6 +2688,7 @@ class CharacterSheetWidget(QWidget):
 
     def populate_from_ai(self, unit):
         """Load an existing AIUnit into the creation form for editing/review."""
+        self._editing_uuid = unit.uuid  # save targets THIS unit by internal ID
         self._name_input.setText(unit.name)
         self._notes.setPlainText(unit.context_notes)
         # set use-case dropdown
