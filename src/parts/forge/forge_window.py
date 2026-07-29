@@ -2616,49 +2616,23 @@ class CharacterSheetWidget(QWidget):
                 if reply == QMessageBox.StandardButton.No:
                     return
 
-            # EDIT detection: stable internal ID first (the form remembers which AI
-            # was loaded into it — a rename still overwrites the SAME unit), then
-            # same-name fallback. Either way the existing uuid is kept so the store
-            # file is overwritten instead of duplicated.
-            edit_uuid = getattr(self, "_editing_uuid", None)
-            existing = None
-            if edit_uuid:
-                existing = next((u for u in self._units if u.uuid == edit_uuid), None)
-            if existing is None:
-                existing = next((u for u in self._units
-                                 if u.name == name and not getattr(u, "is_starter", False)), None)
-            if existing is not None:
-                if existing.name != name:  # renamed via stable ID: drop old store file
-                    try:
-                        old_path = self._store_path(existing)
-                        if old_path.exists():
-                            old_path.unlink()
-                    except Exception:
-                        pass
-                    existing.name = name
-                existing.use_case = use_case
-                existing.capabilities = capabilities
-                existing.abilities = abilities
-                existing.personality_traits = personality
-                existing.context_notes = notes
-                existing.guardrails = guardrails
-                existing.libraries = libraries
-                unit = _scaffold_unit(existing, purpose=notes)
-            else:
-                unit = AIUnit(
-                    uuid=str(uuid.uuid4())[:8],
-                    name=name,
-                    use_case=use_case,
-                    source=AISource.CREATED,
-                    capabilities=capabilities,
-                    abilities=abilities,
-                    personality_traits=personality,
-                    locked=True,
-                    context_notes=notes,
-                    guardrails=guardrails,
-                    libraries=libraries,
-                )
-                unit = _scaffold_unit(unit, purpose=notes)
+            unit = AIUnit(
+                uuid=str(uuid.uuid4())[:8],
+                name=name,
+                use_case=use_case,
+                source=AISource.CREATED,
+                capabilities=capabilities,
+                abilities=abilities,
+                personality_traits=personality,
+                locked=True,
+                context_notes=notes,
+                guardrails=guardrails,
+                libraries=libraries,
+            )
+            # Tag the edit target (stable internal ID): the Forge window resolves
+            # this to an in-place update of the same AI instead of a new one.
+            unit._edit_uuid = getattr(self, "_editing_uuid", None)
+            unit = _scaffold_unit(unit, purpose=notes)
             self.ai_saved.emit(unit)
             # Success/failure is reported by the Forge window after the unit is
             # verified written to the store — no false "saved" confirmation here.
@@ -3335,7 +3309,63 @@ class AIForgeWindow(QMainWindow):
                 break
 
     def _on_ai_saved(self, unit: AIUnit):
-        # License enforcement
+        # EDIT detection: stable internal ID first (tagged by the sheet), then
+        # same-name fallback. Edits overwrite in place and skip the creation cap.
+        edit_uuid = getattr(unit, "_edit_uuid", None)
+        existing = None
+        if edit_uuid:
+            existing = next((u for u in self._units if u.uuid == edit_uuid), None)
+        if existing is None:
+            existing = next((u for u in self._units
+                             if u.name == unit.name and not getattr(u, "is_starter", False)), None)
+        if existing is not None:
+            if existing.name != unit.name:  # renamed via stable ID: drop old store file
+                try:
+                    old_path = self._store_path(existing)
+                    if old_path.exists():
+                        old_path.unlink()
+                except Exception:
+                    pass
+            unit.uuid = existing.uuid
+            unit.source = existing.source
+            unit.is_starter = getattr(existing, "is_starter", False)
+            unit.activated = getattr(existing, "activated", False)
+            self._units[self._units.index(existing)] = unit
+            for row in range(self._list.count()):
+                it = self._list.item(row)
+                if it.data(Qt.ItemDataRole.UserRole) == unit.uuid:
+                    it.setText(f"{unit.name} [{unit.use_case.value}] ({unit.source.value})")
+                    self._list.setCurrentItem(it)
+                    break
+            self._audit_event("ai_updated", msg=unit.name)
+            if not self._save_to_store(unit):
+                QMessageBox.critical(
+                    self, "Save Failed",
+                    f"AI '{unit.name}' could NOT be saved to the Forge store.\n\n"
+                    "Nothing was persisted. Check disk space and permissions, then try again.",
+                )
+                return
+            if self._registry:
+                self._registry.ensure_enabled(
+                    unit.uuid,
+                    name=unit.name,
+                    use_case=unit.use_case.value,
+                    abilities=unit.abilities,
+                    ability_book_path=unit.ability_book_path,
+                    archive_path=unit.archive_path,
+                    ability_surfaces=unit.ability_surfaces,
+                    guardrails=unit.guardrails,
+                    book_defaults_edited=unit.book_defaults_edited,
+                    libraries=unit.libraries,
+                    context_notes=unit.context_notes,
+                    personality_traits=unit.personality_traits,
+                )
+            if self._list.currentItem():
+                self._on_ai_selected(self._list.currentItem())
+            QMessageBox.information(self, "Saved", f"AI '{unit.name}' updated in the Forge.")
+            return
+
+        # License enforcement (creation only)
         allowed, msg = self._check_can_create_ai()
         if not allowed:
             QMessageBox.warning(self, "License Limit", msg)
