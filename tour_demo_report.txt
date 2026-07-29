@@ -7,15 +7,9 @@ Step 2: 🧠 Step 1: Open the AI Forge
   target found: True  action: True  expected: True  popup above tour: None  => PASS
 Step 3: 🏷️ Step 1b: Name Your AI
   target found: True  action: False  expected: True  popup above tour: None  => PASS
-Step 4: 📋 Step 2: Choose a Use Case
-  target found: True  action: False  expected: True  popup above tour: None  => PASS
-Step 5: ⚡ Step 3: Select Capabilities
-  target found: True  action: False  expected: True  popup above tour: None  => PASS
-Step 6: 🎨 Step 4: Personality / Behavior
-  target found: True  action: False  expected: True  popup above tour: None  => PASS
-Step 7: 🛡️ Step 5: Guardrails
-  target found: True  action: False  expected: True  popup above tour: None  => PASS
-Step 8: 💾 Step 6a: Save Your AI First
-  target found: True  action: True  expected: False  popup above tour: None  => FAIL
+Step 2: 🧠 Step 1: Open the AI Forge
+  target found: True  action: True  expected: True  popup above tour: None  => PASS
+Step 2: 🧠 Step 1: Open the AI Forge
+  target found: True  action: True  expected: True  popup above tour: None  => PASS
 
 STOPPED EARLY

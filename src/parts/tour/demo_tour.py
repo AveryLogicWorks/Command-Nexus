@@ -28,6 +28,11 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QPolygon, QScre
 from ...core.tts_engine import get_tts
 
 
+class _SpeechBridge(QObject):
+    """Qt bridge for the TTS engine's speech-finished callback (worker thread -> GUI thread)."""
+    done = Signal()
+
+
 class DemoTourOverlay(QWidget):
     """
     Screen-wide top-level overlay that draws animated highlight AROUND any widget.
@@ -614,13 +619,21 @@ class AutoTourDriver:
         self._baseline = 0
         self._deadline = 0.0
         self._dwell_until = None
+        # Narration-sync tracking (never advance while speech is playing)
+        self._narr_step = -1
+        self._narr_phase = "idle"  # idle | start | speaking | grace | dwell | done
+        self._narr_mark = 0.0
+        self._grace_until = 0.0
         self.results: list[dict] = []
+        tour._speech_bridge.done.connect(self._on_speech_done)
 
     # ---- controls ----
     def start(self):
         self.results.clear()
         self._pos = None
         self._dwell_until = None
+        self._narr_step = -1
+        self._narr_phase = "idle"
         self._state = "moving"
         self._arm()
 
@@ -674,6 +687,54 @@ class AutoTourDriver:
         if self._tour._overlay is not None:
             self._tour._overlay.set_auto_cursor(None)
 
+    def _on_speech_done(self):
+        """TTS reports speech truly finished -> begin the ~1s readable pause."""
+        import time
+        if self._narr_phase in ("start", "speaking"):
+            self._narr_phase = "grace"
+            self._grace_until = time.monotonic() + 1.0
+
+    def _narration_done(self, step) -> bool:
+        """True only after the current step's narration has COMPLETELY finished
+        (engine completion signal / worker exit) plus ~1s. Voice off/unavailable
+        -> readable dwell fallback. The demo never advances on a timer while
+        narration is still speaking."""
+        import time
+        t = self._tour
+        now = time.monotonic()
+        if self._narr_step != t._current_step:
+            self._narr_step = t._current_step
+            text = (step.narration or step.instruction or "").strip()
+            self._narr_phase = ("start" if (t._voice_enabled and t._tts and t._tts.available and text)
+                                else "dwell")
+            self._narr_mark = now
+            return False
+        if self._narr_phase == "start":
+            if t._tts.is_speaking():
+                self._narr_phase = "speaking"
+            elif now - self._narr_mark > 2.0:
+                self._narr_phase = "done"  # narration never started — don't hang
+                return True
+            return False
+        if self._narr_phase == "speaking":
+            if not t._tts.is_speaking():
+                self._narr_phase = "grace"
+                self._grace_until = now + 1.0
+            return False
+        if self._narr_phase == "grace":
+            if now >= self._grace_until:
+                self._narr_phase = "done"
+                return True
+            return False
+        if self._narr_phase == "dwell":
+            words = len((step.narration or step.instruction or "").split())
+            dwell = min(14.0, max(3.0, words / 2.2 + 1.5)) / self._speed
+            if now - self._narr_mark >= dwell:
+                self._narr_phase = "done"
+                return True
+            return False
+        return True
+
     # ---- main loop ----
     def _tick(self):
         import time
@@ -685,16 +746,9 @@ class AutoTourDriver:
         target = t._find_target(step)
         if self._state == "moving":
             if not step.wait_for_click:
-                # Dwell so the viewer can read/hear the step: paced to narration
-                # length (~2.2 words/sec), clamped 4-14s, scaled by demo speed.
-                if self._dwell_until is None:
-                    words = len((step.narration or step.instruction or "").split())
-                    dwell = min(14.0, max(4.0, words / 2.2 + 2.0)) / self._speed
-                    self._dwell_until = time.monotonic() + dwell
+                # Narration gate: NEVER advance while this step's speech is playing.
+                if not self._narration_done(step):
                     return
-                if time.monotonic() < self._dwell_until:
-                    return
-                self._dwell_until = None
                 self.results.append({"step": t._current_step + 1, "title": step.title,
                                      "target_found": target is not None, "action": False,
                                      "expected": True, "popup_ok": None, "ok": True})
@@ -736,6 +790,11 @@ class AutoTourDriver:
             f = min(0.45, 0.25 * self._speed + 0.1)
             self._pos = QPointF(self._pos.x() + dx * f, self._pos.y() + dy * f)
             ov.set_auto_cursor(self._pos)
+            return
+        # Cursor is parked on the target; the CLICK waits until this step's
+        # narration has completely finished (+1s readable pause).
+        if not self._narration_done(step):
+            ov.set_auto_cursor(end)
             return
         ov.set_auto_cursor(end)
         ov.pulse_click_ring()
@@ -857,6 +916,9 @@ class DemoTourController(QWidget):
         self._event_filter_installed = False
         self._pending_click_target = None
         self._tts = get_tts()
+        self._speech_bridge = _SpeechBridge(self)
+        if self._tts:
+            self._tts.set_on_finished(self._speech_bridge.done.emit)
         self._voice_enabled = True
         self._tour_active = False
         self._rehighlight_timer = QTimer(self)

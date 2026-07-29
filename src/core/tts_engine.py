@@ -140,13 +140,35 @@ class TTSEngine:
                     pass
         return voices
 
+    def set_on_finished(self, cb) -> None:
+        """Register a callback fired when speech truly finishes (worker thread end)."""
+        self._on_finished = cb
+
+    def is_speaking(self) -> bool:
+        """True while the speech worker is alive."""
+        t = self._thread
+        return bool(t and t.is_alive())
+
     def speak(self, text: str) -> None:
-        """Speak text in a background thread. Non-blocking."""
+        """Speak text in a background thread. Non-blocking. Exactly one worker
+        exists at a time: any previous speech is killed and joined first."""
         if not self._available or not text:
             return
         self.stop()
         self._stop_flag.clear()
-        self._thread = threading.Thread(target=self._speak_sync, args=(text,), daemon=True)
+
+        def _run():
+            try:
+                self._speak_sync(text)
+            finally:
+                cb = getattr(self, "_on_finished", None)
+                if cb:
+                    try:
+                        cb()
+                    except Exception:
+                        pass
+
+        self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 
     def _speak_sync(self, text: str) -> None:
@@ -208,18 +230,29 @@ class TTSEngine:
             # Use STARTUPINFO + SW_HIDE + CREATE_NO_WINDOW to ensure no visible window
             try:
                 escaped = text.replace("'", "''")
+                sapi_rate = max(-10, min(10, round((self._rate - 175) / 20)))
                 ps_script = (
                     "Add-Type -AssemblyName System.Speech; "
                     "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    f"$s.Rate = {sapi_rate}; "
                     f"$s.Speak('{escaped}');"
                 )
-                subprocess.run(
+                # Popen (not run) so stop() can KILL this process mid-sentence —
+                # a subprocess.run child would keep talking and overlap the next
+                # narration (the reported 'echo').
+                self._proc = subprocess.Popen(
                     ["powershell", "-NoProfile", "-Command", ps_script],
-                    timeout=60,
-                    capture_output=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     creationflags=_SUBPROCESS_FLAGS,
                     startupinfo=_STARTUPINFO,
                 )
+                try:
+                    self._proc.wait(timeout=180)
+                except subprocess.TimeoutExpired:
+                    self._proc.kill()
+                finally:
+                    self._proc = None
             except Exception:
                 pass
 
@@ -311,9 +344,20 @@ class TTSEngine:
                 pass
 
     def stop(self) -> None:
-        """Stop any current speech."""
+        """Stop any current speech: kill the speech subprocess, join the worker."""
         self._stop_flag.set()
+        proc = getattr(self, "_proc", None)
+        if proc is not None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            self._proc = None
         if self._thread and self._thread.is_alive():
+            try:
+                self._thread.join(timeout=1.5)
+            except Exception:
+                pass
             # On Windows, purge the SAPI queue via a new COM call
             try:
                 import pythoncom  # type: ignore
