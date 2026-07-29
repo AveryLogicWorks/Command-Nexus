@@ -437,6 +437,11 @@ class DemoTourTooltip(QFrame):
     
     def keyPressEvent(self, event):
         """Close tour on Escape key."""
+        if event.key() == Qt.Key.Key_A:
+            cb = getattr(self, "_auto_toggle_callback", None)
+            if cb:
+                cb()
+            return
         if event.key() == Qt.Key.Key_Escape:
             if self._close_callback:
                 self._close_callback()
@@ -637,6 +642,25 @@ class DemoTourController(QWidget):
             return None
         return forge.findChild(QListWidget, "forge_ai_list")
 
+    def _find_forge_name_input(self) -> Optional[QWidget]:
+        forge = self._find_forge_window()
+        return forge.findChild(QWidget, "forge_name_input") if forge else None
+
+    def _find_forge_save_button(self) -> Optional[QWidget]:
+        """Find the sheet's real Save button (bottom of guardrails) and scroll it into view."""
+        forge = self._find_forge_window()
+        if not forge:
+            return None
+        btn = forge.findChild(QWidget, "forge_save_button")
+        if btn and btn.isVisible():
+            from PyQt6.QtWidgets import QScrollArea
+            sa = btn.parentWidget()
+            while sa is not None and not isinstance(sa, QScrollArea):
+                sa = sa.parentWidget()
+            if sa is not None:
+                sa.ensureWidgetVisible(btn)
+        return btn
+
     def _find_forge_deploy_button(self) -> Optional[QWidget]:
         forge = self._find_forge_window()
         if forge is None:
@@ -729,6 +753,19 @@ class DemoTourController(QWidget):
                 action_prompt="\U0001f449 CLICK 'AI Forge'",
                 wait_for_click=True,
                 narration="Step 1. Open the AI Forge. The AI Forge is your workshop where you create and customize AI assistants. In the Forge, you can choose a use case like Individual, Business, Educational, or Enterprise. You can select capabilities, which are what your AI can do. You can adjust personality traits like creativity, caution, and formality. And you can add protection rules, which are safety boundaries for your AI. Click the purple AI Forge button in the navigation bar at the top of the window.",
+            ),
+
+            # === STEP 1b: Name Your AI (first thing inside the Forge) ===
+            DemoTourStep(
+                title="\U0001f3f7\ufe0f Step 1b: Name Your AI",
+                instruction="Type a name for your AI in the 'AI Name' field at the top of the form, then click Next.",
+                detail_html="""<p>The first field in the Forge is <b>AI Name</b>.</p>
+                <p>Give your AI a name you'll recognize, like <i>'My Assistant'</i> or <i>'Email Helper'</i>.</p>
+                <p>Everything else on this form configures the AI named here.</p>""",
+                target_getter=self._find_forge_name_input,
+                action_prompt="\U0001f449 TYPE a name, then click Next",
+                wait_for_click=False,
+                narration="Step 1 b. Name your AI. The first field in the Forge is AI Name. Give your AI a name you'll recognize, like My Assistant or Email Helper. Everything else on this form configures the AI named here. Type a name, then click Next.",
             ),
 
             # === STEP 2: Use Case Class ===
@@ -840,8 +877,8 @@ class DemoTourController(QWidget):
                     <li>Your AI appears in the <b>AI Library</b> list on the left</li>
                 </ol>
                 <p><b>You cannot deploy an AI that hasn't been saved.</b> Save first, deploy second.</p>""",
-                target_widget_name="forge_create_button",
-                action_prompt="\U0001f449 CLICK 'Save AI to Forge'",
+                target_getter=self._find_forge_save_button,
+                action_prompt="\U0001f449 CLICK 'Save AI to Forge' at the bottom of the form",
                 wait_for_click=True,
                 narration="Step 6 a. Save your AI first. Click the green Save AI to Forge button at the bottom of the Forge to create your AI. It then appears in the AI Library list on the left. You cannot deploy an AI that hasn't been saved. Save first, deploy second.",
             ),
@@ -1134,6 +1171,18 @@ class DemoTourController(QWidget):
         self._create_tooltip()
         # Install event filter globally for Escape key handling
         self._install_event_filter()
+        # Always-on z-order guardian: keeps notification popups above the tour for
+        # the whole session regardless of step state. Self-terminates when the
+        # overlay is gone (tour ended).
+        self._zorder_timer = QTimer(self)
+        self._zorder_timer.setInterval(300)
+        self._zorder_timer.timeout.connect(self._stack_popups_above_overlay)
+        self._zorder_timer.start()
+        # Auto-pilot: press A during the tour to toggle automated cursor + clicks.
+        self._auto = False
+        self._auto_timer = QTimer(self)
+        self._auto_timer.setInterval(1400)
+        self._auto_timer.timeout.connect(self._auto_tick)
         self._show_current_step()
 
         if self._audit:
@@ -1163,6 +1212,7 @@ class DemoTourController(QWidget):
         self._tooltip._voice_btn.clicked.connect(self._on_voice_toggle)
         # Wire close X button and Escape key to skip
         self._tooltip.set_close_callback(self._on_skip)
+        self._tooltip._auto_toggle_callback = self._on_auto_toggle
         self._tooltip.show()
         self._tooltip.raise_()
     
@@ -1333,6 +1383,11 @@ class DemoTourController(QWidget):
         ('down a notch'); restore it once all popups are gone. Application-modal
         popups are also downgraded to window-modal so Next is never blocked.
         """
+        zt = getattr(self, "_zorder_timer", None)
+        ov = getattr(self, "_overlay", None)
+        if zt is not None and (ov is None or not ov.isVisible()):
+            zt.stop()
+            return
         from PyQt6.QtWidgets import QDialog
         tops = [w for w in QApplication.topLevelWidgets()
                 if w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible()]
@@ -1408,6 +1463,48 @@ class DemoTourController(QWidget):
                 self._stack_popups_above_overlay()
             self._tooltip.raise_()
     
+    def _on_auto_toggle(self):
+        """Toggle automated tour: the cursor visibly moves to each target and
+        clicks it. Synthetic events are posted directly to widgets, so the user's
+        own mouse stays fully usable between automated moves."""
+        self._auto = not getattr(self, "_auto", False)
+        if self._auto:
+            self._auto_timer.start()
+        else:
+            self._auto_timer.stop()
+
+    def _auto_tick(self):
+        if not getattr(self, "_auto", False) or self._current_step >= len(self._steps):
+            self._auto_timer.stop()
+            return
+        step = self._steps[self._current_step]
+        target = self._find_target(step)
+        if step.wait_for_click and target is not None and target.isVisible():
+            self._auto_click(target)
+        elif not step.wait_for_click:
+            btn = self._tooltip._next_btn
+            if btn.isEnabled():
+                self._auto_click(btn)
+
+    def _auto_click(self, target):
+        """Glide the cursor to the target, then post press+release to the widget."""
+        from PyQt6.QtGui import QCursor, QMouseEvent
+        from PyQt6.QtCore import QEvent, QPointF
+        end = target.mapToGlobal(target.rect().center())
+        start = QCursor.pos()
+        steps = 12
+        for i in range(1, steps + 1):
+            x = start.x() + (end.x() - start.x()) * i // steps
+            y = start.y() + (end.y() - start.y()) * i // steps
+            QTimer.singleShot(i * 25, lambda x=x, y=y: QCursor.setPos(x, y))
+        def _click():
+            local = target.mapFromGlobal(end)
+            for t in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
+                QApplication.postEvent(target, QMouseEvent(
+                    t, QPointF(local), Qt.MouseButton.LeftButton,
+                    Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+        QTimer.singleShot(steps * 25 + 80, _click)
+
     def _install_event_filter(self):
         """Install event filter on the application to watch for clicks and Escape key."""
         if not self._event_filter_installed:

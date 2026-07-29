@@ -2175,6 +2175,7 @@ class CharacterSheetWidget(QWidget):
         name_row.addWidget(QLabel("AI Name:"))
         self._name_input = QLineEdit()
         self._name_input.setPlaceholderText("Enter AI name...")
+        self._name_input.setObjectName("forge_name_input")
         self._name_input.setMaxLength(50)  # Limit length to prevent overflow
         self._name_input.textChanged.connect(self._update_ai_details_preview)
         name_row.addWidget(self._name_input)
@@ -2267,6 +2268,7 @@ class CharacterSheetWidget(QWidget):
 
         # Save button
         self._btn_save = QPushButton("Save AI to Forge")
+        self._btn_save.setObjectName("forge_save_button")
         self._btn_save.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold; padding: 8px;")
         self._btn_save.clicked.connect(self._save_ai)
         layout.addWidget(self._btn_save)
