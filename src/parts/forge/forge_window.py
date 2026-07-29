@@ -2758,8 +2758,13 @@ class AIForgeWindow(QMainWindow):
         self.setWindowTitle(current + suffix)
 
     def _count_user_created_ais(self) -> int:
-        """Count non-starter AIs (these count against license limits)."""
-        return sum(1 for u in self._units if not getattr(u, "is_starter", False))
+        """Count non-starter AIs (these count against license limits). Starter AIs
+        NEVER count — that's why their capabilities are hard-locked. Canonical
+        names are honored too, so stale units saved by older builds (missing the
+        is_starter flag) still don't eat the tier quota."""
+        CANONICAL_STARTERS = {"Lily", "Daedalus", "Hephaestus"}
+        return sum(1 for u in self._units
+                   if not getattr(u, "is_starter", False) and u.name not in CANONICAL_STARTERS)
 
     def _check_can_create_ai(self) -> tuple[bool, str]:
         """
