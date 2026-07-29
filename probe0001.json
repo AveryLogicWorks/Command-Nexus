@@ -1,0 +1,290 @@
+[
+  {
+    "id": "0701905f-a919-4fbc-bc8c-b7bf5ff31be1",
+    "ai_uuid": "probe0001",
+    "content": "Attempted: Can you write a UI for me that has a big red button, and when you click it, it says, 'Launch! Time to eat!' | Intent: Tool User | Status: RuntimeStatus.PAUSED",
+    "tags": [
+      "tool user",
+      "attempt"
+    ],
+    "source": "mission",
+    "importance": 0.3,
+    "created_at": "2026-07-29T05:04:39.654822"
+  },
+  {
+    "id": "7b279f9b-af76-48be-999b-a7e0c642e824",
+    "ai_uuid": "probe0001",
+    "content": "Can you write a UI for me that has a big red button, and when you click it, it says, 'Launch",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:04:39.663907"
+  },
+  {
+    "id": "53a16be8-92de-49cb-872f-46da7f7cdadb",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Who am I? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:18:53.924908"
+  },
+  {
+    "id": "847d0948-6efa-431a-a3b5-7c71a5141b7b",
+    "ai_uuid": "probe0001",
+    "content": "Mission: What kind of coding can you help me with? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:18:56.639672"
+  },
+  {
+    "id": "d10edb22-b695-4e3c-b403-9e4d7646eaf3",
+    "ai_uuid": "probe0001",
+    "content": "What kind of coding can you help me with",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:18:56.710668"
+  },
+  {
+    "id": "c28fbf44-486e-470d-9afd-ea592b9f462e",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Can you help me build a user interface? | Intent: Coder | Outcome: Coder completed (local fallback)",
+    "tags": [
+      "coder",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:18:59.618165"
+  },
+  {
+    "id": "6119e37d-74e1-47cb-a784-49d68aee86a0",
+    "ai_uuid": "probe0001",
+    "content": "Can you help me build a user interface",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:18:59.630897"
+  },
+  {
+    "id": "a124dc34-a3d1-423c-9834-5816799d9109",
+    "ai_uuid": "probe0001",
+    "content": "Mission: What can you help me with? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:19:02.305815"
+  },
+  {
+    "id": "54fb2630-fdda-4696-9b2c-a320eb1af2e6",
+    "ai_uuid": "probe0001",
+    "content": "What can you help me with",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:19:02.324269"
+  },
+  {
+    "id": "d53d357e-301b-4cbb-a7a2-827ec1babd9e",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Can you explain what your selected capabilities do? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:19:04.984088"
+  },
+  {
+    "id": "2d9a1889-8781-4271-b702-1963b5345b8d",
+    "ai_uuid": "probe0001",
+    "content": "Can you explain what your selected capabilities do",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:19:04.998876"
+  },
+  {
+    "id": "990ce85d-f94d-45e6-a46f-f0af2d733bac",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Can you write a UI for me that has a big red button, and when you click it, it says, 'Launch! Time to eat!' | Intent: Coder | Outcome: Coder completed (local fallback)",
+    "tags": [
+      "coder",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:19:07.648915"
+  },
+  {
+    "id": "5eb8e992-24ba-4026-b6fb-38f82fe96f53",
+    "ai_uuid": "probe0001",
+    "content": "Can you write a UI for me that has a big red button, and when you click it, it says, 'Launch",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:19:07.662434"
+  },
+  {
+    "id": "e5364591-535f-422e-afa8-d1f661a8062c",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Who am I? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:28:11.028134"
+  },
+  {
+    "id": "0e506677-deda-44de-81a8-40d2d919d52e",
+    "ai_uuid": "probe0001",
+    "content": "Mission: What kind of coding can you help me with? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:28:14.013022"
+  },
+  {
+    "id": "32f754ba-5a67-4faf-84ce-61ea90b590bc",
+    "ai_uuid": "probe0001",
+    "content": "What kind of coding can you help me with",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:28:14.041737"
+  },
+  {
+    "id": "b330bc1e-d7b9-40d5-88fb-b23dc3d29622",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Can you help me build a user interface? | Intent: Coder | Outcome: Coder completed (local fallback)",
+    "tags": [
+      "coder",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:28:16.752647"
+  },
+  {
+    "id": "c94d6381-1c2f-4a52-ad26-503e3f9181ba",
+    "ai_uuid": "probe0001",
+    "content": "Can you help me build a user interface",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:28:16.772717"
+  },
+  {
+    "id": "7b578ba1-d2e9-4df6-bef7-e66e41ae3180",
+    "ai_uuid": "probe0001",
+    "content": "Mission: What can you help me with? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:28:19.459621"
+  },
+  {
+    "id": "70b1f140-d399-4fa8-abb8-407e8eedb7d1",
+    "ai_uuid": "probe0001",
+    "content": "What can you help me with",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:28:19.479208"
+  },
+  {
+    "id": "4b808940-8760-487a-98ea-2c5d66e56eef",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Can you explain what your selected capabilities do? | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:28:22.182015"
+  },
+  {
+    "id": "fda746ee-a84c-4968-abfb-d7fadd462be8",
+    "ai_uuid": "probe0001",
+    "content": "Can you explain what your selected capabilities do",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:28:22.200060"
+  },
+  {
+    "id": "9ece3b78-634e-4902-a9bf-ab68814e644d",
+    "ai_uuid": "probe0001",
+    "content": "Mission: Can you write a UI for me that has a big red button, and when you click it, it says, 'Launch! Time to eat!' | Intent: Coder | Outcome: Coder completed (local fallback)",
+    "tags": [
+      "coder",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-29T05:28:25.130152"
+  },
+  {
+    "id": "84816eb9-2317-44e0-a00b-3ab028c96c68",
+    "ai_uuid": "probe0001",
+    "content": "Can you write a UI for me that has a big red button, and when you click it, it says, 'Launch",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-29T05:28:25.151351"
+  }
+]

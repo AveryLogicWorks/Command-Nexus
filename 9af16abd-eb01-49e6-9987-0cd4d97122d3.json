@@ -1,0 +1,14 @@
+[
+  {
+    "id": "7cf40336-2784-4914-82f7-e2eeea956123",
+    "ai_uuid": "9af16abd-eb01-49e6-9987-0cd4d97122d3",
+    "content": "Attempted: Write a Python script | Intent: Coder | Status: RuntimeStatus.PAUSED",
+    "tags": [
+      "coder",
+      "attempt"
+    ],
+    "source": "mission",
+    "importance": 0.3,
+    "created_at": "2026-06-23T05:59:55.686428"
+  }
+]

@@ -1,0 +1,22 @@
+Avery Logic Works
+Command Nexus
+
+Code:
+HERMES-7-073
+
+Tier:
+TRIAL_7_DAY
+
+Status at creation:
+Inactive until Avery Logic Works activates it.
+
+Website:
+AveryLogicWorks.com
+
+Contact:
+averylogicworks@gmail.com
+
+Note:
+Customer-facing license only. Does not include source-code ownership,
+redistribution rights, reverse-engineering rights, modification rights,
+licensing bypass rights, or protected developer maintenance systems.

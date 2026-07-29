@@ -1,0 +1,67 @@
+Enterprise Quote Options (Private/Internal)
+============================================
+
+These are internal/private quote options for enterprise deployments.
+Do not display these publicly on the pricing page.
+Public-facing page should remain: Enterprise: Negotiated Pricing.
+
+---
+
+Launch Partner / Small Deployment
+$2,500
+
+Includes:
+- Small team deployment (up to 10 users)
+- Basic workflow setup
+- Standard support level
+- Core integrations
+
+Final pricing depends on seats, deployment scope, support, integrations, customization, number of workflows, number of locations, and evaluation results.
+
+---
+
+Business Deployment / Larger Scope
+$10,000
+
+Includes:
+- Medium team deployment (up to 50 users)
+- Advanced workflow configuration
+- Enhanced support level
+- Multiple integrations
+- Custom setup assistance
+Final pricing depends on seats, deployment scope, support, integrations, customization, number of workflows, number of locations, and evaluation results.
+
+---
+
+Enterprise Deployment / Many Employees / Many Workflows / Custom Setup / Support
+$25,000
+
+Includes:
+- Large team deployment (unlimited users)
+- Complex workflow architecture
+- Premium support level
+- Extensive integrations
+- Full custom setup and configuration
+- Dedicated support contact
+- On-site setup assistance (if applicable)
+
+Final pricing depends on seats, deployment scope, support, integrations, customization, number of workflows, number of locations, and evaluation results.
+
+---
+
+IMPORTANT NOTES:
+
+- All enterprise licenses are customer-facing only.
+- Enterprise licenses do NOT unlock:
+  * Aegis Console
+  * Owner tools
+  * Guardrail bypass
+  * Hidden repair tools
+  * Protected internals
+  * Anti-tamper override
+  * _FOUNDER tier
+  * _INTERNAL tier
+  * Private maintenance authority
+
+- Owner/Aegis access is private maintenance authority and is not sold as a license tier.
+- These quotes are for Avery Logic Works internal use during sales discussions.

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "7695cd40-fda3-4219-ae12-ff9ae46ff520",
+    "ai_uuid": "208b6a8f-04b9-408a-95f0-d80cbec25f61",
+    "content": "Mission: hello | Intent: Chatbot | Outcome: Local chat fallback completed",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T05:47:05.861018"
+  },
+  {
+    "id": "6831839c-f040-4958-a5f2-b4afda18ef96",
+    "ai_uuid": "208b6a8f-04b9-408a-95f0-d80cbec25f61",
+    "content": "Mission: Write a Python function to add two numbers | Intent: Coder | Outcome: Coder local fallback completed",
+    "tags": [
+      "coder",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T05:47:09.907737"
+  },
+  {
+    "id": "9a105edd-7533-40d1-9e32-5668f58b6961",
+    "ai_uuid": "208b6a8f-04b9-408a-95f0-d80cbec25f61",
+    "content": "Attempted: Research the latest Python features | Intent: Research | Status: RuntimeStatus.PAUSED",
+    "tags": [
+      "research",
+      "attempt"
+    ],
+    "source": "mission",
+    "importance": 0.3,
+    "created_at": "2026-06-23T05:47:09.995803"
+  },
+  {
+    "id": "085b33cd-9d08-417e-819d-38375e26bfc7",
+    "ai_uuid": "208b6a8f-04b9-408a-95f0-d80cbec25f61",
+    "content": "Mission: Plan a project to build a website | Intent: Planner | Outcome: Planner completed",
+    "tags": [
+      "planner",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T05:47:10.010416"
+  },
+  {
+    "id": "963d4d12-968f-4d08-ad09-b94f9b851797",
+    "ai_uuid": "208b6a8f-04b9-408a-95f0-d80cbec25f61",
+    "content": "Mission: I prefer short answers. What is Rust? | Intent: Chatbot | Outcome: Local chat fallback completed",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-23T05:47:14.045133"
+  },
+  {
+    "id": "847c425d-32e6-4544-b12e-7b88e907fd7e",
+    "ai_uuid": "208b6a8f-04b9-408a-95f0-d80cbec25f61",
+    "content": "I prefer short answers",
+    "tags": [
+      "preference",
+      "user_input"
+    ],
+    "source": "user_input",
+    "importance": 0.85,
+    "created_at": "2026-06-23T05:47:14.047147"
+  }
+]

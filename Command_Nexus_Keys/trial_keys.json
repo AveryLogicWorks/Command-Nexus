@@ -1,0 +1,12 @@
+[
+  {
+    "key": "TR00-6A4C-1486-36B1-EE0D-EA55-083F-D252-70E0",
+    "raw_key": "TR006A4C148636B1EE0DEA55083FD25270E0",
+    "tier": "trial",
+    "tier_label": "15-Day Early Access Trial",
+    "expiry_iso": "2026-07-06T13:48:06.648228",
+    "created_at": "2026-06-21T13:48:06.648732",
+    "notes": "test key",
+    "trial_days": 15
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "194a0aa9-847e-469e-a0ce-7fde211051a5",
+    "ai_uuid": "6a0ec583",
+    "content": "Mission: Please change the file sorting of my desktop by size | Intent: Chatbot | Outcome: Chat completed",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-27T08:46:28.787395"
+  },
+  {
+    "id": "acbec731-5fd4-443e-9fab-6cf30d253441",
+    "ai_uuid": "6a0ec583",
+    "content": "Mission: Bring up your chat menu | Intent: Chatbot | Outcome: Chat completed",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-06-27T08:58:21.118325"
+  },
+  {
+    "id": "6d204e27-1638-4976-b77e-583e496e45af",
+    "ai_uuid": "6a0ec583",
+    "content": "Attempted: I need you to tell me can you go through my emails and find anything that is from a From a medium some of the names could be Terra Athena Maria  And and like two or three others | Intent: Email Automation | Status: RuntimeStatus.PAUSED",
+    "tags": [
+      "email automation",
+      "attempt"
+    ],
+    "source": "mission",
+    "importance": 0.3,
+    "created_at": "2026-07-13T02:35:20.369262"
+  },
+  {
+    "id": "8c02b066-fa2c-4640-9459-ff8990d7031c",
+    "ai_uuid": "6a0ec583",
+    "content": "I need you to tell me can you go through my emails and find anything that is from a From a medium some of the names could be Terra Athena Maria  And and like two or three others",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-13T02:35:20.398339"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "command_nexus_release_build": true,
+  "manifest": {
+    "build.py": "411bedceb537fe131f6eec82713f53ba536fcdd68a62efef7c2a1c223bc58553",
+    "src/core/approval_gate.py": "4e8d86964b74f740b8590ccd60646e11c4879edd51d26ccd4fcab44411ebdbe5",
+    "src/core/audit_logger.py": "b07136b8c30e811ab9fae7d9c5f08871db03dd252b4705a12bcdaec3fdbe9727",
+    "src/core/backend_manager.py": "e8b339a3275e33e57f85716d844151151bc3ffed795071af6fa1ce046b375926",
+    "src/core/capability_registry.py": "b72c908709b208a9b2ee64831d5c1c5a0ead3dff127599bed6095cd144a5ad83",
+    "src/core/license_manager.py": "4b72468fc5b931f7c9eb20c67d91fd9aa65086991fd53279e7cf4d92db6208c7",
+    "src/core/nexus_ai_runtime.py": "f8da3c59e703a54e9ee7450b5f92e6ff68fd92465469756e31cd6013cca9bb41",
+    "src/core/runtime_executor.py": "d3a0092acf6692637c45d8defd4f98cb4b24cc42f3f23cd8fa6de8b4175f8f05",
+    "src/core/settings_manager.py": "1aa351fe9502a8b1bfe5072f2115bf64d3b23064c26084343f5f1bcc2f7e97bf",
+    "src/core/tool_executor.py": "b9a51d004528a4557d0b0529227c666c2cc9695c16995ef17dd098a52f9a9e1b",
+    "src/core/tripwire_manager.py": "c90aa90c6ee192b0866fd5886d25475dad6ce01775bc322a58972940963e423b",
+    "src/core/watcher_service.py": "30cbadf7284a96dff4ea77cb65b5757e3c76ac6b012d9b8ed2aea5cb769e0967",
+    "src/main.py": "ddd55e9a906b71996f005c2d853513f74bcbcda91e21d66018082b56c604903c",
+    "src/parts/owner/owner_console.py": "d96dd1e251bdb55ce1d17ca8fd46f7d2aa71b98c7c3b27f993e1166a34bc80f2",
+    "src/parts/visibility/visibility_window.py": "cf12929734849c560bb0b9e8e300c277fb28b98da1f3378004ecbb58463036bf",
+    "src/parts/watcher/watcher_models.py": "756b7fce93371ab38e6327bf5178bfd4f225f083bd6b15699b324580216b1ae7",
+    "src/parts/watcher/watcher_window.py": "4770ce09b50a496891e7408e0c2af74124a0b24b3338a64559db6f02ec4be58c"
+  },
+  "release_channel": "public"
+}

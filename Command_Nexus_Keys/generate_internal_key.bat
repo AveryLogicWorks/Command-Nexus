@@ -1,0 +1,11 @@
+@echo off
+REM Command Nexus™ — Internal Key Generator (GUI)
+REM Avery Logic Works™ — Employee Forever-Unlock Keys
+
+cd /d "%~dp0"
+py -3.12 -c "import PySide6" 2>nul || (
+    echo PySide6 not found. Installing now...
+    py -3.12 -m pip install --quiet PySide6
+)
+py -3.12 keygen_gui.py
+if errorlevel 1 pause

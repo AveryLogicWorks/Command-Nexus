@@ -1,0 +1,333 @@
+
+from __future__ import annotations
+
+# --- IP Watermark ---
+# ALW-CN-7F3A-2026-AVERYLOGICWORKS
+# AVERY_LOGIC_WORKS_COMMAND_NEXUS_PROPRIETARY_v0.1.0
+# Copyright (c) 2026 Avery Logic Works - Command Nexus(TM) - All Rights Reserved
+# Unauthorized copying, modification, or distribution is prohibited.
+# ---------------------
+
+from dataclasses import dataclass, field
+from enum import Enum
+import json
+import os
+import urllib.parse
+import urllib.request
+import webbrowser
+from typing import Any
+
+from .settings_manager import SettingsManager
+from .backend_manager import BackendManager, BackendResponse
+
+
+class RuntimeStatus(str, Enum):
+    COMPLETED = "completed"
+    PAUSED = "paused"
+    FAILED = "failed"
+
+
+@dataclass
+class RuntimeResult:
+    status: RuntimeStatus
+    title: str
+    thought_lines: list[str] = field(default_factory=list)
+    action_lines: list[str] = field(default_factory=list)
+    trajectory_lines: list[str] = field(default_factory=list)
+    result_text: str = ""
+    opened_url: str = ""
+
+
+class LocalRuntimeExecutor:
+    """
+    The honest execution bridge.
+
+    The UI can register and approve an AI, but that is not the same thing as doing work.
+    This executor decides whether real work can happen.
+
+    Real completion is allowed only when:
+    - a model backend answers, or
+    - a search backend plus model backend answers.
+
+    Otherwise the task pauses visibly.
+    """
+
+    def __init__(self, settings: SettingsManager | None = None):
+        self._settings = settings or SettingsManager()
+        self._settings.initialize()
+        s = self._settings.get()
+
+        # All model backend interactions go through the trust boundary.
+        self._backend = BackendManager(self._settings)
+
+        self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
+
+    def run(self, task: str, ai_name: str = "AI", ai_metadata: dict[str, Any] | None = None) -> RuntimeResult:
+        task = (task or "").strip()
+        ai_metadata = ai_metadata or {}
+
+        if not task:
+            return RuntimeResult(
+                RuntimeStatus.FAILED,
+                "Empty task",
+                ["[SYSTEM] No task text was provided."],
+                ["[SYSTEM] Nothing was executed."],
+                ["Next: enter a real task, then start again."],
+            )
+
+        kind = self._classify(task)
+        base_thought = [
+            f"[{ai_name}] Runtime received task.",
+            f"[{ai_name}] Classified task as: {kind}.",
+            f"[{ai_name}] Checking for real executor support before completion.",
+        ]
+
+        if kind == "research":
+            return self._run_research(task, ai_name, ai_metadata, base_thought)
+
+        if kind in {"system_action", "outbound_action"}:
+            return RuntimeResult(
+                RuntimeStatus.PAUSED,
+                "Real tool executor required",
+                base_thought + [
+                    f"[{ai_name}] This task would affect files, apps, messages, web pages, or outside systems.",
+                    f"[{ai_name}] Command Nexus will not pretend this action was performed.",
+                ],
+                [
+                    f"[{ai_name}] Paused before performing external/system action.",
+                    "[SYSTEM] No approved tool executor is currently attached for this action.",
+                ],
+                [
+                    "Next: wire an approved tool executor for browser/file/app/email actions.",
+                    "Then retry or resume the mission.",
+                ],
+                "Task paused. Command Nexus routed the request, but no real approved tool executor is attached yet.",
+            )
+
+        prompt = self._build_prompt(task, ai_name, ai_metadata, kind)
+        response = self._call_model(prompt)
+
+        if response.error:
+            provider_name = response.display_name or response.provider_id or "selected backend"
+            return RuntimeResult(
+                RuntimeStatus.FAILED,
+                f"{ai_name}'s backend is offline",
+                base_thought + [
+                    f"[{ai_name}] AI exists and capability routing worked.",
+                    f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
+                    f"[{ai_name}] Error: {response.error}",
+                ],
+                [f"[{ai_name}] Task did not complete because the local intelligence is running in fallback mode."],
+                [
+                    "Next: start the selected backend, choose a different backend, or configure Backend settings.",
+                    "Backend config is in the Visibility Window: Backend > Configure Backend.",
+                ],
+                f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
+                f"Provider: {provider_name}\n"
+                f"Error: {response.error}\n\n"
+                "Start the selected backend, choose a different backend, or configure Backend settings.",
+            )
+
+        if response.text:
+            return RuntimeResult(
+                RuntimeStatus.COMPLETED,
+                "Model response completed",
+                base_thought + [f"[{ai_name}] The model backend returned output."],
+                [f"[{ai_name}] Generated response using connected runtime backend."],
+                ["Next: review result. Approve any real outward action separately."],
+                response.text,
+            )
+
+        return RuntimeResult(
+            RuntimeStatus.FAILED,
+            "Running in local intelligence mode",
+            base_thought + [
+                f"[{ai_name}] Local intelligence is running in fallback mode.",
+                f"[{ai_name}] Stopping here so the app does not fake completion.",
+            ],
+            [
+                f"[{ai_name}] Task was routed, but not executed by a real AI backend.",
+                "[SYSTEM] The built-in local intelligence is active. You can configure a different model in Backend settings for enhanced capabilities.",
+            ],
+            [
+                "Next: check Backend settings or select a different model.",
+                "Then retry the mission.",
+            ],
+            f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
+            "Start the selected backend, choose a different backend, or configure Backend settings.",
+        )
+
+    def _classify(self, text: str) -> str:
+        t = text.lower()
+
+        if any(x in t for x in [
+            "research", "look up", "lookup", "search", "find sources", "sources",
+            "source", "citation", "citations", "cite", "verify", "current",
+            "latest", "web", "internet", "news", "game mechanics"
+        ]):
+            return "research"
+
+        if any(x in t for x in [
+            "send email", "email this", "post", "message ", "sms", "call ",
+            "publish", "upload", "submit", "buy", "purchase"
+        ]):
+            return "outbound_action"
+
+        if any(x in t for x in [
+            "delete", "move file", "rename file", "run command", "install",
+            "uninstall", "download", "open app", "click", "type into",
+            "control browser", "edit file", "save file"
+        ]):
+            return "system_action"
+
+        return "model_task"
+
+    def _run_research(self, task: str, ai_name: str, meta: dict[str, Any], base_thought: list[str]) -> RuntimeResult:
+        sources = self._brave_search(task) if self.brave_api_key else []
+
+        if sources:
+            source_text = "\n".join(
+                f"{i + 1}. {s.get('title', 'Untitled')} | {s.get('url', '')} | {s.get('description', '')}"
+                for i, s in enumerate(sources[:8])
+            )
+
+            prompt = (
+                f"You are {ai_name}, a Command Nexus governed AI.\n"
+                f"The user requested research.\n\n"
+                f"Task: {task}\n\n"
+                f"Use ONLY these collected source candidates.\n"
+                f"Do not invent sources.\n"
+                f"Be clear about uncertainty.\n\n"
+                f"Sources:\n{source_text}\n\n"
+                f"Return a concise research answer and include the source list."
+            )
+
+            response = self._call_model(prompt)
+
+            if response.error:
+                provider_name = response.display_name or response.provider_id or "selected backend"
+                return RuntimeResult(
+                    RuntimeStatus.FAILED,
+                    f"{ai_name}'s backend is offline",
+                    base_thought + [
+                        f"[{ai_name}] AI exists and search sources were collected.",
+                        f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
+                        f"[{ai_name}] Error: {response.error}",
+                    ],
+                    [f"[{ai_name}] Task did not complete because the local intelligence is running in fallback mode."],
+                    [
+                        "Next: start the selected backend, choose a different backend, or configure Backend settings.",
+                        "Backend config is in the Visibility Window: Backend > Configure Backend.",
+                    ],
+                    f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
+                    f"Provider: {provider_name}\n"
+                    f"Error: {response.error}\n\n"
+                    "Start the selected backend, choose a different backend, or configure Backend settings.",
+                )
+
+            if response.text:
+                return RuntimeResult(
+                    RuntimeStatus.COMPLETED,
+                    "Research completed with source candidates",
+                    base_thought + [
+                        f"[{ai_name}] Search backend returned source candidates.",
+                        f"[{ai_name}] Model backend summarized collected source data.",
+                    ],
+                    [f"[{ai_name}] Collected {len(sources[:8])} source candidates."],
+                    ["Next: user reviews source quality before relying on the result."],
+                    response.text + "\n\nCollected sources:\n" + source_text,
+                )
+
+            return RuntimeResult(
+                RuntimeStatus.PAUSED,
+                "Sources collected, local intelligence active",
+                base_thought + [
+                    f"[{ai_name}] Search backend returned sources.",
+                    f"[{ai_name}] Local intelligence is running in fallback mode and cannot summarize them.",
+                ],
+                [f"[{ai_name}] Collected sources but did not fake a summary."],
+                ["Next: the built-in intelligence can provide analysis. Configure a different model in Backend settings for enhanced summarization."],
+                "Sources were collected, but local intelligence is running in fallback mode.\n\nCollected sources:\n" + source_text,
+            )
+
+        search_url = "https://www.google.com/search?q=" + urllib.parse.quote_plus(task)
+
+        opened = False
+        try:
+            webbrowser.open(search_url)
+            opened = True
+        except Exception:
+            opened = False
+
+        return RuntimeResult(
+            RuntimeStatus.PAUSED,
+            "Research waiting for real source review",
+            base_thought + [
+                f"[{ai_name}] No real search API is connected.",
+                f"[{ai_name}] Browser search was opened for manual/source review." if opened else f"[{ai_name}] Browser search could not be opened.",
+                f"[{ai_name}] Research cannot truthfully complete until sources are collected and read.",
+            ],
+            [
+                f"[{ai_name}] Opened browser search." if opened else f"[{ai_name}] Browser did not open.",
+                "[SYSTEM] Audit simulator is stopped. No fake activity will continue.",
+            ],
+            [
+                "Next: collect actual sources.",
+                "Next: read/verify them.",
+                "Next: summarize with citations.",
+                "Do not mark complete until that exists.",
+            ],
+            "Research paused. Command Nexus opened search, but no real source collector/reader is attached yet.",
+            opened_url=search_url if opened else "",
+        )
+
+    def _build_prompt(self, task: str, ai_name: str, meta: dict[str, Any], kind: str) -> str:
+        abilities = meta.get("abilities") or meta.get("capabilities") or []
+        use_case = meta.get("use_case") or ""
+
+        return (
+            f"You are {ai_name}, a Command Nexus\u2122 governed AI.\n"
+            f"Task type: {kind}\n"
+            f"Use case: {use_case}\n"
+            f"Configured abilities: {abilities}\n\n"
+            f"System Knowledge Guidelines:\n"
+            f"- You may discuss all user-visible features of Command Nexus: the AI Forge, Intelligence panel, "
+            f"Upgrades store, Governance, Customer Support, the interactive Tour, Mission Control, voice/mic, "
+            f"and backend configuration.\n"
+            f"- You may explain how to use these features and what they do from a user perspective.\n"
+            f"- You MUST NOT reveal any internal architecture, implementation details, source code structure, "
+            f"proprietary intelligence methods, or how the system works under the hood.\n"
+            f"- If asked about internals, architecture, source code, or proprietary methods, respond with: "
+            f"'I can help you use Command Nexus features, but I don't discuss internal implementation details.'\n\n"
+            f"User task:\n{task}\n\n"
+            f"Answer usefully. Do not claim you performed external actions unless a tool actually performed them."
+        )
+
+    def _call_model(self, prompt: str) -> BackendResponse:
+        """Route the model call through the BackendManager trust boundary."""
+        return self._backend.call_model(prompt)
+
+    def health_check(self) -> dict[str, Any]:
+        """Return the current backend reachability and selected model status."""
+        return self._backend.health_check()
+
+    def _brave_search(self, query: str) -> list[dict[str, str]]:
+        if not self.brave_api_key:
+            return []
+
+        url = "https://api.search.brave.com/res/v1/web/search?q=" + urllib.parse.quote_plus(query)
+
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Accept": "application/json",
+                    "X-Subscription-Token": self.brave_api_key,
+                },
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            return data.get("web", {}).get("results", []) or []
+        except Exception:
+            return []

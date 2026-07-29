@@ -1,0 +1,13 @@
+[
+  {
+    "id": "7a3fcad0-4dbb-4cd2-8c44-07bf0e357090",
+    "ai_uuid": "cd242447-6932-403a-be9a-de15493946fb",
+    "content": "User prefers Python over JavaScript",
+    "tags": [
+      "preference"
+    ],
+    "source": "mission",
+    "importance": 0.9,
+    "created_at": "2026-06-23T06:10:23.137140"
+  }
+]

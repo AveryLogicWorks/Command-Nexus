@@ -1,0 +1,21 @@
+﻿
+=== FULL PYTEST (excl headless) ===
+    f"[{datetime.utcnow().isoformat()}] REJECTED: company secret references found in active probing"
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR test_startup.py::test_step
+11 passed, 39 warnings, 1 error in 1.52s
+=== HEADLESS AS SCRIPT ===
+  OK: GuardrailNoFalsePositives
+  OK: TemperatureOverride
+  OK: BackendTemperatureParam
+
+============================================================
+HEADLESS SMOKE TEST: 22 PASSED, 0 FAILED
+ALL TESTS PASSED
+============================================================
+headless exit: 0
+=== COMPILE SWEEP ===
+compileall exit: 0
+DONE

@@ -1,0 +1,25 @@
+=== COMMAND NEXUS - ENTERPRISE CORPORATE (NEGOTIATED) KEYS ===
+Generated: 2026-06-27 16:27
+Tier: Enterprise Corporate (negotiated)
+Duration: 3650 days
+Total keys: 2
+
+--- READY TO DISTRIBUTE ---
+
+Key 01: EC00-7D0C-5F4C-36F6-D4C8-5DA1-1D5F-E1E0-718F
+  Raw:  EC007D0C5F4C36F6D4C85DA11D5FE1E0718F
+  Expires: 2036-06-24
+
+Key 02: EC00-7D0C-5F4C-1E8F-99AB-2FEB-763F-885B-FB0C
+  Raw:  EC007D0C5F4C1E8F99AB2FEB763F885BFB0C
+  Expires: 2036-06-24
+
+=== HOW TO USE ===
+1. Give one key to each person
+2. They download CommandNexus.exe from averylogicworks.com
+3. On first launch, they paste the key to activate
+4. License valid for 3650 days from activation
+
+=== SECURITY NOTE ===
+Each key is HMAC-signed and cannot be forged.
+Keep this file secure. Do not share publicly.

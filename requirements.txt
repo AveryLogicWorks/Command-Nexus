@@ -1,0 +1,14 @@
+PySide6>=6.6.0
+mss>=9.0.0
+psutil>=5.9.0
+
+# Voice — all license-free (MIT/BSD), no cloud APIs, no GPL
+faster-whisper>=1.0.0
+sounddevice>=0.4.0
+numpy>=1.24.0
+
+# Optional — pyaudio is a fallback if sounddevice is unavailable (MIT)
+# PyAudio>=0.2.14
+
+# Optional — pywin32 enables SAPI TTS without ctypes fallback (MIT)
+# pywin32>=306

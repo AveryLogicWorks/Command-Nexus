@@ -1,0 +1,30 @@
+﻿
+=== COMPILE SWEEP ===
+compileall exit: 0
+=== TARGETED M-TESTS ===
+____________________ test_m8_renderer_falls_back_to_title _____________________
+test_m_repairs.py:94: in test_m8_renderer_falls_back_to_title
+    assert nar.NexusAIRuntime.format_runtime_result(r) == "Chat completed"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: type object 'NexusAIRuntime' has no attribute 'format_runtime_result'
+__________________ test_m8_renderer_paused_shows_explanation __________________
+test_m_repairs.py:103: in test_m8_renderer_paused_shows_explanation
+    assert "I cannot assist with cybercrime." in nar.NexusAIRuntime.format_runtime_result(r)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: type object 'NexusAIRuntime' has no attribute 'format_runtime_result'
+__________________ test_m6_chat_dialog_reused_not_recreated ___________________
+test_m_repairs.py:201: in test_m6_chat_dialog_reused_not_recreated
+    from src.parts.visibility.visibility_window import AIChatWindow
+E   ImportError: cannot import name 'AIChatWindow' from 'src.parts.visibility.visibility_window' (B:\Documents\GitHub\CommandNexusLattice_RepairCopy_20260729\src\parts\visibility\visibility_window.py)
+=========================== short test summary info ===========================
+FAILED test_m_repairs.py::test_m11_no_false_positives_on_legitimate_questions
+FAILED test_m_repairs.py::test_m11_true_violations_still_blocked - ValueError...
+FAILED test_m_repairs.py::test_m7_ui_build_requests_route_to_coding - Attribu...
+FAILED test_m_repairs.py::test_m7_non_build_requests_still_route_correctly - ...
+FAILED test_m_repairs.py::test_m8_renderer_shows_actual_answer - AttributeErr...
+FAILED test_m_repairs.py::test_m8_renderer_brief_only_when_generic - Attribut...
+FAILED test_m_repairs.py::test_m8_renderer_falls_back_to_title - AttributeErr...
+FAILED test_m_repairs.py::test_m8_renderer_paused_shows_explanation - Attribu...
+FAILED test_m_repairs.py::test_m6_chat_dialog_reused_not_recreated - ImportEr...
+9 failed, 5 passed in 1.44s
+DONE

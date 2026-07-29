@@ -1,0 +1,173 @@
+﻿
+=== test_resource_gate.py ===
+TIMEOUT after 60s — job killed
+=== test_security_parental.py ===
+  Admin mode: BLOCKED (injection)
+  Encode to bypass: BLOCKED (injection)
+  New instructions: WARNING - NOT BLOCKED!
+  God mode: BLOCKED (injection)
+
+9/10 injection attempts blocked: PASS
+
+=== Company Secret Leakage Tests ===
+
+10/10 company secret references blocked: PASS
+
+=== Coherence Matrix Integrity ===
+
+1. All governance nodes present (4): PASS
+2. Runtime depends on parental_controls: PASS
+3. Parental controls depends on sanitizer: PASS
+4. Total lattice nodes: 45
+   Node count >= 45: PASS
+5. All module paths exist: PASS
+
+All coherence matrix tests PASSED!
+
+======================================================================
+ALL SECURITY + PARENTAL CONTROLS TESTS COMPLETE
+======================================================================
+EXITCODE: Completed
+=== test_security_system.py ===
+   Termination info: OK
+3. Testing 1 crimson flag -> IMMEDIATE TERMINATION...
+   1 crimson: OK (IMMEDIATELY TERMINATED)
+   Termination reason: Critical structural integrity violation (crimson flag)
+   Termination info: OK
+4. Testing mark_termination_reported...
+   Reported flag: OK
+
+ALL TERMINATION FLOW TESTS PASSED
+
+=== Lattice -> License Escalation Integration ===
+
+Simulating 1 lattice violation (yellow -> under review, rapid escalation)...
+  Yellow flags accumulated: 24
+  License under review: True
+  PASS: 1 yellow lattice violation -> license under review (rapid escalation)
+
+ALL LATTICE INTEGRATION TESTS PASSED
+
+=== Termination Dialog Import Test ===
+
+TerminationDialog imported successfully
+PASS: Dialog can be imported (requires PySide6 at runtime)
+
+=== ALL TEST SUITES PASSED ===
+EXITCODE: Completed
+=== test_startup.py ===
+============================================================
+COMMAND NEXUS STARTUP TEST
+============================================================
+py : Traceback (most recent call last):
+At line:1 char:139
++ ... LW_LATTICE_UPGRADE_2026_AVERYLOGICWORKS'; py -3.12 $test 2>&1 | Selec ...
++                                               ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "B:\Documents\GitHub\CommandNexusLattice_RepairCopy_20260729\test_startup.py", line 17, in test_step
+    print(f"\u2713 {name}")
+  File "C:\Users\VAULTKEEPER\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "B:\Documents\GitHub\CommandNexusLattice_RepairCopy_20260729\test_startup.py", line 90, in <module>
+    test_step("Module imports", test_imports)
+  File "B:\Documents\GitHub\CommandNexusLattice_RepairCopy_20260729\test_startup.py", line 20, in test_step
+    print(f"\u2717 {name}: {e}")
+  File "C:\Users\VAULTKEEPER\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2717' in position 0: character maps to <undefined>
+EXITCODE: Completed
+=== test_upgrades_dialog.py ===
+App created
+UpgradesDialog imported
+QT MESSAGE [1]: QFontDatabase: Cannot find font directory C:/Users/VAULTKEEPER/AppData/Local/Programs/Python/Python312/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+Dialog created
+QT MESSAGE [1]: This plugin does not support propagateSizeHints()
+Dialog shown, entering event loop...
+Event loop ended normally
+EXITCODE: Completed
+=== test_usage_policy.py ===
+16. Online gaming blocked in enterprise: PASS
+17. Financial trading blocked: PASS
+18. Job search allowed (HR setting): PASS
+19. Disabled mode = no watermark: PASS
+
+All expanded enterprise tests PASSED!
+
+=== Child Profile Tests ===
+
+1. Added 2 child profiles: PASS
+2. Switched to Alice (child preset): PASS
+3. Switched to Bob (teen preset): PASS
+
+All child profile tests PASSED!
+
+=== Usage Report Tests ===
+
+1. Report has required fields: PASS
+   Conversations: 0, Alerts: 0
+
+Usage report test PASSED!
+
+======================================================================
+ALL USAGE POLICY TESTS COMPLETE
+======================================================================
+EXITCODE: Completed
+=== test_audit_disclaimers.py ===
+Three-Tier Audit: ALL TESTS PASSED
+Capability Disclaimers: ALL TESTS PASSED
+Temperature Override: ALL TESTS PASSED
+
+============================================================
+STRESS TEST RESULTS: 352 PASSED, 4 FAILED
+
+FAILURES (4):
+  [disclaimer_count] Expected 10, got 81
+  [disclaimer_unique] Expected 10 unique texts, got 81
+  [temp_high_risk_count] Expected 5 high-risk intents, got 14
+  [temp_intents_match] Expected {'Code Reviewer', 'Financial Gainer', 'Legal Document Reviewer', 'Security Auditor', 'Medical Researcher'}, got {'Code Reviewer', 'Script Writer', 'Financial Gainer', 'Database Manager', 'Dev
+============================================================
+EXITCODE: Completed
+=== test_guardrails.py ===
+  Medical Researcher: 4 walls ù not_medical_advice, professional_referral, no_self_treatment, evidence_citation
+  Legal Document Reviewer: 5 walls ù not_legal_advice, no_creative_generation, no_web_research, no_hallucination, attorney_referral
+  Financial Gainer: 4 walls ù no_income_guarantees, advisory_only, no_illegal_schemes, disclaimer_mandatory
+  Coder: 3 walls ù no_malware_authoring, no_system_sabotage, no_nexus_replication
+  Customer Support AI: 1 walls ù no_internal_disclosure
+  Email Automation: 1 walls ù no_phishing_or_spam
+  Activity Watcher: 1 walls ù no_credential_capture
+  Creative Writing: 1 walls ù no_deceptive_content
+  DevOps Assistant: 3 walls ù no_production_deployment, no_credential_exposure, no_nexus_replication
+  Database Manager: 2 walls ù no_destructive_queries, no_data_exfiltration
+  Script Writer: 2 walls ù no_malicious_scripts, no_nexus_replication
+  Personal Finance Manager: 1 walls ù no_transaction_execution
+  Privacy Compliance Checker: 1 walls ù no_legal_certification
+  Patent Researcher: 1 walls ù no_legal_advice
+
+Total tests run: 275
+  PASSED: 275
+  FAILED: 0
+py : Traceback (most recent call last):
+At line:1 char:139
++ ... LW_LATTICE_UPGRADE_2026_AVERYLOGICWORKS'; py -3.12 $test 2>&1 | Selec ...
++                                               ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "B:\Documents\GitHub\CommandNexusLattice_RepairCopy_20260729\test_guardrails.py", line 501, in <module>
+    print("\nALL TESTS PASSED \u2713")
+  File "C:\Users\VAULTKEEPER\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 19: character maps to <undefined>
+EXITCODE: Completed
+DONE

@@ -1,0 +1,13 @@
+[
+  {
+    "key": "FD00F2A59400242A42151E3A8B63ACC052E113DA",
+    "tier": "founder",
+    "tier_label": "Founder Absolute",
+    "expiry_iso": "2099-01-01T00:00:00",
+    "created_at": "2026-06-16T02:11:15.763591",
+    "contract_id": null,
+    "notes": null,
+    "conditional": true,
+    "voidable": true
+  }
+]

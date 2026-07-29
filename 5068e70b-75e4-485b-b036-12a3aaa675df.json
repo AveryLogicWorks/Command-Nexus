@@ -1,0 +1,13 @@
+[
+  {
+    "id": "e7218dbb-efa3-4be4-b73c-3ca33dbb796a",
+    "ai_uuid": "5068e70b-75e4-485b-b036-12a3aaa675df",
+    "content": "Project Alpha uses Python",
+    "tags": [
+      "project"
+    ],
+    "source": "manual",
+    "importance": 0.7,
+    "created_at": "2026-06-23T06:02:40.740892"
+  }
+]
