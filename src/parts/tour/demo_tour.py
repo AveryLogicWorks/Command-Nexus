@@ -879,6 +879,18 @@ class DemoTourController(QWidget):
                 narration="Step 7. Give Your AI a Mission. The Active AI is shown in the selector. Type a task in the Mission Control box, like 'Plan my day,' 'Write a poem about space,' 'Explain how photosynthesis works,' 'Summarize this document,' 'Create a weekly meal plan,' or 'Draft an email to my team about the project update.' Your AI will use its capabilities to complete the mission. No coding required. Just type what you want in plain language. The AI's response appears in the Thought and Action panels. You can see exactly what it's thinking and doing. Click the START button when ready.",
             ),
 
+            # === STEP 7b: Select an Active AI (required before Intelligence) ===
+            DemoTourStep(
+                title="\U0001f464 Step 7b: Select Your Active AI",
+                instruction="Make sure your deployed AI is selected in the Active AI selector (top of this window) before continuing.",
+                detail_html="""<p>Look at the <b>Active AI</b> selector near the top of the window.</p>
+                <p>If it is empty or shows the wrong AI, open the dropdown and <b>select the AI you deployed</b>.</p>
+                <p>Everything that comes next — Intelligence, missions, chat — applies to the <b>selected Active AI</b>. If none is selected, the next steps won't work as expected.</p>""",
+                target_widget_name=None,
+                action_prompt="\U0001f449 CHECK that your AI is selected, then click Next",
+                narration="Step 7 b. Select your Active AI. Before using Intelligence, make sure your deployed AI is selected in the Active AI selector at the top of the window. If it's empty, open the dropdown and select the AI you just deployed. Intelligence, missions, and chat all apply to the selected Active AI. If none is selected, the next steps won't work as expected.",
+            ),
+
             # === STEP 8: Intelligence ===
             DemoTourStep(
                 title="\U0001f4da Step 8: Add Intelligence",
