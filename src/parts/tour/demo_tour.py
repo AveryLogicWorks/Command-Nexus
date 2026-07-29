@@ -1302,6 +1302,11 @@ class DemoTourController(QWidget):
             self._rehighlight_timer.stop()
             return
         step = self._steps[self._current_step]
+        # Any popup opened during the tour (model picker, dialogs, etc.) must sit
+        # fully above the overlay — never partially hidden or ambiguous.
+        for w in QApplication.topLevelWidgets():
+            if w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible():
+                self._overlay.stackUnder(w)
         target = self._find_target(step)
         if target and target.isVisible():
             self._rehighlight_timer.stop()
