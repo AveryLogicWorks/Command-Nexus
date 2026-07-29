@@ -1281,6 +1281,7 @@ class DemoTourController(QWidget):
         self._tooltip.setFocus()
         self._tooltip.raise_()
         self._tooltip.activateWindow()
+        self._stack_popups_above_overlay()
         
         # Voice narration — use full narration text if provided, otherwise title + instruction
         if self._voice_enabled and self._tts.available:
@@ -1308,6 +1309,22 @@ class DemoTourController(QWidget):
                 return None
         return None
     
+    def _stack_popups_above_overlay(self):
+        """Every popup (deploy/save confirmations, disclaimers, model picker) must
+        stay fully visible and clickable above the tour: stacked over the overlay,
+        and application-modal ones downgraded to window-modal so the tour's Next
+        button is never blocked.
+        """
+        for w in QApplication.topLevelWidgets():
+            if w in (self._overlay, self._tooltip, self._main_window) or not w.isVisible():
+                continue
+            self._overlay.stackUnder(w)
+            if w.isModal() and not getattr(w, "_tour_windowmodal", False):
+                w._tour_windowmodal = True
+                w.hide()
+                w.setWindowModality(Qt.WindowModality.WindowModal)
+                w.show()
+
     def _rehighlight(self):
         """Periodically re-check if the target widget has appeared (e.g. sub-window just opened)."""
         if self._current_step >= len(self._steps):
@@ -1316,17 +1333,7 @@ class DemoTourController(QWidget):
         step = self._steps[self._current_step]
         # Any popup opened during the tour (model picker, dialogs, etc.) must sit
         # fully above the overlay — never partially hidden or ambiguous.
-        for w in QApplication.topLevelWidgets():
-            if w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible():
-                self._overlay.stackUnder(w)
-                # Downgrade application-modal popups (e.g. "AI activated", import
-                # disclaimer) to window-modal: they stay on top and still block the
-                # app window, but can never block the tour's Next button.
-                if w.isModal() and not getattr(w, "_tour_windowmodal", False):
-                    w._tour_windowmodal = True
-                    w.hide()
-                    w.setWindowModality(Qt.WindowModality.WindowModal)
-                    w.show()
+        self._stack_popups_above_overlay()
         target = self._find_target(step)
         if target and target.isVisible():
             self._rehighlight_timer.stop()
@@ -1354,6 +1361,7 @@ class DemoTourController(QWidget):
                 self._overlay.stackUnder(tw)
             else:
                 self._overlay.raise_()
+                self._stack_popups_above_overlay()
             self._tooltip.raise_()
     
     def _install_event_filter(self):
