@@ -624,6 +624,11 @@ class AutoTourDriver:
         self._narr_phase = "idle"  # idle | start | speaking | grace | dwell | done
         self._narr_mark = 0.0
         self._grace_until = 0.0
+        # Popup title recorded by the tour's z-order guardian (a SEPARATE timer —
+        # the driver's own timer cannot fire while a clicked handler blocks in a
+        # modal dialog's nested exec()).
+        self._popup_seen = None
+        self._popup_since = 0.0
         self.results: list[dict] = []
         tour._speech_bridge.done.connect(self._on_speech_done)
 
@@ -775,7 +780,13 @@ class AutoTourDriver:
                 self._dwell_until = None
                 t._on_next()
             else:
-                self.stop()  # verification failed — stop, do not advance
+                # Verification failed — show the REAL reason, do not advance.
+                try:
+                    reason = getattr(self, "_popup_title", None) or "expected result not confirmed"
+                    self._tour._tooltip._action_label.setText(f"\u26d4 Demo stopped: {reason}")
+                except Exception:
+                    pass
+                self.stop()
 
     def _glide_and_click(self, step, target):
         import time
@@ -798,12 +809,32 @@ class AutoTourDriver:
             return
         ov.set_auto_cursor(end)
         ov.pulse_click_ring()
+        self._prepare_step(step)  # prerequisites: AI name before Save, selection before Deploy
         self._baseline = self._capture_baseline(step)
-        self._trigger(target)
+        # Enter wait_result BEFORE triggering: confirmation dialogs (e.g. "AI
+        # Activated") BLOCK the clicked handler in a nested event loop — re-entrant
+        # timer ticks must already be in wait_result to dismiss/verify them.
         self._pending = {"step": self._tour._current_step + 1, "title": step.title,
                          "target_found": True, "action": True}
+        self._popup_seen = None
+        self._popup_since = 0.0
         self._deadline = time.monotonic() + 8.0 / self._speed
         self._state = "wait_result"
+        self._trigger(target)
+
+    def _prepare_step(self, step):
+        """Ensure the prerequisites a real user would have satisfied:
+        a non-empty AI name before Save (Save validates it), and a selected
+        list item before Deploy (Deploy activates the SELECTION)."""
+        getter_name = getattr(getattr(step, "target_getter", None), "__name__", "") or ""
+        if "save" in getter_name:
+            name_edit = self._tour._find_forge_name_input()
+            if name_edit is not None and not name_edit.text().strip():
+                name_edit.setText("Demo AI")
+        elif "deploy" in getter_name:
+            lst = self._tour._find_forge_ai_list()
+            if lst is not None and lst.count() and lst.currentRow() < 0:
+                lst.setCurrentRow(lst.count() - 1)  # the just-saved AI
 
     # ---- action dispatch: reuse the app's own handlers ----
     def _trigger(self, w):
@@ -835,19 +866,23 @@ class AutoTourDriver:
 
     # ---- verification: expected state + popups demonstrated above the tour ----
     def _verify(self, step):
-        """Returns (ok | None keep-waiting, popup_ok | None). Notification dialogs
-        are detected, recorded as displayed, then closed via their own button."""
-        from PySide6.QtWidgets import QDialog, QPushButton
+        """Returns (ok | None keep-waiting, popup_ok | None). Dialogs are
+        detected/classified/dismissed by the guardian timer (which can fire
+        inside nested exec); here we classify the recorded TITLE: success popups
+        ('AI Activated') confirm; failure popups ('No Selection', 'Missing Name',
+        ...) FAIL with the real reason — a warning can never fake a success."""
+        title = getattr(self, "_popup_seen", None)
+        self._popup_title = title
         popup_ok = None
-        for w in QApplication.topLevelWidgets():
-            if isinstance(w, QDialog) and w.isVisible() and w not in (
-                    self._tour._overlay, self._tour._tooltip, self._tour._main_window):
-                popup_ok = True
-                btns = w.findChildren(QPushButton)
-                if btns:
-                    btns[0].click()
-                else:
-                    w.accept()
+        FAIL_TITLES = ("No Selection", "Missing Name", "Error", "License Limit",
+                       "Save Failed", "BLOCKED", "Protected Mode", "Approved Use Locks",
+                       "Governance Block")
+        if title is not None:
+            if any(t in title for t in FAIL_TITLES):
+                self._popup_seen = None
+                return False, False  # real failure — stop, show reason
+            popup_ok = True  # guardian already demonstrated + dismissed it
+            self._popup_seen = None
         name = step.target_widget_name or ""
         getter_name = getattr(getattr(step, "target_getter", None), "__name__", "") or ""
         if name == "nav_forge":
@@ -858,6 +893,8 @@ class AutoTourDriver:
                 return True, popup_ok
             return None, popup_ok
         if "deploy" in getter_name:
+            # Deploy succeeds only on the activation confirmation, or if the
+            # Forge already closed (post-deploy hook) — never on a bare warning.
             if popup_ok or self._tour._find_forge_window() is None:
                 return True, popup_ok if popup_ok is not None else True
             return None, popup_ok
@@ -1222,7 +1259,7 @@ class DemoTourController(QWidget):
                 narration="Step 5. Guardrails. Guardrails are safety rules your AI follows. They are optional checkboxes that set safety boundaries. Available guardrails include: Ask before editing files, so the AI requests permission before any file change. Cite sources when researching, so the AI includes where it found information. Keep responses beginner-friendly, so the AI avoids technical jargon. Keep responses concise, so the AI keeps answers short. Require confirmation before risky actions, so the AI asks before anything potentially harmful. Prefer step-by-step explanations, so the AI breaks down complex topics. Always explain reasoning before giving answers, so the AI shows its thought process. Flag speculative answers clearly as speculation, so the AI marks guesses as guesses. Use inclusive and neutral language. And always suggest alternatives when declining a request. Guardrails are optional. Pick the ones that fit your use case. You can change them anytime.",
             ),
 
-            # === STEP 6: Save and Deploy ===
+            # === STEP 6: Deploy Your AI (save was covered in 6a) ===
             # === STEP 6a: Save AI to Forge (must come before Deploy) ===
             DemoTourStep(
                 title="\U0001f4be Step 6a: Save Your AI First",
@@ -1240,8 +1277,8 @@ class DemoTourController(QWidget):
             ),
 
             DemoTourStep(
-                title="\U0001f680 Step 6: Save and Deploy",
-                instruction="Click 'Save AI to Forge' to create your AI, then select it and click 'Deploy to Command Center'.",
+                title="\U0001f680 Step 6: Deploy Your AI",
+                instruction="Select your saved AI in the list (left side), then click 'Deploy to Command Center'.",
                 detail_html="""<p>Once you've configured your AI:</p>
                 <ol>
                     <li>Click <b>Save AI to Forge</b> (green button at the bottom) \u2014 this creates your AI</li>
@@ -1262,7 +1299,7 @@ class DemoTourController(QWidget):
                 action_prompt="\U0001f449 CLICK an AI in the list, then CLICK 'Deploy'",
                 wait_for_click=True,
                 on_target_clicked=self._close_forge_after_deploy,
-                narration="Step 6. Save and Deploy. Once you've configured your AI, click the green Save AI to Forge button at the bottom to create your AI. Your AI then appears in the AI Library list on the left side of the Forge. Click your AI in the list to select it. Then click the green Deploy to Command Center button to activate your AI. After deploying, the Forge will close and your AI appears in the Active AI selector in the main window. Other buttons in the Forge include: Drop-In AI, to load a pre-built AI template. Open Knowledge for AI, to edit the AI's intelligence. Open Chat, to start chatting immediately. Save AI to Disk, to export your AI to a file. And Load AI from Disk, to import an AI from a file.",
+                narration="Step 6. Deploy your AI. Your AI is saved. Now select it in the list on the left side of the Forge, then click the green Deploy to Command Center button to activate it. After deploying, the Forge will close and your AI appears in the Active AI selector in the main window.",
             ),
 
             # === STEP 6b: Select an Active AI (required before START) ===
@@ -1763,13 +1800,39 @@ class DemoTourController(QWidget):
         # Dialogs (notifications, disclaimers, pickers): the tour drops its
         # always-on-top band entirely so the dialog rises above everything.
         self._set_topmost(not dialogs)
+        drv = getattr(self, "_driver", None)
+        driver_active = getattr(drv, "_state", "idle") in ("moving", "wait_result")
         for w in dialogs:
-            if w.isModal() and not getattr(w, "_tour_windowmodal", False):
+            # While the automated driver is running, NEVER hide()/re-show a modal
+            # dialog: hide() force-returns exec(), destroying the confirmation
+            # before the driver can verify it. The driver dismisses dialogs via
+            # their own buttons and is not blocked by application modality.
+            if w.isModal() and not driver_active and not getattr(w, "_tour_windowmodal", False):
                 w._tour_windowmodal = True
                 w.hide()
                 w.setWindowModality(Qt.WindowModality.WindowModal)
                 w.show()
             w.raise_()
+        # Dialog dismissal for the automated driver lives HERE: this guardian runs
+        # on a separate QTimer, which CAN fire while the driver's own timer is
+        # blocked inside a clicked handler's nested exec() (deploy confirmation).
+        # The popup is demonstrated visibly for ~1s, then dismissed via its own
+        # button; its TITLE is recorded for the driver's verification.
+        if drv is not None and drv._state == "wait_result":
+            import time as _time
+            from PySide6.QtWidgets import QPushButton
+            for w in dialogs:
+                if w in (self._overlay, self._tooltip, self._main_window):
+                    continue
+                title = w.windowTitle() or ""
+                if drv._popup_seen != title:
+                    drv._popup_seen = title
+                    drv._popup_since = _time.monotonic()
+                    continue  # first sighting — let it stay visible
+                if _time.monotonic() - drv._popup_since < 0.9:
+                    continue  # demonstrating above the tour
+                btns = w.findChildren(QPushButton)
+                (btns[0].click() if btns else w.accept())
 
     def _set_topmost(self, on: bool):
         """Add or remove WindowStaysOnTopHint on the overlay and tooltip."""
