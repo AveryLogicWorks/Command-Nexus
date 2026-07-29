@@ -206,6 +206,10 @@ def test_m2_forge_required_caps_hard_locked():
             chk = by_name[cap]
             assert chk.isChecked(), f"{cap} should be checked for a starter"
             assert not chk.isEnabled(), f"{cap} should be hard-locked (disabled) for a starter"
+        for name, chk in by_name.items():
+            if name not in required:
+                assert not chk.isChecked(), f"{name} should be unchecked for a starter"
+                assert not chk.isEnabled(), f"{name} should be locked (disabled) for a starter"
     finally:
         w.deleteLater()
 

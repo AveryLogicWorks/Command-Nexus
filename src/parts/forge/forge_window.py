@@ -2377,7 +2377,8 @@ class CharacterSheetWidget(QWidget):
         self._apply_required_cap_locks()
 
     def _apply_required_cap_locks(self):
-        """Hard-lock a starter's required capabilities: checked and non-deselectable."""
+        """A starter's capability set is fully fixed: required cores are checked
+        and non-deselectable; every other capability is locked (disabled)."""
         required = getattr(self, "_required_caps", set()) or set()
         if not required:
             return
@@ -2385,9 +2386,15 @@ class CharacterSheetWidget(QWidget):
             base = chk.text().replace("\U0001f512", "").strip()
             if base in required:
                 chk.setChecked(True)
-                chk.setEnabled(False)
                 tip = chk.toolTip() or f"<b>{base}</b>"
                 chk.setToolTip(f"{tip}<br><i>Required for this starter — cannot be removed.</i>")
+            else:
+                chk.setChecked(False)
+                if "\U0001f512" not in chk.text():
+                    chk.setText(f"\U0001f512 {chk.text()}")
+                tip = chk.toolTip() or f"<b>{base}</b>"
+                chk.setToolTip(f"{tip}<br><i>Locked for starters — the capability set is fixed.</i>")
+            chk.setEnabled(False)
 
     def _on_uc_changed(self, text: str):
         # One consistent interaction: capabilities for the chosen use case appear

@@ -50,6 +50,16 @@
       },
       "verification": "test_m_repairs.py 15/15 PASS after fix. App restart verifies store shows exactly 3 starters (Lily, Daedalus, Hephaestus) with hard-locked capability cores.",
       "note": "The first helper-function edit was silently lost from the working tree (external rewrite; same ghost-merge behavior seen mid-session). Re-applied and committed immediately. Recommendation: avoid tools syncing/copying over the repair copy while work is in flight."
+    },
+    {
+      "timestamp": "2026-07-29T08:02:00-07:00",
+      "event": "m1_m2_followup_starter_full_freeze_and_athena_removal",
+      "finding": "Manual test follow-up: (1) starter capability sets must be FULLY fixed — all capabilities except the starter's selected cores must be locked, not just tier-gated; (2) an extra starter-named unit 'Athena' (non-starter leftover Athena_aaed7018, Workflow Automator) still showed in the AI list.",
+      "fix": {
+        "code": "forge_window.py _apply_required_cap_locks: when a starter is loaded, required cores are checked+disabled and EVERY other capability is unchecked+disabled (with lock glyph + tooltip). Test test_m2_forge_required_caps_hard_locked extended to assert non-required caps are unchecked and disabled.",
+        "data": "Deleted Athena_aaed7018.json from ai_store (prior full backup retained in ai_store_backup_20260729_0755)."
+      },
+      "verification": "test_m_repairs.py 15/15 PASS; app relaunched — AI list shows exactly Lily/Daedalus/Hephaestus starters with fully frozen capability sets."
     }
   ]
 }
