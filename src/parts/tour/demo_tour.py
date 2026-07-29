@@ -613,12 +613,14 @@ class AutoTourDriver:
         self._pending = None
         self._baseline = 0
         self._deadline = 0.0
+        self._dwell_until = None
         self.results: list[dict] = []
 
     # ---- controls ----
     def start(self):
         self.results.clear()
         self._pos = None
+        self._dwell_until = None
         self._state = "moving"
         self._arm()
 
@@ -680,6 +682,16 @@ class AutoTourDriver:
         target = t._find_target(step)
         if self._state == "moving":
             if not step.wait_for_click:
+                # Dwell so the viewer can read/hear the step: paced to narration
+                # length (~2.2 words/sec), clamped 4-14s, scaled by demo speed.
+                if self._dwell_until is None:
+                    words = len((step.narration or step.instruction or "").split())
+                    dwell = min(14.0, max(4.0, words / 2.2 + 2.0)) / self._speed
+                    self._dwell_until = time.monotonic() + dwell
+                    return
+                if time.monotonic() < self._dwell_until:
+                    return
+                self._dwell_until = None
                 self.results.append({"step": t._current_step + 1, "title": step.title,
                                      "target_found": target is not None, "action": False,
                                      "expected": True, "popup_ok": None, "ok": True})
@@ -703,6 +715,7 @@ class AutoTourDriver:
                     cb()
                 self._state = "moving"
                 self._pos = None
+                self._dwell_until = None
                 t._on_next()
             else:
                 self.stop()  # verification failed — stop, do not advance
