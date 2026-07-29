@@ -2676,6 +2676,22 @@ class CharacterSheetWidget(QWidget):
         self._update_ai_details_preview()
 
 
+def demote_noncanonical_starters(units, canonical_names):
+    """Demote stale starters left behind by older builds (upgrade path).
+
+    A unit flagged is_starter whose name is not one of the canonical starter
+    names (Lily, Daedalus, Hephaestus) loses starter status so that only the
+    canonical starters exist and carry hard-locked capability cores. Mutates
+    units in place and returns the list of demoted units.
+    """
+    demoted = []
+    for u in units:
+        if getattr(u, "is_starter", False) and u.name not in canonical_names:
+            u.is_starter = False
+            demoted.append(u)
+    return demoted
+
+
 class AIForgeWindow(QMainWindow):
     """Command Nexus™ Part 2 — AI Forge."""
 
@@ -3011,6 +3027,17 @@ class AIForgeWindow(QMainWindow):
             use_full = False
 
         active_starters = starters_full if use_full else starters
+
+        # Reconcile stale starters left by older builds: only canonical starters
+        # keep starter status (and its hard-locked capability cores).
+        for demoted in demote_noncanonical_starters(
+            self._units, {tpl["name"] for tpl in active_starters}
+        ):
+            try:
+                self._save_to_store(demoted)
+            except Exception:
+                pass
+            self._audit_event("starter_ai_demoted", msg=demoted.name)
 
         # Trim starter capabilities to respect tier limits
         from ...core.membership_tiers import get_capability_limit, get_effective_tier

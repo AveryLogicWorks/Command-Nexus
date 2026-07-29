@@ -225,6 +225,40 @@ def test_m6_chat_workflow_reuses_workspace_not_duplicate():
         dlg.deleteLater()
 
 
+def test_m2_stale_starters_demoted():
+    """Units flagged is_starter by older builds (Hermes, Mnemosyne, Athena,
+    Hephaestus Relay) lose starter status; only canonical starters keep it."""
+    from src.parts.forge.forge_window import demote_noncanonical_starters
+    from src.parts.forge.forge_models import AIUnit, AISource
+    from src.core.constants import UseCaseClass
+
+    def mk(name, starter):
+        return AIUnit(
+            uuid=name.lower().replace(" ", "_"),
+            name=name,
+            use_case=UseCaseClass.INDIVIDUAL,
+            source=AISource.CREATED,
+            capabilities=[],
+            abilities=[],
+            personality_traits={},
+            context_notes="",
+            guardrails=[],
+            libraries=[],
+            is_starter=starter,
+        )
+
+    units = [
+        mk("Hermes", True), mk("Mnemosyne", True), mk("Athena", True),
+        mk("Hephaestus Relay", True),
+        mk("Lily", True), mk("Daedalus", True), mk("Hephaestus", True),
+        mk("Custom", False),
+    ]
+    demoted = demote_noncanonical_starters(units, {"Lily", "Daedalus", "Hephaestus"})
+    assert {u.name for u in demoted} == {"Hermes", "Mnemosyne", "Athena", "Hephaestus Relay"}
+    remaining = sorted(u.name for u in units if u.is_starter)
+    assert remaining == ["Daedalus", "Hephaestus", "Lily"]
+
+
 def test_m9_example_chip_launches_immediately():
     """Clicking an example chip must launch the task, not just fill the input."""
     _qapp()
