@@ -485,11 +485,18 @@ class DemoTourTooltip(QFrame):
                     break
             
             if best_x is None:
-                # None fit perfectly — pick the one that needs least clamping
-                best_x, best_y = positions[0][1], positions[0][2]
-                # Clamp to screen bounds
-                best_x = max(margin, min(best_x, screen.right() - size.width() - margin))
-                best_y = max(margin, min(best_y, screen.bottom() - size.height() - margin))
+                # None fit perfectly (large target, e.g. middle panel or bottom
+                # Deploy button) — pick the candidate with the LEAST overlap with
+                # the highlight rect so the tooltip never covers what it describes.
+                best_overlap = None
+                for _name, x, y in positions:
+                    cx = max(margin, min(x, screen.right() - size.width() - margin))
+                    cy = max(margin, min(y, screen.bottom() - size.height() - margin))
+                    inter = QRect(cx, cy, size.width(), size.height()).intersected(highlight_rect)
+                    overlap = inter.width() * inter.height()
+                    if best_overlap is None or overlap < best_overlap:
+                        best_overlap = overlap
+                        best_x, best_y = cx, cy
             
             self.move(best_x, best_y)
         else:
