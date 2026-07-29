@@ -661,6 +661,9 @@ class AutoTourDriver:
 
     def set_speed(self, label: str):
         self._speed = {"0.5x": 0.5, "1x": 1.0, "2x": 2.0}.get(label, 1.0)
+        # Narration rate follows the demo speed (TTS clamps to 1-450 wpm).
+        if self._tour._tts:
+            self._tour._tts.rate = int(175 * self._speed)
         if self._state in ("moving", "wait_result"):
             self._arm()
 

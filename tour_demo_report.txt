@@ -15,5 +15,7 @@ Step 6: 🎨 Step 4: Personality / Behavior
   target found: True  action: False  expected: True  popup above tour: None  => PASS
 Step 7: 🛡️ Step 5: Guardrails
   target found: True  action: False  expected: True  popup above tour: None  => PASS
+Step 8: 💾 Step 6a: Save Your AI First
+  target found: True  action: True  expected: False  popup above tour: None  => FAIL
 
-COMPLETED
+STOPPED EARLY
