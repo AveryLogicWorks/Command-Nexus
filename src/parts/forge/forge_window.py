@@ -2616,20 +2616,34 @@ class CharacterSheetWidget(QWidget):
                 if reply == QMessageBox.StandardButton.No:
                     return
 
-            unit = AIUnit(
-                uuid=str(uuid.uuid4())[:8],
-                name=name,
-                use_case=use_case,
-                source=AISource.CREATED,
-                capabilities=capabilities,
-                abilities=abilities,
-                personality_traits=personality,
-                locked=True,
-                context_notes=notes,
-                guardrails=guardrails,
-                libraries=libraries,
-            )
-            unit = _scaffold_unit(unit, purpose=notes)
+            # Same-name save = EDIT: update the existing unit in place (keeps its
+            # uuid, so the store file is overwritten) instead of creating a new AI.
+            existing = next((u for u in self._units
+                             if u.name == name and not getattr(u, "is_starter", False)), None)
+            if existing is not None:
+                existing.use_case = use_case
+                existing.capabilities = capabilities
+                existing.abilities = abilities
+                existing.personality_traits = personality
+                existing.context_notes = notes
+                existing.guardrails = guardrails
+                existing.libraries = libraries
+                unit = _scaffold_unit(existing, purpose=notes)
+            else:
+                unit = AIUnit(
+                    uuid=str(uuid.uuid4())[:8],
+                    name=name,
+                    use_case=use_case,
+                    source=AISource.CREATED,
+                    capabilities=capabilities,
+                    abilities=abilities,
+                    personality_traits=personality,
+                    locked=True,
+                    context_notes=notes,
+                    guardrails=guardrails,
+                    libraries=libraries,
+                )
+                unit = _scaffold_unit(unit, purpose=notes)
             self.ai_saved.emit(unit)
             # Success/failure is reported by the Forge window after the unit is
             # verified written to the store — no false "saved" confirmation here.
