@@ -1321,8 +1321,14 @@ class DemoTourController(QWidget):
             )
             # Reposition tooltip near the new highlight
             self._tooltip.position_near_highlight(self._overlay._highlight_rect)
-            # Raise overlay above the sub-window that just opened
-            self._overlay.raise_()
+            # If the target lives in a popup, keep the overlay BENEATH it so the
+            # popup stays visible and clickable; otherwise raise above main window.
+            tw = target.window()
+            if tw is not None and tw is not self._main_window:
+                self._overlay.raise_()
+                self._overlay.stackUnder(tw)
+            else:
+                self._overlay.raise_()
             self._tooltip.raise_()
     
     def _install_event_filter(self):
