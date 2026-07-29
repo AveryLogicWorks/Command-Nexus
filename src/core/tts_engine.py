@@ -151,24 +151,28 @@ class TTSEngine:
 
     def _speak_sync(self, text: str) -> None:
         """Actual speech call — runs in background thread."""
-        # Try Kokoro neural TTS first (better quality)
-        if self._kokoro is not None:
-            try:
-                self._kokoro.speak(text)
-                return
-            except Exception:
-                pass
-        # Fall back to OS-native TTS
+        # OS-native voice FIRST (the tour narration tells the user their operating
+        # system's built-in voice will read steps; Kokoro can silently no-op when
+        # its audio backend is misconfigured, which produced total silence).
         system = platform.system()
         try:
             if system == "Windows":
                 self._speak_windows(text)
+                return
             elif system == "Darwin":
                 self._speak_mac(text)
+                return
             elif system == "Linux":
                 self._speak_linux(text)
+                return
         except Exception:
             pass
+        # Fallback: Kokoro neural TTS (local model, if installed)
+        if self._kokoro is not None:
+            try:
+                self._kokoro.speak(text)
+            except Exception:
+                pass
 
     def _speak_windows(self, text: str) -> None:
         """Use Windows SAPI SpVoice COM object or PowerShell fallback."""

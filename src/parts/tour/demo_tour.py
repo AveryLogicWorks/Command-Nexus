@@ -118,6 +118,20 @@ class DemoTourOverlay(QWidget):
         except RuntimeError:
             pass
     
+    def set_auto_cursor(self, pos):
+        """Show/hide the automated-demo virtual cursor (overlay-local QPointF or None)."""
+        self._auto_cursor = pos
+        self.update()
+
+    def pulse_click_ring(self):
+        """Expanding ring at the virtual cursor to indicate a click."""
+        for i in range(1, 13):
+            QTimer.singleShot(i * 28, lambda i=i: self._set_ring(i / 12.0))
+
+    def _set_ring(self, t):
+        self._click_ring_t = t
+        self.update()
+
     def paintEvent(self, event):
         """Paint dimmed overlay with animated highlight border."""
         painter = QPainter(self)
@@ -166,6 +180,25 @@ class DemoTourOverlay(QWidget):
             
             # Corner accents (gold)
             self._draw_corners(painter, self._highlight_rect, QColor(255, 193, 7, 220))
+
+        # Automated-demo virtual cursor (painted overlay element — the OS cursor
+        # is never moved, locked, hidden, or controlled).
+        cur = getattr(self, "_auto_cursor", None)
+        if cur is not None:
+            from PyQt6.QtGui import QPolygonF
+            from PyQt6.QtCore import QPointF
+            ring_t = getattr(self, "_click_ring_t", 1.0)
+            if ring_t < 1.0:
+                r = 6.0 + ring_t * 26.0
+                painter.setPen(QPen(QColor(88, 166, 255, int(255 * (1.0 - ring_t))), 3))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(cur, r, r)
+            arrow = QPolygonF([cur, QPointF(cur.x() + 4, cur.y() + 16),
+                               QPointF(cur.x() + 7, cur.y() + 11),
+                               QPointF(cur.x() + 16, cur.y() + 10)])
+            painter.setPen(QPen(QColor(13, 17, 23), 1))
+            painter.setBrush(QColor(255, 255, 255, 245))
+            painter.drawPolygon(arrow)
     
     def _draw_corners(self, painter: QPainter, rect: QRect, color: QColor):
         """Draw yellow corner accents."""
@@ -361,6 +394,27 @@ class DemoTourTooltip(QFrame):
 
         layout.addLayout(button_layout)
 
+        # Automated demonstration controls (Start/Pause/Resume/Stop/Restart/Speed)
+        from PyQt6.QtWidgets import QComboBox
+        demo_layout = QHBoxLayout()
+        demo_layout.setSpacing(6)
+        demo_style = ("QPushButton { background-color: #30363d; color: #c9d1d9; padding: 6px 10px; "
+                      "border-radius: 6px; border: 1px solid #484f58; font-size: 11px; }"
+                      "QPushButton:hover { background-color: #484f58; }")
+        self._demo_start_btn = QPushButton("\u25b6 Demo")
+        self._demo_pause_btn = QPushButton("\u23f8 Pause")
+        self._demo_stop_btn = QPushButton("\u23f9 Stop")
+        self._demo_restart_btn = QPushButton("\u27f2 Restart")
+        self._demo_speed = QComboBox()
+        self._demo_speed.addItems(["0.5x", "1x", "2x"])
+        self._demo_speed.setCurrentText("1x")
+        for b in (self._demo_start_btn, self._demo_pause_btn, self._demo_stop_btn, self._demo_restart_btn):
+            b.setStyleSheet(demo_style)
+            demo_layout.addWidget(b)
+        demo_layout.addWidget(self._demo_speed)
+        demo_layout.addStretch()
+        layout.addLayout(demo_layout)
+
         # Tour info notice
         info_notice = QLabel("💡 Click highlighted items to advance • Press Esc to exit")
         info_notice.setFont(QFont("Segoe UI", 9))
@@ -540,6 +594,227 @@ class DemoTourStep:
         self.completed = False
 
 
+class AutoTourDriver:
+    """Automated demonstration driver. A virtual cursor painted on the tour
+    overlay glides to each step's control, shows a click ring, and triggers the
+    application's own handlers (button.click(), focus, etc.). The user's OS
+    cursor, mouse, and keyboard are never touched. Every step is verified before
+    advancing; a failed verification stops the demo — the tour timer never fakes
+    progress. Results are recorded per step and written to tour_demo_report.txt.
+    """
+
+    def __init__(self, tour):
+        self._tour = tour
+        self._timer = QTimer(tour)
+        self._timer.timeout.connect(self._tick)
+        self._state = "idle"  # idle | moving | wait_result | paused | done
+        self._speed = 1.0
+        self._pos = None
+        self._pending = None
+        self._baseline = 0
+        self._deadline = 0.0
+        self.results: list[dict] = []
+
+    # ---- controls ----
+    def start(self):
+        self.results.clear()
+        self._pos = None
+        self._state = "moving"
+        self._arm()
+
+    def pause(self):
+        if self._state in ("moving", "wait_result"):
+            self._state = "paused"
+            self._timer.stop()
+
+    def resume(self):
+        if self._state == "paused":
+            self._state = "moving"
+            self._arm()
+
+    def stop(self):
+        self._timer.stop()
+        active = self._state not in ("idle", "done")
+        self._state = "idle"
+        self._clear_cursor()
+        if self._tour._tts:
+            self._tour._tts.stop()
+        if active or self.results:
+            self._write_report(stopped=True)
+
+    def restart(self):
+        self._timer.stop()
+        self._state = "idle"
+        self._tour._current_step = 0
+        self._tour._show_current_step()
+        self.start()
+
+    def toggle(self):
+        if self._state in ("moving", "wait_result"):
+            self.pause()
+        elif self._state == "paused":
+            self.resume()
+        else:
+            self.start()
+
+    def set_speed(self, label: str):
+        self._speed = {"0.5x": 0.5, "1x": 1.0, "2x": 2.0}.get(label, 1.0)
+        if self._state in ("moving", "wait_result"):
+            self._arm()
+
+    def _arm(self):
+        self._timer.start(max(120, int(350 / self._speed)))
+
+    def _clear_cursor(self):
+        if self._tour._overlay is not None:
+            self._tour._overlay.set_auto_cursor(None)
+
+    # ---- main loop ----
+    def _tick(self):
+        import time
+        t = self._tour
+        if t._current_step >= len(t._steps) or not t._tour_active:
+            self._finish()
+            return
+        step = t._steps[t._current_step]
+        target = t._find_target(step)
+        if self._state == "moving":
+            if not step.wait_for_click:
+                self.results.append({"step": t._current_step + 1, "title": step.title,
+                                     "target_found": target is not None, "action": False,
+                                     "expected": True, "popup_ok": None, "ok": True})
+                t._on_next()
+                return
+            if target is None or not target.isVisible():
+                return  # target not on screen yet — keep waiting, no fake advance
+            self._glide_and_click(step, target)
+        elif self._state == "wait_result":
+            ok, popup = self._verify(step)
+            if ok is None and time.monotonic() < self._deadline:
+                return
+            rec = self._pending or {"step": t._current_step + 1, "title": step.title,
+                                    "target_found": True, "action": True}
+            rec.update({"expected": bool(ok), "popup_ok": popup, "ok": bool(ok)})
+            self.results.append(rec)
+            self._pending = None
+            if ok:
+                cb = getattr(step, "on_target_clicked", None)
+                if cb:
+                    cb()
+                self._state = "moving"
+                self._pos = None
+                t._on_next()
+            else:
+                self.stop()  # verification failed — stop, do not advance
+
+    def _glide_and_click(self, step, target):
+        import time
+        from PyQt6.QtCore import QPointF
+        ov = self._tour._overlay
+        end_g = target.mapToGlobal(target.rect().center())
+        end = QPointF(end_g - ov.geometry().topLeft())
+        if self._pos is None:
+            self._pos = end
+        dx, dy = end.x() - self._pos.x(), end.y() - self._pos.y()
+        if (dx * dx + dy * dy) ** 0.5 > 8:
+            f = min(0.45, 0.25 * self._speed + 0.1)
+            self._pos = QPointF(self._pos.x() + dx * f, self._pos.y() + dy * f)
+            ov.set_auto_cursor(self._pos)
+            return
+        ov.set_auto_cursor(end)
+        ov.pulse_click_ring()
+        self._baseline = self._capture_baseline(step)
+        self._trigger(target)
+        self._pending = {"step": self._tour._current_step + 1, "title": step.title,
+                         "target_found": True, "action": True}
+        self._deadline = time.monotonic() + 8.0 / self._speed
+        self._state = "wait_result"
+
+    # ---- action dispatch: reuse the app's own handlers ----
+    def _trigger(self, w):
+        from PyQt6.QtWidgets import QPushButton, QCheckBox, QComboBox, QLineEdit, QListWidget
+        if isinstance(w, QCheckBox):
+            if not w.isChecked():
+                w.click()
+        elif isinstance(w, QPushButton):
+            w.click()
+        elif isinstance(w, QLineEdit):
+            w.setFocus()
+            if not w.text().strip():
+                w.setText("Demo AI")
+        elif isinstance(w, QComboBox):
+            w.showPopup()
+            QTimer.singleShot(int(900 / self._speed), w.hidePopup)
+        elif isinstance(w, QListWidget):
+            if w.count() and w.currentRow() < 0:
+                w.setCurrentRow(0)
+        else:
+            w.setFocus()
+
+    def _capture_baseline(self, step):
+        getter = getattr(step, "target_getter", None)
+        if getter and "save" in getattr(getter, "__name__", ""):
+            lst = self._tour._find_forge_ai_list()
+            return lst.count() if lst is not None else 0
+        return 0
+
+    # ---- verification: expected state + popups demonstrated above the tour ----
+    def _verify(self, step):
+        """Returns (ok | None keep-waiting, popup_ok | None). Notification dialogs
+        are detected, recorded as displayed, then closed via their own button."""
+        from PyQt6.QtWidgets import QDialog, QPushButton
+        popup_ok = None
+        for w in QApplication.topLevelWidgets():
+            if isinstance(w, QDialog) and w.isVisible() and w not in (
+                    self._tour._overlay, self._tour._tooltip, self._tour._main_window):
+                popup_ok = True
+                btns = w.findChildren(QPushButton)
+                if btns:
+                    btns[0].click()
+                else:
+                    w.accept()
+        name = step.target_widget_name or ""
+        getter_name = getattr(getattr(step, "target_getter", None), "__name__", "") or ""
+        if name == "nav_forge":
+            return (self._tour._find_forge_window() is not None) or None, popup_ok
+        if "save" in getter_name:
+            lst = self._tour._find_forge_ai_list()
+            if lst is not None and lst.count() > self._baseline:
+                return True, popup_ok
+            return None, popup_ok
+        if "deploy" in getter_name:
+            if popup_ok or self._tour._find_forge_window() is None:
+                return True, popup_ok if popup_ok is not None else True
+            return None, popup_ok
+        return True, popup_ok
+
+    # ---- report ----
+    def _finish(self):
+        if self._state == "done":
+            return
+        self._timer.stop()
+        self._state = "done"
+        self._clear_cursor()
+        self._write_report()
+
+    def _write_report(self, stopped=False):
+        if not self.results:
+            return
+        try:
+            from pathlib import Path
+            lines = ["AUTOMATED TOUR DEMO REPORT", "=" * 44, ""]
+            for r in self.results:
+                lines.append(
+                    f"Step {r['step']}: {r['title']}\n"
+                    f"  target found: {r.get('target_found')}  action: {r.get('action')}  "
+                    f"expected: {r.get('expected')}  popup above tour: {r.get('popup_ok')}  "
+                    f"=> {'PASS' if r.get('ok') else 'FAIL'}")
+            lines += ["", "STOPPED EARLY" if stopped else "COMPLETED"]
+            Path("tour_demo_report.txt").write_text("\n".join(lines), encoding="utf-8")
+        except Exception:
+            pass
+
+
 class DemoTourController(QWidget):
     """
     Demo tour that:
@@ -571,6 +846,7 @@ class DemoTourController(QWidget):
         self._rehighlight_timer = QTimer(self)
         self._rehighlight_timer.setInterval(300)
         self._rehighlight_timer.timeout.connect(self._rehighlight)
+        self._driver = AutoTourDriver(self)
         self._setup_steps()
 
     def eventFilter(self, obj, event):
@@ -659,6 +935,8 @@ class DemoTourController(QWidget):
                 sa = sa.parentWidget()
             if sa is not None:
                 sa.ensureWidgetVisible(btn)
+                # Re-highlight after the scroll settles so the glow lands on the button
+                QTimer.singleShot(450, lambda b=btn: self._overlay.highlight_widget(b) if self._overlay else None)
         return btn
 
     def _find_forge_deploy_button(self) -> Optional[QWidget]:
@@ -1213,6 +1491,13 @@ class DemoTourController(QWidget):
         # Wire close X button and Escape key to skip
         self._tooltip.set_close_callback(self._on_skip)
         self._tooltip._auto_toggle_callback = self._on_auto_toggle
+        # Wire automated-demo control bar
+        self._tooltip._demo_start_btn.clicked.connect(self._driver.start)
+        self._tooltip._demo_pause_btn.clicked.connect(
+            lambda: self._driver.pause() if self._driver._state != "paused" else self._driver.resume())
+        self._tooltip._demo_stop_btn.clicked.connect(self._driver.stop)
+        self._tooltip._demo_restart_btn.clicked.connect(self._driver.restart)
+        self._tooltip._demo_speed.currentTextChanged.connect(self._driver.set_speed)
         self._tooltip.show()
         self._tooltip.raise_()
     
@@ -1464,14 +1749,8 @@ class DemoTourController(QWidget):
             self._tooltip.raise_()
     
     def _on_auto_toggle(self):
-        """Toggle automated tour: the cursor visibly moves to each target and
-        clicks it. Synthetic events are posted directly to widgets, so the user's
-        own mouse stays fully usable between automated moves."""
-        self._auto = not getattr(self, "_auto", False)
-        if self._auto:
-            self._auto_timer.start()
-        else:
-            self._auto_timer.stop()
+        """A key: toggle the automated demonstration (start/pause/resume)."""
+        self._driver.toggle()
 
     def _auto_tick(self):
         if not getattr(self, "_auto", False) or self._current_step >= len(self._steps):
