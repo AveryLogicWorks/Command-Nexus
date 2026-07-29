@@ -185,8 +185,8 @@ class DemoTourOverlay(QWidget):
         # is never moved, locked, hidden, or controlled).
         cur = getattr(self, "_auto_cursor", None)
         if cur is not None:
-            from PyQt6.QtGui import QPolygonF
-            from PyQt6.QtCore import QPointF
+            from PySide6.QtGui import QPolygonF
+            from PySide6.QtCore import QPointF
             ring_t = getattr(self, "_click_ring_t", 1.0)
             if ring_t < 1.0:
                 r = 6.0 + ring_t * 26.0
@@ -395,7 +395,7 @@ class DemoTourTooltip(QFrame):
         layout.addLayout(button_layout)
 
         # Automated demonstration controls (Start/Pause/Resume/Stop/Restart/Speed)
-        from PyQt6.QtWidgets import QComboBox
+        from PySide6.QtWidgets import QComboBox
         demo_layout = QHBoxLayout()
         demo_layout.setSpacing(6)
         demo_style = ("QPushButton { background-color: #30363d; color: #c9d1d9; padding: 6px 10px; "
@@ -709,7 +709,7 @@ class AutoTourDriver:
 
     def _glide_and_click(self, step, target):
         import time
-        from PyQt6.QtCore import QPointF
+        from PySide6.QtCore import QPointF
         ov = self._tour._overlay
         end_g = target.mapToGlobal(target.rect().center())
         end = QPointF(end_g - ov.geometry().topLeft())
@@ -732,7 +732,7 @@ class AutoTourDriver:
 
     # ---- action dispatch: reuse the app's own handlers ----
     def _trigger(self, w):
-        from PyQt6.QtWidgets import QPushButton, QCheckBox, QComboBox, QLineEdit, QListWidget
+        from PySide6.QtWidgets import QPushButton, QCheckBox, QComboBox, QLineEdit, QListWidget
         if isinstance(w, QCheckBox):
             if not w.isChecked():
                 w.click()
@@ -762,7 +762,7 @@ class AutoTourDriver:
     def _verify(self, step):
         """Returns (ok | None keep-waiting, popup_ok | None). Notification dialogs
         are detected, recorded as displayed, then closed via their own button."""
-        from PyQt6.QtWidgets import QDialog, QPushButton
+        from PySide6.QtWidgets import QDialog, QPushButton
         popup_ok = None
         for w in QApplication.topLevelWidgets():
             if isinstance(w, QDialog) and w.isVisible() and w not in (
@@ -929,7 +929,7 @@ class DemoTourController(QWidget):
             return None
         btn = forge.findChild(QWidget, "forge_save_button")
         if btn and btn.isVisible():
-            from PyQt6.QtWidgets import QScrollArea
+            from PySide6.QtWidgets import QScrollArea
             sa = btn.parentWidget()
             while sa is not None and not isinstance(sa, QScrollArea):
                 sa = sa.parentWidget()
@@ -1673,7 +1673,7 @@ class DemoTourController(QWidget):
         if zt is not None and (ov is None or not ov.isVisible()):
             zt.stop()
             return
-        from PyQt6.QtWidgets import QDialog
+        from PySide6.QtWidgets import QDialog
         tops = [w for w in QApplication.topLevelWidgets()
                 if w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible()]
         dialogs = [w for w in tops if isinstance(w, QDialog)]
@@ -1767,8 +1767,8 @@ class DemoTourController(QWidget):
 
     def _auto_click(self, target):
         """Glide the cursor to the target, then post press+release to the widget."""
-        from PyQt6.QtGui import QCursor, QMouseEvent
-        from PyQt6.QtCore import QEvent, QPointF
+        from PySide6.QtGui import QCursor, QMouseEvent
+        from PySide6.QtCore import QEvent, QPointF
         end = target.mapToGlobal(target.rect().center())
         start = QCursor.pos()
         steps = 12
