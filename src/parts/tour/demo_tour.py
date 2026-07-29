@@ -830,6 +830,22 @@ class DemoTourController(QWidget):
             ),
 
             # === STEP 6: Save and Deploy ===
+            # === STEP 6a: Save AI to Forge (must come before Deploy) ===
+            DemoTourStep(
+                title="\U0001f4be Step 6a: Save Your AI First",
+                instruction="Click 'Save AI to Forge' (green button at the bottom) to create your AI. You must save before you can deploy.",
+                detail_html="""<p>Before anything else works, your AI must be <b>saved</b>:</p>
+                <ol>
+                    <li>Click <b>Save AI to Forge</b> (green button at the bottom of the Forge)</li>
+                    <li>Your AI appears in the <b>AI Library</b> list on the left</li>
+                </ol>
+                <p><b>You cannot deploy an AI that hasn't been saved.</b> Save first, deploy second.</p>""",
+                target_widget_name="forge_create_button",
+                action_prompt="\U0001f449 CLICK 'Save AI to Forge'",
+                wait_for_click=True,
+                narration="Step 6 a. Save your AI first. Click the green Save AI to Forge button at the bottom of the Forge to create your AI. It then appears in the AI Library list on the left. You cannot deploy an AI that hasn't been saved. Save first, deploy second.",
+            ),
+
             DemoTourStep(
                 title="\U0001f680 Step 6: Save and Deploy",
                 instruction="Click 'Save AI to Forge' to create your AI, then select it and click 'Deploy to Command Center'.",
@@ -856,6 +872,18 @@ class DemoTourController(QWidget):
                 narration="Step 6. Save and Deploy. Once you've configured your AI, click the green Save AI to Forge button at the bottom to create your AI. Your AI then appears in the AI Library list on the left side of the Forge. Click your AI in the list to select it. Then click the green Deploy to Command Center button to activate your AI. After deploying, the Forge will close and your AI appears in the Active AI selector in the main window. Other buttons in the Forge include: Drop-In AI, to load a pre-built AI template. Open Knowledge for AI, to edit the AI's intelligence. Open Chat, to start chatting immediately. Save AI to Disk, to export your AI to a file. And Load AI from Disk, to import an AI from a file.",
             ),
 
+            # === STEP 6b: Select an Active AI (required before START) ===
+            DemoTourStep(
+                title="\U0001f464 Step 6b: Select Your Active AI",
+                instruction="Make sure your deployed AI is selected in the Active AI selector (top of this window) before you click START.",
+                detail_html="""<p>Look at the <b>Active AI</b> selector near the top of the window.</p>
+                <p>If it is empty or shows the wrong AI, open the dropdown and <b>select the AI you deployed</b>.</p>
+                <p>Everything that comes next — START, Intelligence, missions, chat — applies to the <b>selected Active AI</b>. If none is selected, START will not run your AI.</p>""",
+                target_widget_name=None,
+                action_prompt="\U0001f449 CHECK that your AI is selected, then click Next",
+                narration="Step 6 b. Select your Active AI. Before you click START, make sure your deployed AI is selected in the Active AI selector at the top of the window. If it's empty, open the dropdown and select the AI you just deployed. START, Intelligence, missions, and chat all apply to the selected Active AI. If none is selected, START will not run your AI.",
+            ),
+
             # === STEP 7: Give Your AI a Mission ===
             DemoTourStep(
                 title="\U0001f3af Step 7: Give Your AI a Mission",
@@ -877,18 +905,6 @@ class DemoTourController(QWidget):
                 action_prompt="\U0001f449 TYPE a mission, then click START",
                 wait_for_click=True,
                 narration="Step 7. Give Your AI a Mission. The Active AI is shown in the selector. Type a task in the Mission Control box, like 'Plan my day,' 'Write a poem about space,' 'Explain how photosynthesis works,' 'Summarize this document,' 'Create a weekly meal plan,' or 'Draft an email to my team about the project update.' Your AI will use its capabilities to complete the mission. No coding required. Just type what you want in plain language. The AI's response appears in the Thought and Action panels. You can see exactly what it's thinking and doing. Click the START button when ready.",
-            ),
-
-            # === STEP 7b: Select an Active AI (required before Intelligence) ===
-            DemoTourStep(
-                title="\U0001f464 Step 7b: Select Your Active AI",
-                instruction="Make sure your deployed AI is selected in the Active AI selector (top of this window) before continuing.",
-                detail_html="""<p>Look at the <b>Active AI</b> selector near the top of the window.</p>
-                <p>If it is empty or shows the wrong AI, open the dropdown and <b>select the AI you deployed</b>.</p>
-                <p>Everything that comes next — Intelligence, missions, chat — applies to the <b>selected Active AI</b>. If none is selected, the next steps won't work as expected.</p>""",
-                target_widget_name=None,
-                action_prompt="\U0001f449 CHECK that your AI is selected, then click Next",
-                narration="Step 7 b. Select your Active AI. Before using Intelligence, make sure your deployed AI is selected in the Active AI selector at the top of the window. If it's empty, open the dropdown and select the AI you just deployed. Intelligence, missions, and chat all apply to the selected Active AI. If none is selected, the next steps won't work as expected.",
             ),
 
             # === STEP 8: Intelligence ===
