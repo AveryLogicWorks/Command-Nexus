@@ -1327,19 +1327,43 @@ class DemoTourController(QWidget):
     
     def _stack_popups_above_overlay(self):
         """Every popup (deploy/save confirmations, disclaimers, model picker) must
-        stay fully visible and clickable above the tour: stacked over the overlay,
-        and application-modal ones downgraded to window-modal so the tour's Next
-        button is never blocked.
+        appear ABOVE the tour. The overlay/tooltip use WindowStaysOnTopHint, which
+        puts them in the OS always-on-top band — a normal popup can NEVER stack
+        above that. So while any popup is open, drop the tour's topmost flag
+        ('down a notch'); restore it once all popups are gone. Application-modal
+        popups are also downgraded to window-modal so Next is never blocked.
         """
+        popup_open = any(
+            w not in (self._overlay, self._tooltip, self._main_window) and w.isVisible()
+            for w in QApplication.topLevelWidgets()
+        )
+        self._set_topmost(not popup_open)
         for w in QApplication.topLevelWidgets():
             if w in (self._overlay, self._tooltip, self._main_window) or not w.isVisible():
                 continue
-            self._overlay.stackUnder(w)
+            w.raise_()
             if w.isModal() and not getattr(w, "_tour_windowmodal", False):
                 w._tour_windowmodal = True
                 w.hide()
                 w.setWindowModality(Qt.WindowModality.WindowModal)
                 w.show()
+                w.raise_()
+
+    def _set_topmost(self, on: bool):
+        """Add or remove WindowStaysOnTopHint on the overlay and tooltip."""
+        if getattr(self, "_topmost_state", None) == on:
+            return
+        self._topmost_state = on
+        for w in (self._overlay, self._tooltip):
+            flags = w.windowFlags()
+            if on:
+                w.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
+            else:
+                w.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
+            w.show()
+        if on:
+            self._overlay.raise_()
+            self._tooltip.raise_()
 
     def _rehighlight(self):
         """Periodically re-check if the target widget has appeared (e.g. sub-window just opened)."""
