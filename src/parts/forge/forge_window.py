@@ -2454,6 +2454,7 @@ class CharacterSheetWidget(QWidget):
         for i, opt in enumerate(options):
             chk = QCheckBox(opt)
             chk.stateChanged.connect(self._update_ai_details_preview)
+            chk.stateChanged.connect(self._enforce_capability_limit)
             self._caps_layout.addWidget(chk, i // 2, i % 2)
             self._cap_checks.append(chk)
 
@@ -3742,13 +3743,9 @@ class AIForgeWindow(QMainWindow):
             QMessageBox.warning(self, "No Selection", "Select an AI to activate.")
             return
 
-        # License enforcement
-        allowed, msg = self._check_can_create_ai()
-        if not allowed:
-            QMessageBox.warning(self, "License Limit", msg)
-            self._audit_event("ai_activation_denied", msg=f"tier={self._license.get_tier_label()}, reason=limit")
-            return
-
+        # Deploy operates on an ALREADY-CREATED AI — the creation limit must not
+        # re-fire here (that sounded the alarm AT the limit instead of above it).
+        # The tier cap is enforced at creation time only.
         uid = item.data(Qt.ItemDataRole.UserRole)
         for u in self._units:
             if u.uuid == uid:
