@@ -29,3 +29,11 @@ cnx_stderr.txt
 
 # Environment variables — secrets loaded from env, never committed
 .env
+
+_legacy_archive/
+.env
+*.key
+field_keys*/
+generated_keys.json
+keys_*.txt
+trial_keys*.txt

@@ -1,3 +1,0 @@
-﻿Testing imports...
-  VoiceManager class: OK
-  TTSEngine class: OK
