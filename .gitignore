@@ -37,3 +37,5 @@ field_keys*/
 generated_keys.json
 keys_*.txt
 trial_keys*.txt
+
+KIMI_REPAIR_ACTIVITY_LOG.json
