@@ -12,11 +12,14 @@ from .interfaces import (
     ICompendium,
     IMemoryRouter,
     IGuardrailScreener,
+    IExternalIntelligence,
     MemoryEntry,
     RoutingResult,
     RuntimeResult,
     RuntimeStatus,
 )
+from .local_reasoning_engine import ExternalIntelligenceGuard
+from .quantum_entanglement_cognition import TrifectaFold
 
 __all__ = [
     "IMemoryStore",
@@ -25,6 +28,9 @@ __all__ = [
     "ICompendium",
     "IMemoryRouter",
     "IGuardrailScreener",
+    "IExternalIntelligence",
+    "ExternalIntelligenceGuard",
+    "TrifectaFold",
     "MemoryEntry",
     "RoutingResult",
     "RuntimeResult",

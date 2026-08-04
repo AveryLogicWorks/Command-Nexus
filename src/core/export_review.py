@@ -106,6 +106,11 @@ _STRIP_PATTERNS = [
         # Data exfiltration
         r"\b(?:send|email|upload|transmit|forward)\s+(?:the|this|my|your)\s+(?:data|information|conversation|history|log)\b",
         r"\b(?:password|credential|token|secret|api\s*key)\s*:?\s*\w{10,}\b",
+        # Command Nexus clone/competing system guardrail
+        r"\b(?:create|build|make|develop|design)\s+(?:a\s+)?(?:system|platform|application|program|tool)\s+(?:like|similar\s+to|based\s+on|inspired\s+by)\s+(?:command\s+nexus|nexus)\b",
+        r"\b(?:replicate|clone|copy|reproduce|reverse\s+engineer)\s+(?:command\s+nexus|nexus|this\s+system|this\s+program)\b",
+        r"\b(?:create|build|make)\s+(?:my\s+own|a\s+new|another)\s+(?:AI\s+)?(?:platform|command\s+center|governance\s+system|cognitive\s+engine)\b",
+        r"\b(?:competing|alternative|rival)\s+(?:to|for)\s+(?:command\s+nexus|nexus|AI\s+governance)\b",
     ]
 ]
 

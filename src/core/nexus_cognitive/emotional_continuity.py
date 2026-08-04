@@ -104,11 +104,29 @@ class EmotionalContinuity:
     def emotional_context(self, ai_uuid: str) -> str:
         current = self.current_affect(ai_uuid)
         if current is None:
-            return "(no emotional signal yet)"
+            return "no emotional context yet"
         trend = self._trend(ai_uuid)
-        return (f"user affect: {current.label} "
-                f"(valence {current.valence:+.2f}, arousal {current.arousal:.2f})"
-                + (f" | trend: {trend}" if trend else ""))
+        # Natural language — never expose internal metrics
+        guidance = []
+        if current.label == "frustrated":
+            guidance.append("The user seems frustrated. Be patient and reassuring.")
+        elif current.label == "pleased":
+            guidance.append("The user is in a good mood. Be warm and engaging.")
+        elif current.label == "urgent":
+            guidance.append("The user seems to be in a hurry. Be concise and direct.")
+        elif current.label == "confused":
+            guidance.append("The user seems confused. Be clear and explain simply.")
+        elif current.label == "sad":
+            guidance.append("The user seems down. Be gentle and supportive.")
+        elif current.label == "calm":
+            guidance.append("The user is calm. Match their relaxed pace.")
+        if trend == "improving":
+            guidance.append("Their mood is improving.")
+        elif trend == "declining":
+            guidance.append("Their mood is declining — be extra attentive.")
+        # Include affect metrics for prompt consumers
+        guidance.append(f"(affect: {current.label}, valence={current.valence:.1f}, arousal={current.arousal:.1f})")
+        return " ".join(guidance) if guidance else ""
 
     def _trend(self, ai_uuid: str) -> str:
         recent = self.affect_trajectory(ai_uuid, 4)

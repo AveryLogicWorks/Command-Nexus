@@ -2212,6 +2212,9 @@ class ChatCapabilityDialog(BaseCapabilityDialog):
         self._approval_banner.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 4px; border-radius: 4px;")
         self._approval_banner.setVisible(False)
         layout.addWidget(self._approval_banner)
+        footer = QLabel("AI operates under Command Nexus\u2122 governance. Risky actions require approval. Avery Logic Works is not liable.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
         self._append_ai(f"Workspace ready. I am {ai_name}, operating as {self._use_case or 'Unspecified'} with: {', '.join(self._abilities) or 'general assistance'}.")
         self._append_ai(f"Available actions: {', '.join(self._action_buttons.keys()) if self._action_buttons else 'chat only'}.")
         workflows = get_combined_capability_workflows(self._abilities, self._libraries, self._use_case)
@@ -2333,6 +2336,7 @@ class ChatCapabilityDialog(BaseCapabilityDialog):
             except Exception as e2:
                 self._append_ai(f"I'm having trouble connecting to my local model: {e2}")
 
+        self._set_result_summary(f"Chat exchange completed: {msg[:80]}")
         self._input.clear()
 
     def _append_user(self, text: str):
@@ -10974,6 +10978,7 @@ class ProgressJournalDialog(BaseCapabilityDialog):
         self._pj_entry_output.setText(f"Entry saved:\n  ID: {entry['id']}\n  Title: {title}\n  Mood: {mood}\n  Date: {entry['timestamp'][:10]}\n  Total entries: {len(self._entries)}")
         self._pj_title.clear()
         self._pj_content.clear()
+        self._set_result_summary(f"Journal entry '{title}' saved (mood: {mood}).")
 
     def _add_milestone(self):
         title = self._ms_title.text().strip()
@@ -10988,6 +10993,7 @@ class ProgressJournalDialog(BaseCapabilityDialog):
         self._ms_title.clear()
         self._ms_desc.clear()
         self._ms_target.clear()
+        self._set_result_summary(f"Milestone '{title}' added.")
 
     def _complete_milestone(self):
         for ms in reversed(self._milestones):
@@ -10997,6 +11003,7 @@ class ProgressJournalDialog(BaseCapabilityDialog):
                 self._ms_output.setText(f"Milestone completed:\n  [{ms['id']}] {ms['title']}\n  Completed: {ms['completed_date']}")
                 return
         self._ms_output.setText("No pending milestones to complete.")
+        self._set_result_summary("No pending milestones to complete.")
 
     def _generate_timeline(self):
         all_items = []
@@ -11652,6 +11659,7 @@ class TeamOrchestratorDialog(BaseCapabilityDialog):
         self._to_member_name.clear()
         self._to_member_role.clear()
         self._to_member_skills.clear()
+        self._set_result_summary(f"Team member '{name}' added as {role}.")
 
     def _to_add_task(self):
         title = self._to_task_title.text().strip()
@@ -11666,6 +11674,7 @@ class TeamOrchestratorDialog(BaseCapabilityDialog):
         self._to_tasks_output.setText(f"Task created: [{task['id']}] {title}\nAssignee: {assignee}\nPriority: {priority}")
         self._to_task_title.clear()
         self._to_task_desc.clear()
+        self._set_result_summary(f"Task '{title}' created for {assignee}.")
 
     def _to_complete_task(self):
         for t in reversed(self._tasks):
@@ -11674,6 +11683,7 @@ class TeamOrchestratorDialog(BaseCapabilityDialog):
                 self._to_tasks_output.setText(f"Task completed: [{t['id']}] {t['title']}")
                 return
         self._to_tasks_output.setText("No pending tasks.")
+        self._set_result_summary("No pending tasks to complete.")
 
     def _to_refresh_board(self):
         if not self._tasks:
@@ -11766,6 +11776,7 @@ class MemoryBridgeDialog(BaseCapabilityDialog):
         self._mb_from.clear()
         self._mb_to.clear()
         self._mb_context.clear()
+        self._set_result_summary(f"Memory bridge created: {frm} -> {to}.")
 
     def _mb_history(self):
         if not self._bridges:
@@ -11873,6 +11884,7 @@ class VisualCanvasDialog(BaseCapabilityDialog):
         self._nodes.append(node)
         self._vc_nodes_output.setText(f"Node added: [{node['id']}] {label} ({ntype})\nTotal nodes: {len(self._nodes)}")
         self._vc_node_label.clear()
+        self._set_result_summary(f"Node '{label}' ({ntype}) added.")
 
     def _vc_add_edge(self):
         frm = self._vc_edge_from.text().strip()
@@ -11887,6 +11899,7 @@ class VisualCanvasDialog(BaseCapabilityDialog):
         self._vc_edge_from.clear()
         self._vc_edge_to.clear()
         self._vc_edge_label.clear()
+        self._set_result_summary(f"Connection added: {frm} -> {to}.")
 
     def _vc_render(self):
         if not self._nodes:
@@ -11902,6 +11915,7 @@ class VisualCanvasDialog(BaseCapabilityDialog):
                 lbl = f" -- {e['label']} -->" if e["label"] else " -->"
                 lines.append(f"  [{e['from']}] {lbl} [{e['to']}]")
         self._vc_render_output.setText("\n".join(lines))
+        self._set_result_summary(f"Diagram rendered: {len(self._nodes)} nodes, {len(self._edges)} edges.")
 
 
 class APIIntegratorDialog(BaseCapabilityDialog):
@@ -12015,6 +12029,7 @@ class APIIntegratorDialog(BaseCapabilityDialog):
         self._api_name.clear()
         self._api_url.clear()
         self._api_key.clear()
+        self._set_result_summary(f"API '{name}' added ({url}).")
 
     def _api_test(self):
         idx = self._api_test_combo.currentIndex()
@@ -12037,8 +12052,9 @@ class APIIntegratorDialog(BaseCapabilityDialog):
             f"API: {api['name']}\nURL: {full_url}\nMethod: {method}\nAuth: {api['auth']}\n\n"
             f"{ai_result}\n\n"
             f"WARNING: External API calls carry security risk. Only test\n"
-            f"endpoints you trust and have authorization to access."
+            f"endpoints you trust and have authorization to access.\n"
         )
+        self._set_result_summary(f"API test analysis: {method} {full_url}")
 
     def _api_list(self):
         if not self._apis:
@@ -12145,6 +12161,7 @@ class KnowledgeBaseDialog(BaseCapabilityDialog):
         self._kb_topic.clear()
         self._kb_question.clear()
         self._kb_answer.clear()
+        self._set_result_summary(f"Knowledge entry '{topic}' added.")
 
     def _kb_qa(self):
         query = self._kb_qa_input.text().strip().lower()
@@ -12161,6 +12178,7 @@ class KnowledgeBaseDialog(BaseCapabilityDialog):
             lines.append(f"  Q: {e['question']}")
             lines.append(f"  A: {e['answer'][:300]}{'...' if len(e['answer']) > 300 else ''}\n")
         self._kb_qa_output.setText("\n".join(lines))
+        self._set_result_summary(f"Q&A search: {len(matches)} matches for '{query}'.")
 
     def _kb_browse(self):
         if not self._kb_entries:
@@ -12273,6 +12291,7 @@ class EmailAutomationDialog(BaseCapabilityDialog):
         self._ea_tpl_name.clear()
         self._ea_tpl_subject.clear()
         self._ea_tpl_body.clear()
+        self._set_result_summary(f"Email template '{name}' saved.")
 
     def _ea_save_sequence(self):
         name = self._ea_seq_name.text().strip()
@@ -12290,6 +12309,7 @@ class EmailAutomationDialog(BaseCapabilityDialog):
         self._ea_seq_output.setText(f"Sequence saved: [{seq['id']}] {name}\n  Steps: {len(steps)}\n  Total: {len(self._sequences)}")
         self._ea_seq_name.clear()
         self._ea_seq_steps.clear()
+        self._set_result_summary(f"Email sequence '{name}' saved ({len(steps)} steps).")
 
     def _ea_show_all(self):
         lines = [f"EMAIL AUTOMATION OVERVIEW\n{'='*60}\n"]
@@ -12411,6 +12431,7 @@ class CalendarManagerDialog(BaseCapabilityDialog):
         self._cm_start.clear()
         self._cm_end.clear()
         self._cm_notes.clear()
+        self._set_result_summary(f"Event '{title}' added on {date}.")
 
     def _cm_agenda(self):
         if not self._events:
@@ -12431,6 +12452,7 @@ class CalendarManagerDialog(BaseCapabilityDialog):
                 lines.append(f"\n--- {cur_date} ---")
             lines.append(f"  {e['start']:>5s}-{e['end']:<5s} [{e['category']}] {e['title']}")
         self._cm_agenda_output.setText("\n".join(lines))
+        self._set_result_summary(f"Agenda: {len(events)} events shown.")
 
     def _cm_conflicts(self):
         if not self._events:
@@ -12551,6 +12573,7 @@ class DocumentGeneratorDialog(BaseCapabilityDialog):
         self._dg_create_output.setText(f"Document saved: [{doc['id']}] {title}\n  Type: {dtype}\n  Length: {len(content)} chars\n  Total: {len(self._documents)}")
         self._dg_title.clear()
         self._dg_content.clear()
+        self._set_result_summary(f"Document '{title}' ({dtype}) created.")
 
     def _dg_preview_template(self):
         tpl = self._dg_tpl_combo.currentText()
@@ -12576,6 +12599,7 @@ class DocumentGeneratorDialog(BaseCapabilityDialog):
             lines.append(f"  [{d['id']}] {d['title']} ({d['type']})")
             lines.append(f"    Created: {d['created'][:10]} | Length: {len(d['content'])} chars\n")
         self._dg_lib_output.setText("\n".join(lines))
+        self._set_result_summary(f"Document library: {len(self._documents)} documents.")
 
 
 class TranslationExpertDialog(BaseCapabilityDialog):
@@ -12690,6 +12714,7 @@ class TranslationExpertDialog(BaseCapabilityDialog):
             f"Translation ID: {entry['id']}"
         )
         self._te_input.clear()
+        self._set_result_summary(f"Translated {src_lang} -> {tgt_lang} (ID: {entry['id']}).")
 
     def _te_add_glossary(self):
         src = self._te_gloss_src.text().strip()
@@ -12704,6 +12729,7 @@ class TranslationExpertDialog(BaseCapabilityDialog):
         self._te_gloss_src.clear()
         self._te_gloss_tgt.clear()
         self._te_gloss_lang.clear()
+        self._set_result_summary(f"Glossary entry added: {src} -> {tgt}.")
 
     def _te_history(self):
         if not self._translations:
@@ -12825,8 +12851,9 @@ class PresentationBuilderDialog(BaseCapabilityDialog):
         self._pb_outline_output.setText(
             f"Generated {len(self._slides)} slides from outline.\nTitle: {title}\n\n"
             f"AI-GENERATED SLIDE CONTENT:\n{'='*60}\n{result}\n\n"
-            f"Use the Slides tab to add or refine content for each slide."
+            f"Use the Slides tab to add or refine content for each slide.\n"
         )
+        self._set_result_summary(f"Presentation '{title}' generated ({len(self._slides)} slides).")
 
     def _pb_add_slide(self):
         title = self._pb_slide_title.text().strip()
@@ -12840,6 +12867,7 @@ class PresentationBuilderDialog(BaseCapabilityDialog):
         self._pb_slides_output.setText(f"Slide added: [{slide['id']}] {title}\nTotal slides: {len(self._slides)}")
         self._pb_slide_title.clear()
         self._pb_slide_content.clear()
+        self._set_result_summary(f"Slide '{title}' added ({len(self._slides)} total).")
 
     def _pb_save_notes(self):
         idx = self._pb_notes_combo.currentIndex()
@@ -12850,6 +12878,7 @@ class PresentationBuilderDialog(BaseCapabilityDialog):
         self._slides[idx]["notes"] = notes
         self._pb_notes_output.setText(f"Notes saved for slide [{self._slides[idx]['id']}] {self._slides[idx]['title']}")
         self._pb_notes_input.clear()
+        self._set_result_summary(f"Notes saved for slide [{self._slides[idx]['id']}].")
 
 
 class SpreadsheetWizardDialog(BaseCapabilityDialog):
@@ -12942,6 +12971,7 @@ class SpreadsheetWizardDialog(BaseCapabilityDialog):
         for i, row in enumerate(self._rows):
             lines.append(f"  Row {i}: {row}")
         self._sw_data_output.setText("\n".join(lines))
+        self._set_result_summary(f"Data loaded: {len(self._rows)} rows.")
 
     def _sw_calc(self):
         if not self._rows:
@@ -12984,8 +13014,10 @@ class SpreadsheetWizardDialog(BaseCapabilityDialog):
             )
             ai_result = self._call_engine(sys_prompt, f"Formula: {ftype}\nData column {col}: {values}", temperature=0.2)
             self._sw_formula_output.setText(f"{ftype}(column {col})\nValues: {values}\n\n{ai_result}")
+            self._set_result_summary(f"Custom formula '{ftype}' calculated.")
             return
         self._sw_formula_output.setText(f"{ftype}(column {col}) = {result}\nValues: {values}")
+        self._set_result_summary(f"{ftype}(column {col}) = {result}.")
 
     def _sw_chart(self):
         if not self._rows or len(self._rows) < 2:
@@ -13004,6 +13036,7 @@ class SpreadsheetWizardDialog(BaseCapabilityDialog):
             bar_len = int((val / max_val) * 40) if max_val > 0 else 0
             lines.append(f"  {label[:15]:15s} | {'#' * bar_len} {val}")
         self._sw_chart_output.setText("\n".join(lines))
+        self._set_result_summary(f"Bar chart rendered: {len(labels)} items.")
 
 
 class LegalDocumentReviewerDialog(BaseCapabilityDialog):
@@ -13121,6 +13154,7 @@ class LegalDocumentReviewerDialog(BaseCapabilityDialog):
         )
         self._ldr_title.clear()
         self._ldr_text.clear()
+        self._set_result_summary(f"Legal document '{title}' analyzed ({dtype}).")
 
     def _ldr_history(self):
         if not self._reviews:
@@ -13272,6 +13306,7 @@ class MedicalResearcherDialog(BaseCapabilityDialog):
         )
         self._mr_study_title.clear()
         self._mr_abstract.clear()
+        self._set_result_summary(f"Medical study '{title}' summarized.")
 
 
 class AccessibilityAssistantDialog(BaseCapabilityDialog):
@@ -13386,6 +13421,7 @@ class AccessibilityAssistantDialog(BaseCapabilityDialog):
             f"Readability score: {score}/100 ({level})\n"
             f"Check ID: {check['id']}"
         )
+        self._set_result_summary(f"Readability: {score}/100 ({level}), {len(words)} words.")
 
     def _aa_gen_alttext(self):
         ctx = self._aa_alt_input.toPlainText().strip()
@@ -13408,6 +13444,7 @@ class AccessibilityAssistantDialog(BaseCapabilityDialog):
             f"  - Convey purpose, not just appearance\n"
             f"  - If decorative, use empty alt=\"\""
         )
+        self._set_result_summary("Alt-text generated.")
 
 
 class FactCheckerDialog(BaseCapabilityDialog):
@@ -13521,6 +13558,7 @@ class FactCheckerDialog(BaseCapabilityDialog):
             f"Claim ID: {entry['id']}"
         )
         self._fc_claim.clear()
+        self._set_result_summary(f"Fact check completed for claim (ID: {entry['id']}).")
 
     def _fc_add_source(self):
         name = self._fc_src_name.text().strip()
@@ -13724,6 +13762,7 @@ class VoiceInterfaceDialog(BaseCapabilityDialog):
         self._voice_log.append(entry)
         self._vi_tts_output.setText(f"Speaking... ({len(text)} chars)")
         self._vm.speak(text)
+        self._set_result_summary(f"TTS: {len(text)} chars spoken.")
 
     def _vi_stop_speaking(self):
         self._vm.stop_speaking()
@@ -13885,6 +13924,7 @@ class WorkflowAutomatorDialog(BaseCapabilityDialog):
         )
         self._wa_name.clear()
         self._wa_steps.clear()
+        self._set_result_summary(f"Workflow '{name}' saved ({len(steps)} steps).")
 
     def _wa_add_trigger(self):
         ttype = self._wa_trigger_type.currentText()
@@ -14022,6 +14062,7 @@ class CompetitiveAnalystDialog(BaseCapabilityDialog):
         self._ca_strengths.clear()
         self._ca_weaknesses.clear()
         self._ca_share.clear()
+        self._set_result_summary(f"Competitor '{name}' added.")
 
     def _ca_gen_swot(self):
         subject = self._ca_swot_subject.text().strip()
@@ -14049,6 +14090,7 @@ class CompetitiveAnalystDialog(BaseCapabilityDialog):
             f"THREATS:\n{t or '(none listed)'}\n\n"
             f"STRATEGIC INSIGHTS (AI-GENERATED):\n{'='*60}\n{result}"
         )
+        self._set_result_summary(f"SWOT analysis generated for '{subject}'.")
 
     def _ca_positioning(self):
         if not self._competitors:
@@ -14173,6 +14215,7 @@ class LearningPathCreatorDialog(BaseCapabilityDialog):
         )
         self._lp_title.clear()
         self._lp_milestones.clear()
+        self._set_result_summary(f"Learning path '{title}' created ({level}, {len(milestones)} milestones).")
 
     def _lp_add_resource(self):
         name = self._lp_res_name.text().strip()
@@ -14314,6 +14357,7 @@ class SmartSearchDialog(BaseCapabilityDialog):
             f"Search ID: {entry['id']}"
         )
         self._ss_query.clear()
+        self._set_result_summary(f"Smart search completed for '{query}' ({scope}).")
 
     def _ss_save_settings(self):
         algo = self._ss_algo.currentText()
@@ -14733,6 +14777,9 @@ class ContentStrategistDialog(BaseCapabilityDialog):
         tabs.addTab(self._build_repurpose_tab(), "Repurposing Engine")
         tabs.addTab(self._build_brandvoice_tab(), "Brand Voice")
         layout.addWidget(tabs, stretch=1)
+        footer = QLabel("Content strategy is guidance. Verify platform requirements and brand guidelines before publishing.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _build_calendar_tab(self):
         w = QWidget()
@@ -15075,6 +15122,9 @@ class TaskSchedulerDialog(BaseCapabilityDialog):
         self._sched_output.setReadOnly(True)
         l.addWidget(self._sched_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Schedule suggestions are recommendations only. Verify times and conflicts before acting.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_schedule(self):
         task = self._sched_input.toPlainText().strip()
@@ -15113,6 +15163,9 @@ class FormBuilderDialog(BaseCapabilityDialog):
         self._form_output.setReadOnly(True)
         l.addWidget(self._form_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Form designs are suggestions. Test forms before deployment. Avery Logic Works is not liable.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_form(self):
         task = self._form_input.toPlainText().strip()
@@ -15151,6 +15204,9 @@ class ReportGeneratorDialog(BaseCapabilityDialog):
         self._report_output.setReadOnly(True)
         l.addWidget(self._report_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Reports are AI-generated. Verify data accuracy before distribution.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_report(self):
         task = self._report_input.toPlainText().strip()
@@ -15230,6 +15286,9 @@ class SpreadsheetAnalystDialog(BaseCapabilityDialog):
         self._ss_output.setReadOnly(True)
         l.addWidget(self._ss_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Formula guidance is informational. Test on copies before applying to live data.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_ss(self):
         task = self._ss_input.toPlainText().strip()
@@ -15268,6 +15327,9 @@ class DataVisualizerDialog(BaseCapabilityDialog):
         self._dv_output.setReadOnly(True)
         l.addWidget(self._dv_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Visualization recommendations are suggestions. Verify chart accuracy before presentation.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_dv(self):
         task = self._dv_input.toPlainText().strip()
@@ -15347,6 +15409,9 @@ class TrendForecasterDialog(BaseCapabilityDialog):
         self._fc_output.setReadOnly(True)
         l.addWidget(self._fc_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Forecasts are estimates based on available data. Actual results may vary significantly.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_fc(self):
         task = self._fc_input.toPlainText().strip()
@@ -15385,6 +15450,9 @@ class DevOpsAssistantDialog(BaseCapabilityDialog):
         self._devops_output.setReadOnly(True)
         l.addWidget(self._devops_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("DevOps guidance is informational. Test configurations in staging before production deployment.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_devops(self):
         task = self._devops_input.toPlainText().strip()
@@ -15423,6 +15491,9 @@ class DatabaseManagerDialog(BaseCapabilityDialog):
         self._db_output.setReadOnly(True)
         l.addWidget(self._db_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Database guidance is informational. Always backup before migrations or schema changes.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_db(self):
         task = self._db_input.toPlainText().strip()
@@ -15461,6 +15532,9 @@ class TestGeneratorDialog(BaseCapabilityDialog):
         self._test_output.setReadOnly(True)
         l.addWidget(self._test_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Generated tests require review. Verify coverage and correctness before relying on them.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_test(self):
         task = self._test_input.toPlainText().strip()
@@ -15499,6 +15573,9 @@ class DocumentationGeneratorDialog(BaseCapabilityDialog):
         self._doc_output.setReadOnly(True)
         l.addWidget(self._doc_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Documentation is AI-generated. Verify technical accuracy before publishing.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_doc(self):
         task = self._doc_input.toPlainText().strip()
@@ -15537,6 +15614,9 @@ class ScriptWriterDialog(BaseCapabilityDialog):
         self._script_output.setReadOnly(True)
         l.addWidget(self._script_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Scripts require testing in a safe environment. Avery Logic Works is not liable for script outcomes.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_script(self):
         task = self._script_input.toPlainText().strip()
@@ -15575,6 +15655,9 @@ class CopyEditorDialog(BaseCapabilityDialog):
         self._copy_output.setReadOnly(True)
         l.addWidget(self._copy_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Edits are suggestions. Review all changes before accepting.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_copy(self):
         task = self._copy_input.toPlainText().strip()
@@ -15613,6 +15696,9 @@ class PodcastPlannerDialog(BaseCapabilityDialog):
         self._pod_output.setReadOnly(True)
         l.addWidget(self._pod_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Podcast plans are creative suggestions. Adapt to your audience and format.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_pod(self):
         task = self._pod_input.toPlainText().strip()
@@ -15651,6 +15737,9 @@ class BrandStrategistDialog(BaseCapabilityDialog):
         self._brand_strat_output.setReadOnly(True)
         l.addWidget(self._brand_strat_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Brand strategy is guidance only. Market research and professional review recommended.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_brand_strat(self):
         task = self._brand_strat_input.toPlainText().strip()
@@ -15689,6 +15778,9 @@ class PresentationCoachDialog(BaseCapabilityDialog):
         self._pres_output.setReadOnly(True)
         l.addWidget(self._pres_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Coaching is guidance. Practice and adapt to your audience and context.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_pres(self):
         task = self._pres_input.toPlainText().strip()
@@ -15727,6 +15819,9 @@ class PRAssistantDialog(BaseCapabilityDialog):
         self._pr_output.setReadOnly(True)
         l.addWidget(self._pr_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("PR content requires review. Verify facts and legal compliance before distribution.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_pr(self):
         task = self._pr_input.toPlainText().strip()
@@ -15765,6 +15860,9 @@ class InternalCommsWriterDialog(BaseCapabilityDialog):
         self._ic_output.setReadOnly(True)
         l.addWidget(self._ic_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Internal communications are drafts. Review for accuracy and tone before sending.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_ic(self):
         task = self._ic_input.toPlainText().strip()
@@ -15803,6 +15901,9 @@ class AcademicCitationManagerDialog(BaseCapabilityDialog):
         self._cite_output.setReadOnly(True)
         l.addWidget(self._cite_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Citations require verification. Always check against official style guides.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_cite(self):
         task = self._cite_input.toPlainText().strip()
@@ -15882,6 +15983,9 @@ class MarketAnalystDialog(BaseCapabilityDialog):
         self._market_output.setReadOnly(True)
         l.addWidget(self._market_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Market analysis is informational. Verify data and consult professionals for investment decisions.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_market(self):
         task = self._market_input.toPlainText().strip()
@@ -15920,6 +16024,9 @@ class RecipePlannerDialog(BaseCapabilityDialog):
         self._recipe_output.setReadOnly(True)
         l.addWidget(self._recipe_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Recipe suggestions are general. Adjust for dietary needs and verify food safety.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_recipe(self):
         task = self._recipe_input.toPlainText().strip()
@@ -15958,6 +16065,9 @@ class TravelPlannerDialog(BaseCapabilityDialog):
         self._travel_output.setReadOnly(True)
         l.addWidget(self._travel_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Travel plans are suggestions. Verify prices, availability, and requirements before booking.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_travel(self):
         task = self._travel_input.toPlainText().strip()
@@ -15996,6 +16106,9 @@ class EventPlannerDialog(BaseCapabilityDialog):
         self._event_output.setReadOnly(True)
         l.addWidget(self._event_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Event plans are guidance. Verify venue, vendor, and logistics details independently.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_event(self):
         task = self._event_input.toPlainText().strip()
@@ -16116,6 +16229,9 @@ class DataGovernanceAdvisorDialog(BaseCapabilityDialog):
         self._gov_output.setReadOnly(True)
         l.addWidget(self._gov_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Governance guidance is informational. Consult legal and compliance professionals.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_gov(self):
         task = self._gov_input.toPlainText().strip()
@@ -16154,6 +16270,9 @@ class CurriculumDesignerDialog(BaseCapabilityDialog):
         self._curr_output.setReadOnly(True)
         l.addWidget(self._curr_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Curriculum designs are suggestions. Adapt to your institution's standards and requirements.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_curr(self):
         task = self._curr_input.toPlainText().strip()
@@ -16192,6 +16311,9 @@ class ExamPrepCoachDialog(BaseCapabilityDialog):
         self._exam_output.setReadOnly(True)
         l.addWidget(self._exam_output, stretch=1)
         layout.addLayout(l)
+        footer = QLabel("Study plans are guidance. Adapt to your learning style and verify exam requirements.")
+        footer.setStyleSheet("color: #ffab70; background-color: #4a2c00; padding: 6px; border-radius: 4px;")
+        layout.addWidget(footer)
 
     def _run_exam(self):
         task = self._exam_input.toPlainText().strip()

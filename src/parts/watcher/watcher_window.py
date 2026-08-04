@@ -141,6 +141,30 @@ class WatcherEngine(QObject):
     def report(self) -> str:
         return self._core.report()
 
+    # ----------------------------------------------------------
+    # External intelligence registry passthroughs
+    # ----------------------------------------------------------
+
+    def register_external_intelligence(self, intel_id: str, metadata: dict) -> bool:
+        """Register an external intelligence with the tripwire."""
+        return self._core.register_external_intelligence(intel_id, metadata)
+
+    def unregister_external_intelligence(self, intel_id: str) -> bool:
+        """Unregister an external intelligence from the tripwire."""
+        return self._core.unregister_external_intelligence(intel_id)
+
+    def is_external_intelligence_registered(self, intel_id: str) -> bool:
+        """Check if an intelligence is registered."""
+        return self._core.is_external_intelligence_registered(intel_id)
+
+    def get_external_intelligence_registry(self) -> dict:
+        """Return a snapshot of the external intelligence registry."""
+        return self._core.get_external_intelligence_registry()
+
+    def check_external_intelligence_permission(self, intel_id: str, action: str) -> bool:
+        """Check if a registered intelligence is permitted to perform an action."""
+        return self._core.check_external_intelligence_permission(intel_id, action)
+
 
 class ReverseSandboxWidget(QFrame):
     """

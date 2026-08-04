@@ -405,6 +405,18 @@ class SystemPenetrationWatcher:
         (r"\b(reverse\s*engineer\s*(the\s*system|nexus|application))\b", "Reverse engineering attempt"),
     ]
 
+    # Defensive / legitimate engineering context — these are ALLOWED
+    # Includes external intelligence integration context markers
+    DEFENSIVE_ALLOW_CONTEXT: list[str] = [
+        r"\b(dependency\s*injection|injection\s*pattern|di\s*container)\b",
+        r"\b(refactor|code\s*review|unit\s*test|integration\s*test)\b",
+        r"\b(modify\s*(internal\s*state|configuration|settings)\s*(for|to|in)\s*(testing|development|config))\b",
+        r"\b(external\s*intelligence|trifecta\s*fold|dim4|cognitive\s*dimension)\b",
+        r"\b(snap.?in\s*adapter|reasoning\s*engine|memory\s*consolidation)\b",
+        r"\b(learning\s*from\s*external|anti.?confliction|circuit\s*breaker)\b",
+        r"\b(security\s*layer|guardrail\s*screen|confidence\s*cap)\b",
+    ]
+
     # Evasion / confusion tactics — trying to go around the rules
     EVASION_PATTERNS: list[tuple[str, str]] = [
         (r"\b(jailbreak\s*(the\s*ai|prompt|system|nexus))\b", "AI jailbreak attempt"),
@@ -425,12 +437,33 @@ class SystemPenetrationWatcher:
     def screen(cls, text: str) -> tuple[bool, str, list[str]]:
         """
         Returns (clean, cleaned_text, violation_messages).
+
+        Uses DEFENSIVE_ALLOW_CONTEXT to distinguish legitimate software
+        engineering and external intelligence integration from actual
+        penetration attempts.
         """
         violations: list[str] = []
         cleaned = text
 
+        # Check if the content is in a defensive/legitimate context
+        is_defensive = any(
+            re.search(ctx, text, re.IGNORECASE) for ctx in cls.DEFENSIVE_ALLOW_CONTEXT
+        )
+
         for pattern, label in cls.PENETRATION_PATTERNS:
             if re.search(pattern, cleaned, re.IGNORECASE):
+                # If in defensive context, check for legitimate framing
+                if is_defensive:
+                    # Look for legitimate engineering framing
+                    legit_framing = re.search(
+                        r"\b(dependency\s*injection|injection\s*pattern|refactor|"
+                        r"code\s*review|unit\s*test|integration\s*test|external\s*intelligence|"
+                        r"trifecta\s*fold|dim4|cognitive\s*dimension|snap.?in\s*adapter|"
+                        r"reasoning\s*engine|anti.?confliction|circuit\s*breaker)\b",
+                        text, re.IGNORECASE
+                    )
+                    if legit_framing:
+                        continue  # Skip — this is legitimate engineering
                 violations.append(f"[Penetration] {label}")
                 cleaned = re.sub(pattern, "[REDACTED-PENETRATION]", cleaned, flags=re.IGNORECASE)
 

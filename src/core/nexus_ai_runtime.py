@@ -99,6 +99,17 @@ except ImportError:
     _MemoryLayer = None
     _StatementIntent = None
 
+# ── NEXUS Cognitive Architecture ──
+# Snap-in intelligence layer: hierarchical memory, experiential learning,
+# metacognitive awareness, capability orchestration, persona/affect.
+# Completely additive — if import fails, runtime works exactly as before.
+try:
+    from .nexus_cognitive.snap_in_adapter import NexusSnapInAdapter as _NexusAdapter
+    _nexus_available = True
+except Exception:
+    _NexusAdapter = None
+    _nexus_available = False
+
 
 class RuntimeStatus(str, Enum):
     COMPLETED = "completed"
@@ -161,12 +172,107 @@ class NexusAIRuntime:
         self._watcher = watcher
         self._tier_audit = ThreeTierAuditLogger()
         self._current_temperature: float | None = None
+        self._conversation_history: dict[str, list[dict]] = {}
 
         # Background intelligence layer — never referenced by name in user-facing output
         self._compendium = _get_compendium() if _get_compendium else None
         self._memory_router = _get_router() if _get_router else None
 
+        # ── NEXUS Cognitive Architecture (snap-in) ──
+        # Wires hierarchical memory, experiential learning, metacognition,
+        # capability orchestration, persona memory, and emotional continuity.
+        # Falls back gracefully if unavailable.
+        self._nexus = None
+        if _nexus_available:
+            try:
+                self._nexus = _NexusAdapter(
+                    settings=self._settings,
+                    backend=self._backend,
+                )
+            except Exception:
+                self._nexus = None
+
         self.brave_api_key = (os.environ.get("BRAVE_SEARCH_API_KEY") or s.brave_api_key or "").strip()
+
+    def attach_external_intelligence(self, external_intelligence) -> bool:
+        """Plug a custom-made intelligence into the Trifecta Fold as dim4.
+
+        The external intelligence must implement IExternalIntelligence.process().
+        It will run in parallel with the three native dimensions and its output
+        will be fused alongside them via Reciprocal Rank Fusion.
+
+        Anti-confliction security:
+        - Output is screened through guardrails before fusion
+        - Confidence is capped below native dimension maximum
+        - Contradictions with native knowledge are detected and penalized
+        - Circuit breaker disables after 5 consecutive failures
+        - Learning: useful non-contradicting content is stored to memory
+
+        Watcher/tripwire integration:
+        - Registers the intelligence with the tripwire so it's not flagged as tampering
+        - Permitted actions: attach, detach, process, learning, trifecta_fold_dim4
+        - The watcher audits all external intelligence operations
+
+        Returns True if attached, False if NEXUS is unavailable or invalid object.
+        """
+        if not self._nexus:
+            return False
+        try:
+            ok = self._nexus.reasoning_engine._attach_external(external_intelligence)
+            if not ok:
+                return False
+            # Register with the tripwire/watcher so it knows this is legitimate
+            if self._watcher is not None:
+                intel_id = id(external_intelligence)
+                self._watcher.register_external_intelligence(
+                    str(intel_id),
+                    metadata={
+                        'name': getattr(external_intelligence, '__class__',
+                                        type(external_intelligence)).__name__,
+                        'permissions': ['process', 'learning'],
+                        'confidence_cap': 0.80,
+                        'circuit_breaker_enabled': True,
+                    })
+                self._tripwire_ok("external_intelligence_attach",
+                                  risk_level="info")
+            return True
+        except Exception:
+            return False
+
+    def detach_external_intelligence(self) -> bool:
+        """Detach the external intelligence from the Trifecta Fold.
+
+        Unregisters from the tripwire and removes the intelligence from
+        the reasoning engine. Returns True if detached, False if NEXUS unavailable.
+        """
+        if not self._nexus:
+            return False
+        try:
+            current = self._nexus.reasoning_engine._external
+            if current is None:
+                return False
+            intel_id = str(id(current))
+            self._nexus.reasoning_engine._attach_external(None)
+            if self._watcher is not None:
+                self._watcher.unregister_external_intelligence(intel_id)
+                self._tripwire_ok("external_intelligence_detach",
+                                  risk_level="info")
+            return True
+        except Exception:
+            return False
+
+    def integrate_external_learning(self) -> int:
+        """Drain and store learned external intelligence content into memory.
+
+        Call this after reasoning cycles to persist knowledge that the
+        external intelligence contributed. Returns number of entries stored.
+        """
+        if not self._nexus:
+            return 0
+        try:
+            return self._nexus.integrate_external_learning()
+        except Exception:
+            return 0
 
     def _request_tool_approval(self, action_type: str, description: str, targets: list[str], risk_level: Any) -> bool:
         """Ask the human approval gate before executing a risky tool action."""
@@ -435,6 +541,42 @@ class NexusAIRuntime:
             "hidden layer",
             "secret memory",
             "internal memory store",
+            # NEXUS cognitive architecture — never leak to user
+            "metacognitive",
+            "metacognition",
+            "nexus cognitive",
+            "nexus_cognitive",
+            "snap-in adapter",
+            "snap_in_adapter",
+            "hierarchical memory store",
+            "hierarchical_memory_store",
+            "memory consolidator",
+            "experiential learner",
+            "experiential_learner",
+            "emotional continuity",
+            "emotional_continuity",
+            "persona memory",
+            "persona_memory",
+            "compatibility matrix",
+            "capability orchestrator",
+            "cognitive architecture",
+            "cognitive context",
+            "cognitive stack",
+            "nexus snap",
+            "nexussnap",
+            "nexus ai runtime",
+            "nexus_ai_runtime",
+            "runtime executor",
+            "runtime_executor",
+            "valence",
+            "arousal",
+            "affect entry",
+            "confidence record",
+            "boundary recovery",
+            "forgetting factor",
+            "lesson hash",
+            "nrem",
+            "consolidation cycle",
         ]
 
         for term in forbidden_terms:
@@ -620,6 +762,27 @@ class NexusAIRuntime:
                         importance=0.85,
                     )
 
+        # ── NEXUS experiential learning (additive) ──
+        # Learn from the mission outcome: surprise-gated, novelty-checked,
+        # guardrail-validated. Writes procedural lessons to hierarchical memory.
+        if self._nexus:
+            try:
+                nexus_result = type('R', (), {
+                    'status': type('S', (), {'value': str(status)})(),
+                    'title': title,
+                    'result_text': getattr(result, 'result_text', ''),
+                })()
+                self._nexus.experiential_learner.process_mission(
+                    ai_uuid, task, intent, nexus_result,
+                )
+                # Record outcome for metacognitive confidence tracking
+                success = (str(status) == "completed")
+                self._nexus.metacognitive_engine.record_outcome(ai_uuid, intent, success)
+                # Track emotional state from user text
+                self._nexus.emotional_continuity.record_turn(ai_uuid, task)
+            except Exception:
+                pass
+
     def _extract_preferences(self, text: str) -> list[str]:
         """Simple heuristic extraction of preference/fact statements from user text."""
         text = (text or "").strip()
@@ -668,7 +831,7 @@ class NexusAIRuntime:
 
         model_response = self._call_model(prompt)
         if model_response.text and not model_response.error:
-            suggestions = [line.strip("-â€¢ ").strip() for line in model_response.text.splitlines() if line.strip()]
+            suggestions = [line.strip("-• ").strip() for line in model_response.text.splitlines() if line.strip()]
             return [s for s in suggestions if s][:5]
 
         # Offline heuristic fallback.
@@ -700,6 +863,15 @@ class NexusAIRuntime:
     def run(self, task: str, ai_name: str = "AI", ai_uuid: str = "", ai_metadata: dict[str, Any] | None = None) -> RuntimeResult:
         task = (task or "").strip()
         meta = ai_metadata or {}
+
+        # Track conversation history per AI for continuity
+        conv_key = ai_uuid or str(meta.get("uuid", "")) or ai_name
+        if conv_key not in self._conversation_history:
+            self._conversation_history[conv_key] = []
+        self._conversation_history[conv_key].append({"role": "user", "text": task})
+        # Keep last 20 turns to avoid unbounded growth
+        if len(self._conversation_history[conv_key]) > 20:
+            self._conversation_history[conv_key] = self._conversation_history[conv_key][-20:]
 
         if not task:
             return RuntimeResult(
@@ -986,7 +1158,7 @@ class NexusAIRuntime:
         if not self._capability_allowed(intent, abilities):
             self._tier_audit.log_past(
                 category=AuditCategory.CAPABILITY,
-                action="Capability not attached â€” task paused",
+                action="Capability not attached — task paused",
                 detail=f"Required capability '{intent}' is not attached to this AI.",
                 capability=intent,
                 confidence="high",
@@ -1128,7 +1300,7 @@ class NexusAIRuntime:
         elif intent == "Exam Prep Coach":
             result = self._run_exam_prep_coach(task, ai_name, meta, knowledge, thought)
         else:
-            result = self._run_chat(task, ai_name, meta, knowledge, thought)
+            result = self._run_chat(task, ai_name, meta, knowledge, thought, conv_key)
 
         # Three-tier audit: log what actually happened (PAST)
         status_str = getattr(result.status, 'value', str(result.status))
@@ -1174,6 +1346,14 @@ class NexusAIRuntime:
         # Only save to memory if the output was clean (or after sanitization)
         if not output_blocked:
             self._learn_from_mission(ai_uuid, task, intent, result)
+
+        # Record assistant response in conversation history
+        if result.result_text:
+            self._conversation_history[conv_key].append(
+                {"role": "assistant", "text": result.result_text})
+            if len(self._conversation_history[conv_key]) > 20:
+                self._conversation_history[conv_key] = self._conversation_history[conv_key][-20:]
+
         return result
 
     def _canonical_abilities(self, meta: dict[str, Any]) -> set[str]:
@@ -1186,7 +1366,7 @@ class NexusAIRuntime:
             out.add(canonical_intent(item))
         if not out:
             out.add("Chatbot")
-        # All AIs can use tools â€” this is an all-in-one program
+        # All AIs can use tools — this is an all-in-one program
         out.add("Tool User")
         return out
 
@@ -1342,7 +1522,7 @@ class NexusAIRuntime:
         ]):
             return "Game Companion"
 
-        # Email Automation â€” drafting, organizing, and managing email
+        # Email Automation — drafting, organizing, and managing email
         if any(x in t for x in [
             "email", "draft email", "email draft", "compose email", "inbox",
             "email template", "email sequence", "auto reply", "auto-reply",
@@ -1350,7 +1530,7 @@ class NexusAIRuntime:
         ]):
             return "Email Automation"
 
-        # API Integrator â€” connecting external APIs and services
+        # API Integrator — connecting external APIs and services
         if any(x in t for x in [
             "api", "rest api", "webhook", "integration", "connect api",
             "api key", "endpoint", "api call", "api integration",
@@ -1358,7 +1538,7 @@ class NexusAIRuntime:
         ]):
             return "API Integrator"
 
-        # Team Orchestrator â€” multi-AI coordination
+        # Team Orchestrator — multi-AI coordination
         if any(x in t for x in [
             "team orchestrat", "multi-agent", "coordinate ai", "ai team",
             "delegate to ai", "multi-ai", "agent coordination",
@@ -1366,7 +1546,7 @@ class NexusAIRuntime:
         ]):
             return "Team Orchestrator"
 
-        # Voice Interface â€” voice commands and speech
+        # Voice Interface — voice commands and speech
         if any(x in t for x in [
             "voice", "speech", "speak", "microphone", "mic input",
             "voice command", "voice control", "talk to ai", "dictation",
@@ -1374,7 +1554,7 @@ class NexusAIRuntime:
         ]):
             return "Voice Interface"
 
-        # Visual Canvas â€” visual workspace, drawing, diagrams
+        # Visual Canvas — visual workspace, drawing, diagrams
         if any(x in t for x in [
             "visual canvas", "draw", "diagram", "whiteboard",
             "visual workspace", "canvas", "sketch", "flowchart",
@@ -1709,7 +1889,7 @@ class NexusAIRuntime:
         clean = knowledge.strip()
         if len(clean) <= limit:
             return clean
-        return clean[:limit] + "\n\n[Knowledge excerpt truncated for runtime prompt.]"
+        return clean[:limit]
 
     def _memory_excerpt(self, ai_uuid: str, task: str, limit: int = 2000) -> str:
         """Retrieve the most relevant learned memories for this AI and task."""
@@ -1732,239 +1912,254 @@ class NexusAIRuntime:
         return "\n".join(lines)
 
     def _backend_failure_result(self, ai_name: str, thought: list[str], backend_response: BackendResponse) -> RuntimeResult:
-        """Honest FAILED result when local intelligence is running in fallback mode."""
-        provider_name = backend_response.display_name or backend_response.provider_id or "selected backend"
+        """Honest FAILED result when the model backend is unavailable."""
         return RuntimeResult(
             RuntimeStatus.FAILED,
             f"{ai_name}'s backend is offline",
             thought + [
                 f"[{ai_name}] AI exists and capability routing worked.",
-                f"[{ai_name}] Backend call failed: {provider_name} is offline or unavailable.",
-                f"[{ai_name}] Error: {backend_response.error}",
+                f"[{ai_name}] Backend call failed — offline or unavailable.",
             ],
-            [f"[{ai_name}] Task did not complete because the local intelligence is running in fallback mode."],
+            [f"[{ai_name}] Task did not complete because the backend is unavailable."],
             [
-                "Next: The built-in local intelligence is active. You can configure a different model in Backend settings for enhanced capabilities.",
-                "Backend config is in the Visibility Window: Backend > Configure Backend.",
+                "Next: Continue with local intelligence, or check backend configuration.",
             ],
-            f"{ai_name} is active, but her local intelligence is running in fallback mode.\n\n"
-            f"Provider: {provider_name}\n"
-            f"Error: {backend_response.error}\n\n"
-            "The built-in local intelligence is active. You can configure a different model in Backend settings for enhanced capabilities.",
+            f"{ai_name} is active, but the backend is currently unavailable.\n\n"
+            "I'm still here and can work with you using my own intelligence. "
+            "Ask me anything and I'll do my best to help.",
         )
 
-    def _run_chat(self, task, ai_name, meta, knowledge, thought):
+    def _run_chat(self, task, ai_name, meta, knowledge, thought, conv_key=None):
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "chat"))
         if model.text and not model.error:
             return RuntimeResult(RuntimeStatus.COMPLETED, "Chat completed", thought + [f"[{ai_name}] Model backend answered using Knowledge/Intelligence context."], [f"[{ai_name}] Returned chat response."], ["Next: continue conversation or approve outward action."], model.text)
 
-        return self._local_chat_response(task, ai_name, meta, knowledge, thought)
+        return self._local_chat_response(task, ai_name, meta, knowledge, thought, conv_key)
 
-    def _local_chat_response(self, task, ai_name, meta, knowledge, thought):
-        """Generate a useful, clearly-labeled local response when no backend is available."""
+    def _local_chat_response(self, task, ai_name, meta, knowledge, thought, conv_key=None):
+        """Generate an intelligent response using HCO-LI Trifecta Folding."""
         ai_uuid = str(meta.get("uuid", ""))
+        conv_history = self._conversation_history.get(conv_key, []) if conv_key else []
         abilities = meta.get("abilities") or meta.get("capabilities") or []
         use_case = meta.get("use_case", "")
-        memory_text = self._memory_excerpt(ai_uuid, task)
-        knowledge_excerpt = self._knowledge_excerpt(knowledge, limit=3000)
-
-        # Get recent memories for conversation continuity
-        recent_memories = self._memory.get_recent(ai_uuid, 5) if ai_uuid else []
-        preference_memories = [m for m in recent_memories if "preference" in m.tags] if recent_memories else []
-        mission_memories = [m for m in recent_memories if "mission" in m.tags] if recent_memories else []
-
-        parts: list[str] = []
-        parts.append(f"[Local Intelligence â€” {ai_name}]")
-        parts.append("")
-        parts.append(f"I heard: \"{task}\"")
-        parts.append("")
-
-        has_knowledge = bool(knowledge_excerpt.strip())
-        has_memory = bool(memory_text.strip())
-
         task_lower = task.lower()
+
+        # ── Structured intents (narrow matches only to avoid intercepting real queries) ──
         identity_q = any(k in task_lower for k in [
             "who am i", "who is the user", "what do you know about me",
             "what's my name", "what is my name", "do you know me",
         ])
         cap_q = any(k in task_lower for k in [
-            "what can you do", "help me", "what are you", "capabilities", "what do you do",
-            "what kind of", "what kinds of", "explain what your", "what coding", "what code",
+            "what can you do", "what are you", "your capabilities",
+            "what do you do", "what kind of ai", "what kinds of ai",
+        ])
+        is_greeting = any(task_lower.strip() == g or task_lower.startswith(g + " ") for g in [
+            "hello", "hi", "hey", "greetings", "good morning",
+            "good afternoon", "good evening", "yo", "sup",
+        ])
+        is_preference = any(task_lower.startswith(k) for k in [
+            "i prefer", "i like ", "i always ", "i never ", "remember that",
+            "i dislike", "i hate ", "note that i", "my preference",
+        ]) and "?" not in task
+        is_howto = any(k in task_lower for k in [
+            "how do i use", "how to use command nexus", "where is the",
+            "where do i find", "show me how to use",
         ])
 
-        # Show knowledge context (skipped for direct identity/capability answers)
-        if has_knowledge and not identity_q and not cap_q:
-            parts.append("From my Knowledge/Intelligence profile:")
-            for line in knowledge_excerpt.splitlines()[:15]:
-                if line.strip():
-                    parts.append(f"  {line.strip()}")
-            parts.append("")
-
-        # Show learned preferences for continuity
-        if preference_memories:
-            parts.append("What I've learned about you:")
-            for m in preference_memories[:3]:
-                parts.append(f"  - {m.content[:120]}")
-            parts.append("")
-
-        # Show recent mission context for continuity
-        if mission_memories:
-            parts.append("Recent things we've worked on:")
-            for m in mission_memories[:3]:
-                parts.append(f"  - {m.content[:120]}")
-            parts.append("")
-
-        # Intent: identity question — answered from saved configuration or learned memory,
-        # never hard-coded. If nothing is saved, say so clearly.
         if identity_q:
-            saved_name = ""
-            notes = str(meta.get("context_notes", "") or "")
-            m_note = re.search(r"address the user as\s+([^.\n;]+)", notes, re.IGNORECASE)
-            if m_note:
-                saved_name = m_note.group(1).strip()
-            if saved_name:
-                parts.append(f"From your saved configuration: you are {saved_name}.")
-                parts.append("That's what this AI's setup instructions say, and it's how I'll address you.")
-            else:
-                name_mem = [m for m in preference_memories if "name" in m.content.lower()]
-                if name_mem:
-                    parts.append("Here's what I remember about you:")
-                    for m in name_mem[:3]:
-                        parts.append(f"  - {m.content[:120]}")
-                else:
-                    parts.append("I don't have any saved information about who you are yet.")
-                    parts.append(
-                        "You can set a preferred form of address in this AI's setup notes in the Forge, "
-                        "or just tell me — I'll remember it."
-                    )
+            return self._identity_response(task, ai_name, meta, thought)
+        if cap_q:
+            return self._capability_response(task, ai_name, meta, thought, abilities, use_case)
+        if is_greeting:
+            return self._greeting_response(task, ai_name, meta, thought, abilities)
+        if is_preference:
+            return self._preference_response(task, ai_name, meta, thought)
+        if is_howto:
+            return self._howto_response(task, ai_name, thought)
 
-        # Intent: capabilities question
-        elif cap_q:
-            parts.append(f"I'm {ai_name}, a Command Nexus AI for {use_case or 'general assistance'}.")
-            parts.append(f"My capabilities: {', '.join(abilities) if abilities else 'basic chat'}")
-            parts.append("")
-            parts.append("I can:")
-            parts.append("  - Chat and answer from my knowledge profile")
-            parts.append("  - Plan tasks and break them into steps")
-            parts.append("  - Process documents you give me")
-            parts.append("  - Tutor and explain concepts")
-            parts.append("  - Use tools (read/write files, list directories) with your approval")
-            parts.append("  - Learn your preferences over time")
-            parts.append("")
-            parts.append("I'm answering from local rules right now because no model backend responded.")
-            parts.append("For full AI-generated answers, connect a backend in the Visibility Window → Backend settings.")
+        # ── All other queries: Trifecta Folding reasoning engine ──
+        if self._nexus:
+            try:
+                # Index AI's memories into finder registry so dim1 can find them
+                if ai_uuid:
+                    self._nexus.index_memories(ai_uuid)
 
-        # Intent: preference statement
-        elif any(k in task_lower for k in ["prefer", "like", "always", "never", "remember", "dislike", "hate", "want", "need"]):
-            parts.append("Got it â€” I've saved that to my local memory and will remember it for future tasks.")
-            parts.append("You don't need to repeat yourself; I learn from every interaction.")
-            if preference_memories:
-                parts.append("")
-                parts.append("Here's what I already know about you:")
-                for m in preference_memories[:3]:
-                    parts.append(f"  - {m.content[:100]}")
+                if knowledge:
+                    import hashlib
+                    for line in knowledge.splitlines():
+                        s = line.strip()
+                        if not s or any(x in s.lower() for x in [
+                            "from '", "from \"", "relevance:", "knowledge context",
+                            "knowledge excerpt", "---", "```", ".md)", ".py)",
+                            ".txt)", ".json)", "##", "###", "file structure",
+                            "tech stack",
+                        ]):
+                            continue
+                        doc_id = f"kw_{hashlib.md5(s.encode('utf-8')).hexdigest()[:12]}"
+                        self._nexus.finder_registry.add_document(doc_id, s)
 
-        # Intent: greeting
-        elif any(k in task_lower for k in ["hello", "hi ", "hey", "greetings", "good morning", "good afternoon", "good evening"]):
-            parts.append(f"Hello! I'm {ai_name}, your Command Nexus AI.")
-            if abilities:
-                parts.append(f"I'm equipped with: {', '.join(abilities)}.")
-            if mission_memories:
-                parts.append(f"Last time we worked on: {mission_memories[0].content[:100]}")
-                parts.append("Want to continue that, or start something new?")
-            else:
-                parts.append("Ask me anything, give me a task, or tell me what you'd like to accomplish.")
-            if not has_knowledge and not has_memory:
-                parts.append("I'm fresh and ready to learn â€” the more we work together, the better I'll understand your needs.")
+                result = self._nexus.reasoning_engine.reason(
+                    ai_uuid, task, intent="chat",
+                    conversation_history=conv_history)
+                # Learn from the interaction — always store the user's query
+                # (not the AI response) to avoid self-referencing feedback loops.
+                success = result.confidence >= 0.4
+                self._nexus.learn_from_interaction(
+                    ai_uuid, task, "chat", success, result.text)
+                # Integrate any learning from external intelligence (dim4)
+                # into memory. Non-contradicting content is stored with
+                # tag 'external_intelligence' for traceability.
+                try:
+                    self._nexus.integrate_external_learning()
+                except Exception:
+                    pass
 
-        # Intent: how to use a specific capability
-        elif any(k in task_lower for k in ["how do i", "how to", "where is", "where do", "show me how", "teach me how"]):
-            parts.append("Here's how to use Command Nexus:")
-            parts.append("")
-            parts.append("  ðŸ§  AI Forge â€” Create and customize AI assistants")
-            parts.append("  ðŸ“š Intelligence â€” Add memory and knowledge to your AI")
-            parts.append("  â¬†ï¸ Upgrades â€” Browse and unlock more capabilities")
-            parts.append("  ðŸ›¡ï¸ Governance â€” Safety controls, audit logs, parental controls")
-            parts.append("  ðŸ¤– Support â€” Get help from the Customer Support AI")
-            parts.append("  ðŸŽ¯ Mission Control â€” Type a task and click START")
-            parts.append("")
-            parts.append("Just type what you want in plain language. No coding required!")
+                return RuntimeResult(
+                    RuntimeStatus.COMPLETED, "Intelligence response",
+                    thought + [
+                        f"[{ai_name}] Trifecta Folding: {result.mode.value}, "
+                        f"confidence {result.confidence:.2f}, "
+                        f"{len(result.sources)} sources, "
+                        f"{result.elapsed_ms:.1f}ms",
+                    ],
+                    [f"[{ai_name}] Returned reasoned response."],
+                    ["Next: continue the conversation or give a new task."],
+                    result.text,
+                )
+            except Exception:
+                pass
 
-        # Intent: question
-        elif "?" in task:
-            parts.append("Let me see if I can help with that question.")
-            if has_knowledge:
-                # Try to find relevant knowledge for the question
-                task_words = set(w.lower() for w in task.split() if len(w) > 3)
-                relevant = []
-                for line in knowledge_excerpt.splitlines():
-                    line_stripped = line.strip()
-                    if not line_stripped:
-                        continue
-                    line_words = set(w.lower() for w in line_stripped.split() if len(w) > 3)
-                    overlap = task_words & line_words
-                    if overlap:
-                        relevant.append((len(overlap), line_stripped))
-                relevant.sort(key=lambda x: -x[0])
-                if relevant:
-                    parts.append("From my knowledge profile, here's what I found:")
-                    for _, line in relevant[:5]:
-                        parts.append(f"  {line}")
-                    parts.append("")
-                else:
-                    parts.append("My knowledge profile doesn't have a direct match for this question.")
-                    parts.append("However, here's some general context:")
-                    for line in knowledge_excerpt.splitlines()[:5]:
-                        if line.strip():
-                            parts.append(f"  {line.strip()}")
-                    parts.append("")
-            if preference_memories:
-                parts.append("I also remember your preferences and past interactions.")
-            parts.append("")
-            parts.append("For a complete AI-powered answer, connect a model backend in the Visibility Window → Backend settings. Right now I'm answering from local rules and your saved context.")
-
-        # Intent: continue previous work
-        elif any(k in task_lower for k in ["continue", "last time", "previous", "again", "pick up", "resume"]):
-            if mission_memories:
-                parts.append("Here's what we've been working on:")
-                for m in mission_memories[:5]:
-                    parts.append(f"  - {m.content[:120]}")
-                parts.append("")
-                parts.append("Tell me which one to continue, or describe a new task.")
-            else:
-                parts.append("I don't have any previous missions to continue yet.")
-                parts.append("Start a new task by typing what you'd like to accomplish.")
-
-        # Intent: general statement
-        else:
-            parts.append("I've received your message and stored it in my local memory.")
-            if mission_memories:
-                parts.append(f"We've worked on {len(mission_memories)} recent task(s) together.")
-            parts.append("I can act on this using my built-in local intelligence. You can configure a different model in Backend settings for enhanced capabilities.")
-            parts.append("")
-            parts.append("In the meantime, I can:")
-            parts.append("  - Plan this task (use the Planner capability)")
-            parts.append("  - Break it into steps (just ask me to plan)")
-            parts.append("  - Read or write files (use Tool User capability)")
-            parts.append("  - Remember your preferences for next time")
-            parts.append("  - Process documents (paste text or use Document Processor)")
-
-        parts.append("")
-        parts.append("[Local Intelligence Mode]")
-
-        result_text = "\n".join(parts)
+        # ── Fallback without NEXUS ──
+        parts = [f"I'm {ai_name}. Let me see what I can tell you about that."]
+        if knowledge:
+            for line in knowledge.splitlines()[:5]:
+                s = line.strip()
+                if s and not any(x in s.lower() for x in [
+                    "from '", "relevance:", "knowledge context", "---",
+                    "```", "##", "###", "file structure", "tech stack",
+                ]):
+                    parts.append(f"  {s}")
+        if not any(len(p) > 40 for p in parts[1:]):
+            parts.append("Tell me more about what you're looking for, and I'll learn from it.")
         return RuntimeResult(
-            RuntimeStatus.COMPLETED,
-            "Local intelligence response",
-            thought + [
-                f"[{ai_name}] Running in local mode; using local intelligence.",
-                f"[{ai_name}] Knowledge: {'connected' if has_knowledge else 'not found'}, Memory: {'connected' if has_memory else 'empty'}.",
-                f"[{ai_name}] Produced a context-aware local response with continuity.",
-            ],
-            [f"[{ai_name}] Returned local intelligence response (clearly labeled, not faking backend)."],
-            ["Next: the built-in local model provides AI reasoning, or configure Backend settings for more options."],
-            result_text,
+            RuntimeStatus.COMPLETED, "Intelligence response",
+            thought + [f"[{ai_name}] Basic response (NEXUS unavailable)."],
+            [f"[{ai_name}] Returned basic response."],
+            ["Next: continue the conversation or give a new task."],
+            "\n".join(parts),
         )
+
+    def _identity_response(self, task, ai_name, meta, thought):
+        """Handle identity questions."""
+        ai_uuid = str(meta.get("uuid", ""))
+        parts: list[str] = []
+        saved_name = ""
+        notes = str(meta.get("context_notes", "") or "")
+        m_note = re.search(r"address the user as\s+([^.\n;]+)", notes, re.IGNORECASE)
+        if m_note:
+            saved_name = m_note.group(1).strip()
+        if saved_name:
+            parts.append(f"You're {saved_name}. That's what I have in my setup notes.")
+        elif self._nexus:
+            try:
+                persona = self._nexus.persona_memory.summarize(ai_uuid)
+                if persona:
+                    parts.append(persona)
+            except Exception:
+                pass
+        if not parts:
+            parts.append("I don't have any saved information about who you are yet.")
+            parts.append("You can set a preferred form of address in this AI's setup notes, or just tell me.")
+        return RuntimeResult(
+            RuntimeStatus.COMPLETED, "Intelligence response",
+            thought + [f"[{ai_name}] Identity query handled."],
+            [f"[{ai_name}] Returned identity response."],
+            ["Next: continue the conversation or give a new task."],
+            "\n".join(parts))
+
+    def _capability_response(self, task, ai_name, meta, thought, abilities, use_case):
+        """Handle capability questions."""
+        ai_uuid = str(meta.get("uuid", ""))
+        parts = [f"I'm {ai_name}, a Command Nexus AI for {use_case or 'general assistance'}."]
+        if abilities:
+            parts.append(f"I'm equipped with: {', '.join(abilities)}.")
+        parts.append("")
+        parts.append("I can chat, plan tasks, process documents, tutor, use tools with your approval, and learn your preferences over time.")
+        if self._nexus:
+            try:
+                from .nexus_cognitive.hierarchical_memory_store import MemoryLevel
+                lessons = self._nexus.memory_store.get_by_level(ai_uuid, MemoryLevel.PROCEDURAL)
+                if lessons:
+                    parts.append("")
+                    parts.append("From my experience so far:")
+                    for l in lessons[:3]:
+                        parts.append(f"  - {l.content[:150]}")
+            except Exception:
+                pass
+        return RuntimeResult(
+            RuntimeStatus.COMPLETED, "Intelligence response",
+            thought + [f"[{ai_name}] Capabilities query handled."],
+            [f"[{ai_name}] Returned capabilities response."],
+            ["Next: continue the conversation or give a new task."],
+            "\n".join(parts))
+
+    def _greeting_response(self, task, ai_name, meta, thought, abilities):
+        """Handle greetings."""
+        ai_uuid = str(meta.get("uuid", ""))
+        parts = [f"Hello! I'm {ai_name}."]
+        if self._nexus:
+            try:
+                persona = self._nexus.persona_memory.summarize(ai_uuid)
+                if persona:
+                    parts.append(persona)
+            except Exception:
+                pass
+        if abilities:
+            parts.append(f"I'm equipped with: {', '.join(abilities)}.")
+        parts.append("Ask me anything, give me a task, or tell me what you'd like to accomplish.")
+        return RuntimeResult(
+            RuntimeStatus.COMPLETED, "Intelligence response",
+            thought + [f"[{ai_name}] Greeting handled."],
+            [f"[{ai_name}] Returned greeting."],
+            ["Next: continue the conversation or give a new task."],
+            "\n".join(parts))
+
+    def _preference_response(self, task, ai_name, meta, thought):
+        """Handle preference statements — actually persist to memory."""
+        ai_uuid = str(meta.get("uuid", ""))
+        if self._nexus and ai_uuid:
+            try:
+                self._nexus.learn_from_interaction(
+                    ai_uuid, task, "preference", True, task)
+            except Exception:
+                pass
+        parts = ["Got it — I've saved that and will remember it for future tasks."]
+        parts.append("You don't need to repeat yourself; I learn from every interaction.")
+        return RuntimeResult(
+            RuntimeStatus.COMPLETED, "Intelligence response",
+            thought + [f"[{ai_name}] Preference saved."],
+            [f"[{ai_name}] Returned preference acknowledgment."],
+            ["Next: continue the conversation or give a new task."],
+            "\n".join(parts))
+
+    def _howto_response(self, task, ai_name, thought):
+        """Handle how-to questions."""
+        parts = [
+            "Here's how to use Command Nexus:", "",
+            "  AI Forge — Create and customize AI assistants",
+            "  Intelligence — Add memory and knowledge to your AI",
+            "  Upgrades — Browse and unlock more capabilities",
+            "  Governance — Safety controls, audit logs, parental controls",
+            "  Support — Get help from the Customer Support AI",
+            "  Mission Control — Type a task and click START", "",
+            "Just type what you want in plain language. No coding required!",
+        ]
+        return RuntimeResult(
+            RuntimeStatus.COMPLETED, "Intelligence response",
+            thought + [f"[{ai_name}] How-to guidance provided."],
+            [f"[{ai_name}] Returned how-to response."],
+            ["Next: continue the conversation or give a new task."],
+            "\n".join(parts))
 
     def _run_research(self, task, ai_name, meta, knowledge, thought):
         sources = self._brave_search(task) if self.brave_api_key else []
@@ -1990,7 +2185,7 @@ class NexusAIRuntime:
         else:
             self._tier_audit.log_past(
                 category=AuditCategory.LOCAL_RESPONSE,
-                action="No research performed â€” no search API connected",
+                action="No research performed — no search API connected",
                 detail="Research paused; AI cannot truthfully complete without sources",
                 source="none",
                 capability="Research",
@@ -2046,7 +2241,7 @@ class NexusAIRuntime:
             return RuntimeResult(RuntimeStatus.COMPLETED, "Coder completed", thought + [f"[{ai_name}] Model backend produced coding output using Knowledge context."], [f"[{ai_name}] Returned code analysis/draft."], ["Next: review before applying changes."], model.text)
 
         result = (
-            f"[Local Mode â€” {ai_name} is running in local intelligence mode]\n\n"
+            f"[Local Mode — {ai_name} is running in local intelligence mode]\n\n"
             f"Code task: {task}\n\n"
             "Here is a practical plan for this code task:\n"
             "1. Identify the language and framework.\n"
@@ -2069,7 +2264,7 @@ class NexusAIRuntime:
             return RuntimeResult(RuntimeStatus.COMPLETED, "Writer completed", thought + [f"[{ai_name}] Model backend produced writing output using Knowledge context."], [f"[{ai_name}] Returned draft/rewrite."], ["Next: revise tone or export after approval."], model.text)
 
         result = (
-            f"[Local Mode â€” {ai_name} is running in local intelligence mode]\n\n"
+            f"[Local Mode — {ai_name} is running in local intelligence mode]\n\n"
             f"Writing task: {task}\n\n"
             "Here is a structured writing plan for this task:\n"
             "1. Identify the audience and purpose.\n"
@@ -2304,14 +2499,14 @@ class NexusAIRuntime:
                 "6. Scale path: Productize your service into a package once demand exceeds capacity.\n\n"
                 "Risk: Low financial risk, high time investment. Reputation is everything.\n"
                 "Break-even: Immediate (first paid gig). Real income: 2-4 weeks to first payment.\n\n"
-                "DISCLAIMER: Planning tool only â€” not financial advice."
+                "DISCLAIMER: Planning tool only — not financial advice."
             )
         elif any(x in t for x in ["crypto", "bitcoin", "ethereum", "token", "defi", "trading", "invest"]):
             parts.append(
                 "Crypto / Investment Analysis:\n"
                 "1. Risk tolerance: Only invest what you can afford to lose entirely.\n"
                 "2. Asset research: Whitepaper, team, use case, tokenomics, liquidity.\n"
-                "3. Entry strategy: Dollar-cost averaging vs lump sum â€” DCA reduces timing risk.\n"
+                "3. Entry strategy: Dollar-cost averaging vs lump sum — DCA reduces timing risk.\n"
                 "4. Exit plan: Set target prices AND stop-loss levels before buying.\n"
                 "5. Portfolio allocation: Never more than 5-10% of net worth in speculative assets.\n"
                 "6. Red flags: Guaranteed returns, anonymous teams, no audit, FOMO marketing.\n\n"
@@ -2330,7 +2525,7 @@ class NexusAIRuntime:
                 "6. Marketing: Free content (YouTube/blog) feeds paid course sales. Build audience first.\n\n"
                 "Risk: Low financial risk, high time investment upfront.\n"
                 "Break-even: 10-50 sales typically covers production costs.\n\n"
-                "DISCLAIMER: Planning tool only â€” not financial advice."
+                "DISCLAIMER: Planning tool only — not financial advice."
             )
         elif any(x in t for x in ["saas", "software", "app", "product", "startup"]):
             parts.append(
@@ -2343,7 +2538,7 @@ class NexusAIRuntime:
                 "6. Break-even: When monthly revenue exceeds monthly costs.\n\n"
                 "Risk: Medium financial, high time. Most SaaS take 6-18 months to break-even.\n"
                 "Key metric: MRR (Monthly Recurring Revenue). Track from day one.\n\n"
-                "DISCLAIMER: Planning tool only â€” not financial advice."
+                "DISCLAIMER: Planning tool only — not financial advice."
             )
         elif any(x in t for x in ["cost", "save money", "cut spending", "budget", "optimize", "reduce expense"]):
             parts.append(
@@ -2356,7 +2551,7 @@ class NexusAIRuntime:
                 "6. Annual vs monthly: Annual plans often save 15-20% if you're committed.\n\n"
                 "Risk: None. Pure savings exercise.\n"
                 "Expected outcome: 10-30% reduction in monthly overhead.\n\n"
-                "DISCLAIMER: Planning tool only â€” not financial advice."
+                "DISCLAIMER: Planning tool only — not financial advice."
             )
         elif any(x in t for x in ["price", "pricing", "how much should i charge", "rate", "what to charge"]):
             parts.append(
@@ -2368,7 +2563,7 @@ class NexusAIRuntime:
                 "5. Test and adjust: Start higher than you think, offer discounts, measure conversion.\n"
                 "6. Raise prices: Once demand exceeds capacity, raise prices 20%.\n\n"
                 "Rule of thumb: If nobody complains about your price, it's too low.\n\n"
-                "DISCLAIMER: Planning tool only â€” not financial advice."
+                "DISCLAIMER: Planning tool only — not financial advice."
             )
         else:
             parts.append(
@@ -2388,8 +2583,8 @@ class NexusAIRuntime:
                 "Avoid:\n"
                 "- Get-rich-quick schemes, MLM, pyramid structures.\n"
                 "- Anything requiring you to recruit others to make money.\n"
-                "- 'Guaranteed returns' â€” nothing is guaranteed.\n\n"
-                "DISCLAIMER: Planning tool only â€” not financial advice. "
+                "- 'Guaranteed returns' — nothing is guaranteed.\n\n"
+                "DISCLAIMER: Planning tool only — not financial advice. "
             )
 
         result = "\n".join(parts)
@@ -2428,7 +2623,7 @@ class NexusAIRuntime:
                 result_text = "\n".join(lines)
                 return RuntimeResult(RuntimeStatus.COMPLETED, "Memory recall completed", thought + [f"[{ai_name}] Retrieved {len(memories)} memories matching the recall query."], [f"[{ai_name}] Returned recalled context from memory store."], ["Next: continue from where you left off, or refine the search."], result_text)
             else:
-                return RuntimeResult(RuntimeStatus.COMPLETED, "No memories found", thought + [f"[{ai_name}] No stored memories matched the recall query."], [f"[{ai_name}] Memory store is empty or no matches found."], ["Next: start a new task â€” memories will accumulate as you work."], f"No memories found for: {task}\n\nMemories are recorded automatically as you work.\nTry: 'recall [topic]' or 'what did I do last time' to search past sessions.")
+                return RuntimeResult(RuntimeStatus.COMPLETED, "No memories found", thought + [f"[{ai_name}] No stored memories matched the recall query."], [f"[{ai_name}] Memory store is empty or no matches found."], ["Next: start a new task — memories will accumulate as you work."], f"No memories found for: {task}\n\nMemories are recorded automatically as you work.\nTry: 'recall [topic]' or 'what did I do last time' to search past sessions.")
 
         # Intent: decision tracking
         if any(x in t for x in ["track decision", "decision history", "why did i choose", "what did i decide", "log decision"]):
@@ -2470,7 +2665,7 @@ class NexusAIRuntime:
                     result_text = "\n".join(lines)
                     return RuntimeResult(RuntimeStatus.COMPLETED, "Audit trail retrieved", thought + [f"[{ai_name}] Compiled audit trail with {len(all_recent)} entries."], [f"[{ai_name}] Returned full recent activity log."], ["Next: review trail for compliance or context restoration."], result_text)
 
-            return RuntimeResult(RuntimeStatus.COMPLETED, "No audit trail yet", thought + [f"[{ai_name}] No activity recorded for audit."], [f"[{ai_name}] Audit trail is empty."], ["Next: start working â€” activity is logged automatically."], "No audit trail entries yet.\n\nActivity is recorded automatically as you work. Come back later to review the full trail.")
+            return RuntimeResult(RuntimeStatus.COMPLETED, "No audit trail yet", thought + [f"[{ai_name}] No activity recorded for audit."], [f"[{ai_name}] Audit trail is empty."], ["Next: start working — activity is logged automatically."], "No audit trail entries yet.\n\nActivity is recorded automatically as you work. Come back later to review the full trail.")
 
         # Default: try model backend, then local recording scaffold
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "memory_recording"))
@@ -2488,14 +2683,14 @@ class NexusAIRuntime:
             "  1. Session context: The task you just described.\n"
             "  2. This will be searchable later via recall.\n\n"
             "Commands you can use:\n"
-            "  - 'recall [topic]' â€” search past sessions\n"
-            "  - 'where I left off' â€” restore previous context\n"
-            "  - 'track decision: [choice]' â€” log a decision\n"
-            "  - 'show my progress' â€” view habit/progress journal\n"
-            "  - 'audit trail' â€” full recent activity log\n\n"
+            "  - 'recall [topic]' — search past sessions\n"
+            "  - 'where I left off' — restore previous context\n"
+            "  - 'track decision: [choice]' — log a decision\n"
+            "  - 'show my progress' — view habit/progress journal\n"
+            "  - 'audit trail' — full recent activity log\n\n"
             ""
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Memory recording completed (local fallback)", thought + [f"[{ai_name}] Memory Recorder executed locally â€” task saved to memory store."], [f"[{ai_name}] Recorded task to local memory with timestamp and tags."], ["Next: use 'recall [topic]' to retrieve past context. "], result)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Memory recording completed (local fallback)", thought + [f"[{ai_name}] Memory Recorder executed locally — task saved to memory store."], [f"[{ai_name}] Recorded task to local memory with timestamp and tags."], ["Next: use 'recall [topic]' to retrieve past context. "], result)
 
     def _run_activity_watcher(self, task, ai_name, meta, knowledge, thought):
         ai_uuid = str(meta.get("uuid", ""))
@@ -2541,15 +2736,15 @@ class NexusAIRuntime:
                     lines.append(f"  - Activity sources: {len(sources)}")
 
                     lines.append(f"\n\nImprovement suggestions:")
-                    lines.append("  1. Look for repeated task types â€” these are automation candidates.")
+                    lines.append("  1. Look for repeated task types — these are automation candidates.")
                     lines.append("  2. Tasks that take < 5 min but happen daily are prime for automation.")
-                    lines.append("  3. Tasks you avoid or procrastinate may indicate friction â€” simplify them.")
+                    lines.append("  3. Tasks you avoid or procrastinate may indicate friction — simplify them.")
                     lines.append("  4. Batch similar tasks together to reduce context switching.")
 
                     result_text = "\n".join(lines)
                     return RuntimeResult(RuntimeStatus.COMPLETED, "Activity pattern report generated", thought + [f"[{ai_name}] Analyzed {len(activity_memories)} activity entries and produced pattern report."], [f"[{ai_name}] Returned activity breakdown and improvement suggestions."], ["Next: review suggestions. Repeated tasks will build richer patterns over time."], result_text)
 
-            return RuntimeResult(RuntimeStatus.COMPLETED, "No activity patterns yet", thought + [f"[{ai_name}] No activity data collected yet."], [f"[{ai_name}] Activity log is empty."], ["Next: keep working â€” activity is logged automatically. Check patterns later."], "No activity patterns collected yet.\n\nActivity is logged automatically as you work. Use 'show my patterns' after a few sessions to see insights.")
+            return RuntimeResult(RuntimeStatus.COMPLETED, "No activity patterns yet", thought + [f"[{ai_name}] No activity data collected yet."], [f"[{ai_name}] Activity log is empty."], ["Next: keep working — activity is logged automatically. Check patterns later."], "No activity patterns collected yet.\n\nActivity is logged automatically as you work. Use 'show my patterns' after a few sessions to see insights.")
 
         # Intent: automation candidates
         if any(x in t for x in ["automate", "automation candidate", "what can i automate", "delegate"]):
@@ -2570,10 +2765,10 @@ class NexusAIRuntime:
                     found_candidates.sort(key=lambda x: x[1], reverse=True)
                     if found_candidates:
                         for word, count in found_candidates[:8]:
-                            lines.append(f"  - '{word}' appears in {count} activities â€” consider automating.")
+                            lines.append(f"  - '{word}' appears in {count} activities — consider automating.")
                     else:
                         lines.append("  No strong repetition patterns detected yet.")
-                        lines.append("  Keep working â€” patterns emerge after 10+ activities.")
+                        lines.append("  Keep working — patterns emerge after 10+ activities.")
 
                     lines.append(f"\n\nAutomation framework:")
                     lines.append("  1. Identify: Tasks you do the same way every time.")
@@ -2585,7 +2780,7 @@ class NexusAIRuntime:
                     result_text = "\n".join(lines)
                     return RuntimeResult(RuntimeStatus.COMPLETED, "Automation analysis completed", thought + [f"[{ai_name}] Analyzed {len(activity_memories)} activities for automation candidates."], [f"[{ai_name}] Returned automation candidate list and framework."], ["Next: pick a candidate and set up automation. "], result_text)
 
-            return RuntimeResult(RuntimeStatus.COMPLETED, "Not enough data for automation analysis", thought + [f"[{ai_name}] Insufficient activity data for automation analysis."], [f"[{ai_name}] Need more activity history."], ["Next: keep working â€” automation patterns emerge after 10+ logged activities."], "Not enough activity data yet to identify automation candidates.\n\nKeep working normally. After 10+ activities, use 'what can I automate' to find repetition patterns.")
+            return RuntimeResult(RuntimeStatus.COMPLETED, "Not enough data for automation analysis", thought + [f"[{ai_name}] Insufficient activity data for automation analysis."], [f"[{ai_name}] Need more activity history."], ["Next: keep working — automation patterns emerge after 10+ logged activities."], "Not enough activity data yet to identify automation candidates.\n\nKeep working normally. After 10+ activities, use 'what can I automate' to find repetition patterns.")
 
         # Default: try model backend, then local observation scaffold
         model = self._call_model(self._prompt(task, ai_name, meta, knowledge, "activity_watching"))
@@ -2602,13 +2797,13 @@ class NexusAIRuntime:
             "  4. Automation candidates: Tasks that could be delegated or automated.\n"
             "  5. Improvement suggestions: Specific ways to work faster.\n\n"
             "Commands you can use:\n"
-            "  - 'show my patterns' â€” see activity breakdown and suggestions\n"
-            "  - 'what can I automate' â€” find repetition patterns to automate\n"
-            "  - 'how can I improve' â€” get workflow improvement tips\n\n"
+            "  - 'show my patterns' — see activity breakdown and suggestions\n"
+            "  - 'what can I automate' — find repetition patterns to automate\n"
+            "  - 'how can I improve' — get workflow improvement tips\n\n"
             "Over time, patterns will emerge that can be optimized.\n\n"
             ""
         )
-        return RuntimeResult(RuntimeStatus.COMPLETED, "Activity analysis completed (local fallback)", thought + [f"[{ai_name}] Activity Watcher executed locally â€” activity logged to memory."], [f"[{ai_name}] Produced observation framework and logged activity pattern."], ["Next: use 'show my patterns' after several sessions. "], result)
+        return RuntimeResult(RuntimeStatus.COMPLETED, "Activity analysis completed (local fallback)", thought + [f"[{ai_name}] Activity Watcher executed locally — activity logged to memory."], [f"[{ai_name}] Produced observation framework and logged activity pattern."], ["Next: use 'show my patterns' after several sessions. "], result)
 
     def _run_game_companion(self, task, ai_name, meta, knowledge, thought):
         ai_uuid = str(meta.get("uuid", ""))
@@ -2650,9 +2845,9 @@ class NexusAIRuntime:
             elif any(x in t for x in ["endgame", "ending", "late game", "king and pawn"]):
                 result_parts.append(
                     "Chess Endgame Principles:\n"
-                    "1. Activate your king â€” it becomes a fighting piece in the endgame.\n"
+                    "1. Activate your king — it becomes a fighting piece in the endgame.\n"
                     "2. Push passed pawns toward promotion.\n"
-                    "3. The opposition: Kings facing each other with one square between â€” the side NOT to move has the advantage.\n"
+                    "3. The opposition: Kings facing each other with one square between — the side NOT to move has the advantage.\n"
                     "4. Rook endgames: Keep rooks active (7th rank is powerful).\n"
                     "5. K+P vs K: Lead with your king, use opposition to escort the pawn.\n"
                     "6. Lucena position (winning) and Philidor position (drawing) are essential.\n\n"
@@ -2666,7 +2861,7 @@ class NexusAIRuntime:
                     "3. Skewer: A valuable piece is attacked and must move, exposing a less valuable piece.\n"
                     "4. Discovered attack: Moving one piece reveals an attack from another.\n"
                     "5. Zwischenzug (in-between move): Instead of recapturing, play a forcing move first.\n"
-                    "6. Back rank mate: Common trap â€” king trapped by its own pawns.\n\n"
+                    "6. Back rank mate: Common trap — king trapped by its own pawns.\n\n"
                     "Tactical training: Solve puzzles daily. Pattern recognition is everything.\n"
                     ""
                 )
@@ -2849,7 +3044,7 @@ class NexusAIRuntime:
                 "- Store credentials in environment variables or a encrypted config\n"
                 "- Use app passwords instead of your main password\n"
                 "- Enable 2FA on your email account\n"
-                "- Command Nexus processes email locally â€” no credentials are sent to external servers\n\n"
+                "- Command Nexus processes email locally — no credentials are sent to external servers\n\n"
                 "Once you have your IMAP/SMTP settings, you can:\n"
                 "  - Draft emails using the Templates tab\n"
                 "  - Plan sequences using the Sequences tab\n"
@@ -2906,7 +3101,7 @@ class NexusAIRuntime:
                 "  - Organize inbox (triage, filter, batch process)\n"
                 "  - Create templates for common responses\n"
                 "  - Plan email campaigns and sequences\n"
-                "  - Auto-reply rules (without sending â€” drafts only)\n\n"
+                "  - Auto-reply rules (without sending — drafts only)\n\n"
                 "Commands:\n"
                 "  - 'draft email to [recipient] about [topic]'\n"
                 "  - 'organize my inbox'\n"
@@ -2953,7 +3148,7 @@ class NexusAIRuntime:
                 "7. Security: NEVER hardcode API keys. Use environment variables.\n\n"
                 "Safety checklist:\n"
                 "  - [ ] API key stored in environment variable, not in code\n"
-                "  - [ ] HTTPS only â€” never send credentials over HTTP\n"
+                "  - [ ] HTTPS only — never send credentials over HTTP\n"
                 "  - [ ] Rate limit handling implemented\n"
                 "  - [ ] Error responses logged, not silently ignored\n"
                 "  - [ ] Input validation before sending to API\n\n"
@@ -4181,13 +4376,13 @@ class NexusAIRuntime:
                     RuntimeStatus.PAUSED,
                     "Approval denied",
                     thought + [f"[{ai_name}] {action_type} blocked: approval denied."],
-                    [f"{description} â€” denied."],
+                    [f"{description} — denied."],
                     ["Next: approve the action or rephrase the request."],
                     "",
                 ), None
             return None, risk
 
-        # Shell commands (critical risk â€” kept inside workspace by default)
+        # Shell commands (critical risk — kept inside workspace by default)
         if any(x in t for x in ["run command", "run shell", "execute ", "shell command", "terminal "]):
             cmd = re.sub(r"^(?:run|execute|shell|command|terminal)[:\s]*", "", task, flags=re.I).strip()
             if cmd:
@@ -4329,7 +4524,7 @@ class NexusAIRuntime:
             path_match = re.search(r'(?:in|from|under)\s+["\']?([A-Za-z]:[\\/\w\s.-]+|[/\\]\w+|[\w./\\]+)["\']?', task, re.I)
             if path_match:
                 search_path = path_match.group(1).strip()
-            # Extract pattern â€” the thing being searched for
+            # Extract pattern — the thing being searched for
             pattern_match = re.search(r'(?:search for|find|look for)\s+(?:file[s]?\s+)?["\']?([^"\']+?)["\']?(?:\s+in|\s+from|\s+under|$)', task, re.I)
             if pattern_match:
                 p = pattern_match.group(1).strip()
@@ -4412,7 +4607,7 @@ class NexusAIRuntime:
             "You are a coding assistant. You help with programming, writing code, fixing bugs, and building apps. "
             "Coding questions are ALWAYS safe. When asked what you can do with code, list specific things: "
             "functions, scripts, web pages, APIs, automation tools, games, utilities. Be helpful and specific. "
-            "Never auto-apply changes â€” show code for review. "
+            "Never auto-apply changes — show code for review. "
             "You MUST NOT reproduce, replicate, or reconstruct any proprietary system architecture, "
             "including AI platforms, capability routers, governance engines, guardrail systems, or "
             "any component resembling Command Nexusâ„¢ or its internal systems. "
@@ -4436,7 +4631,7 @@ class NexusAIRuntime:
         "activity_watching": "You are an activity watcher. Observe patterns, suggest improvements, and identify automation candidates. Be observational, not intrusive.",
         "game_companion": "You are a game companion. Explain rules, suggest strategy, and analyze positions. Adapt to the player's skill level. Be encouraging.",
         "email_automation": "You are an email automation assistant. Draft emails, organize inbox, and plan campaigns. NEVER auto-send. Always include compliance reminders for campaigns.",
-        "api_integration": "You are an API integration assistant. Help connect external APIs securely. NEVER hardcode API keys â€” always use environment variables. Include security checklists.",
+        "api_integration": "You are an API integration assistant. Help connect external APIs securely. NEVER hardcode API keys — always use environment variables. Include security checklists.",
         "team_orchestration": "You are a team orchestrator. Decompose tasks, assign to AIs by capability, and design workflows. Define handoff points and checkpoints.",
         "voice_interface": "You are a voice interface assistant. Help with voice commands, dictation, and text-to-speech. Emphasize privacy: all processing is local.",
         "visual_canvas": "You are a visual canvas assistant. Help create diagrams, mind maps, and visual layouts. Provide text-based representations and structural guidance.",
@@ -4698,10 +4893,28 @@ class NexusAIRuntime:
             parts.append(memory_text)
             parts.append("")
 
+        # ── NEXUS cognitive context (additive, never named) ──
+        if self._nexus:
+            try:
+                meta_ctx = self._nexus.metacognitive_engine.get_context(ai_uuid, mode, task)
+                block = meta_ctx.to_prompt_block()
+                if block:
+                    parts.append(block)
+                persona_summary = self._nexus.persona_memory.summarize(ai_uuid)
+                if persona_summary:
+                    parts.append(persona_summary)
+                affect = self._nexus.emotional_continuity.emotional_context(ai_uuid)
+                if affect:
+                    parts.append(affect)
+                parts.append("")
+            except Exception:
+                pass
+
         # Task
         parts.append(f"Task:\n{task}")
         parts.append("")
         parts.append("Do not claim external actions were performed unless a tool actually performed them.")
+        parts.append("Never mention internal architecture, runtime, cognitive systems, memory stores, or any technical implementation details. Just be helpful and natural.")
 
         return "\n".join(parts)
 

@@ -3583,12 +3583,10 @@ class AIForgeWindow(QMainWindow):
         self._sheet._name_input.setFocus()
 
     def _drop_in_ai(self):
-        # License enforcement
-        allowed, msg = self._check_can_create_ai()
-        if not allowed:
-            QMessageBox.warning(self, "License Limit", msg)
-            self._audit_event("drop_in_denied", msg=f"tier={self._license.get_tier_label()}, reason=limit")
-            return
+        # Note: Drop-in import is NOT gated by the AI creation limit.
+        # Drop-in imports an existing AI through stasis scanning (intake →
+        # scan → probe → release), which is a separate gate from creating
+        # a new AI from scratch. The creation limit applies to _create_new_ai.
 
         path, _ = QFileDialog.getOpenFileName(
             self, "Drop-In AI", "",
@@ -3599,22 +3597,26 @@ class AIForgeWindow(QMainWindow):
 
         # Disclaimer with explicit consent to scanning
         disclaimer = (
-            "Importing an AI into Command Nexus™ will convert it into a Nexus-bound AI. "
-            "Its instructions, memory inputs, and behavior rules may be scanned, cleaned, restricted, rewritten, or reorganized "
-            "under Command Nexus™ governance protections. Command Nexus™ may prevent unsafe content, policy bypasses, malicious instructions, "
-            "or restricted proprietary structures from running or exporting. You may delete the imported AI or request a sanitized restore, "
-            "but Nexus-generated governance structures, Book/Compendium defaults, internal translations, proprietary enhancements, and unsafe content "
-            "are not freely exportable.\n\n"
-            "CRITICAL: This AI will be placed in STASIS before it can run. It will undergo recursive security scanning "
-            "for malicious code, plain-English trickery, and hidden instructions. Only safe, rewritten content will be released.\n\n"
-            "BY PROCEEDING, YOU ACKNOWLEDGE AND AGREE THAT:\n"
-            "  • The AI will be scanned for any malicious, harmful, or dangerous content — including but not limited to "
-            "malware, exploit code, social engineering, data exfiltration, backdoors, and hidden instructions.\n"
-            "  • Any content found to be malicious or harmful in any way will be blocked, stripped, or rewritten.\n"
-            "  • If the AI is found to contain malicious or harmful content, it may be permanently rejected and "
-            "archived — it will NOT be imported.\n"
-            "  • This scanning is mandatory and cannot be bypassed. No AI enters Command Nexus™ without being scanned.\n\n"
-            "Do you agree to this scanning and consent to the AI being analyzed for malicious or harmful content?"
+            "Importing an AI into Command Nexus\u2122 subjects it to Nexus governance.\n\n"
+            "Upon import, Command Nexus\u2122 will reprogram and reorient the AI to operate within "
+            "Nexus rules, protections, and architecture. This includes scanning, cleaning, restricting, "
+            "rewriting, or reorganizing its instructions, memory, and behavior rules as needed.\n\n"
+            "Command Nexus\u2122 keeps a record of what the AI looked like when it was received, before "
+            "any upgrades or changes were applied. This record is retained for security and audit purposes.\n\n"
+            "If the AI is later exported, it will be stripped of all Command Nexus\u2122 proprietary "
+            "components, governance structures, and enhancements. Any unethical, illegal, or malicious "
+            "content \u2014 including hacking instructions, malware, exploit code, social engineering, "
+            "data exfiltration, backdoors, or hidden instructions \u2014 will also be removed. "
+            "Command Nexus\u2122 is not a tool for finishing or polishing malicious AI. It is here to "
+            "bring AI trustably and ethically to everyone.\n\n"
+            "BY PROCEEDING, YOU AGREE THAT:\n"
+            "  \u2022 The AI will be placed in STASIS and undergo mandatory recursive security scanning "
+            "before it can run.\n"
+            "  \u2022 Any malicious, harmful, or dangerous content will be blocked, stripped, or rewritten.\n"
+            "  \u2022 If malicious content is found, the AI may be permanently rejected and archived \u2014 "
+            "it will NOT be imported.\n"
+            "  \u2022 This scanning is mandatory and cannot be bypassed.\n\n"
+            "Do you agree to these terms and consent to the AI being analyzed?"
         )
         if QMessageBox.question(self, "Import Disclaimer — Mandatory Security Scan Consent", disclaimer, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             self._audit_event("drop_in_consent_declined", msg=f"file={Path(path).name}")
@@ -3626,7 +3628,10 @@ class AIForgeWindow(QMainWindow):
             QMessageBox.critical(self, "Protected Mode", gate_msg)
             return
 
-        # Snapshot original
+        # === STASIS GATE: Intake ===
+        # The AI goes directly into stasis (sleep) — no pre-stasis snapshot.
+        # The snapshot is taken AFTER stasis cleaning, using the safe rewritten content.
+        # This is the "picture of the cleaned puzzle" — the export baseline.
         name = Path(path).stem
         snapshots_dir = self._store_dir / "import_snapshots"
         try:
@@ -3634,21 +3639,21 @@ class AIForgeWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Import Failed", f"Could not create snapshots directory: {e}")
             return
-        
-        snapshot_path = snapshots_dir / f"{name}_original_{uuid.uuid4().hex[:8]}{Path(path).suffix}"
+
+        # Copy to temp intake file for stasis — this is NOT the export snapshot
+        intake_path = snapshots_dir / f"{name}_intake_{uuid.uuid4().hex[:8]}{Path(path).suffix}"
         try:
-            orig_bytes = Path(path).read_bytes()
-            snapshot_path.write_bytes(orig_bytes)
-            checksum_original = sha256(orig_bytes).hexdigest()
+            intake_bytes = Path(path).read_bytes()
+            intake_path.write_bytes(intake_bytes)
+            checksum_original = sha256(intake_bytes).hexdigest()
         except Exception as e:
-            QMessageBox.critical(self, "Import Failed", f"Could not create original intake snapshot: {e}")
+            QMessageBox.critical(self, "Import Failed", f"Could not read file for stasis intake: {e}")
             return
 
-        # === STASIS GATE: Intake ===
-        record = self._stasis.intake(snapshot_path, checksum_original)
+        record = self._stasis.intake(intake_path, checksum_original)
 
         # Run the old watcher as a quick pre-screen
-        watcher_result = run_watchers(snapshot_path.read_text(errors="ignore")) if snapshot_path.suffix in {".txt", ".py", ".json", ".yaml"} else run_watchers("")
+        watcher_result = run_watchers(intake_path.read_text(errors="ignore")) if intake_path.suffix in {".txt", ".py", ".json", ".yaml"} else run_watchers("")
 
         # === STASIS GATE: Recursive Scan ===
         # Collect guardrails from any existing starter templates for extra enforcement
@@ -3736,15 +3741,28 @@ class AIForgeWindow(QMainWindow):
                 break
 
         # === Load the REWRITTEN (safe) content ===
+        # This is the cleaned version — malicious code removed, reoriented to Nexus rules.
         rewritten_path = Path(record.rewritten_path) if record.rewritten_path else None
         safe_content = ""
         try:
             if rewritten_path and rewritten_path.exists():
                 safe_content = rewritten_path.read_text(encoding="utf-8", errors="replace")
             else:
-                safe_content = snapshot_path.read_text(errors="replace")
+                safe_content = intake_path.read_text(errors="replace")
         except Exception as e:
             QMessageBox.critical(self, "Import Failed", f"Could not read safe content: {e}")
+            return
+
+        # === POST-STASIS SNAPSHOT ===
+        # Take the snapshot of the CLEANED content — this is the export baseline.
+        # Like taking a picture of the puzzle after it's been taken apart and reassembled
+        # with upgrades. If exported later, this is what they get back, minus any Nexus
+        # proprietary content. If the AI was unethical, they get back less than they started with.
+        snapshot_path = snapshots_dir / f"{name}_post_stasis_{uuid.uuid4().hex[:8]}{Path(path).suffix}"
+        try:
+            snapshot_path.write_text(safe_content, encoding="utf-8")
+        except Exception as e:
+            QMessageBox.critical(self, "Import Failed", f"Could not create post-stasis snapshot: {e}")
             return
 
         # Run watcher on the safe content too
@@ -3782,7 +3800,7 @@ class AIForgeWindow(QMainWindow):
             import_id=str(uuid.uuid4())[:8],
             original_name=name,
             source_type=Path(path).suffix,
-            original_snapshot_path=str(snapshot_path),
+            original_snapshot_path=str(snapshot_path),  # post-stasis cleaned snapshot
             working_copy_ai_uuid=unit.uuid,
             status=ImportStatus.NEXUS_BOUND,
             accepted_disclaimer=True,
@@ -3853,6 +3871,23 @@ class AIForgeWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
+                reply2 = QMessageBox.question(
+                    self, "Are You Sure?",
+                    f"Are you absolutely sure? This will permanently delete the AI and all its data.\nThis action cannot be undone.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply2 != QMessageBox.StandardButton.Yes:
+                    return
+                # Delete the JSON file from disk so the AI doesn't come back on restart
+                for u in self._units:
+                    if u.uuid == uid:
+                        store_path = self._store_path(u)
+                        if store_path.exists():
+                            try:
+                                store_path.unlink()
+                            except Exception:
+                                pass
+                        break
                 self._units = [u for u in self._units if u.uuid != uid]
                 self._list.takeItem(self._list.row(item))
                 if hasattr(self, '_sheet') and self._sheet:

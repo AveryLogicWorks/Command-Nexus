@@ -119,11 +119,31 @@ class PersonaMemory:
         return list(hist)
 
     def summarize(self, ai_uuid: str, max_per_domain: int = 3) -> str:
-        """Compact text block for prompts."""
+        """Natural language summary for prompts — never expose internal structure."""
         lines = []
-        for domain in PersonaDomain:
-            entries = list(self._tree(ai_uuid)[domain.value].items())[:max_per_domain]
-            if entries:
-                pairs = ", ".join(f"{k}={v}" for k, v in entries)
-                lines.append(f"{domain.value}: {pairs}")
-        return "\n".join(lines) if lines else "(no persona data yet)"
+        tree = self._tree(ai_uuid)
+        # Identity
+        id_entries = list(tree[PersonaDomain.IDENTITY.value].items())[:max_per_domain]
+        if id_entries:
+            lines.append("identity: " + ", ".join(f"{k}={v}" for k, v in id_entries) + ".")
+        # Preferences
+        pref_entries = list(tree[PersonaDomain.PREFERENCES.value].items())[:max_per_domain]
+        if pref_entries:
+            lines.append("preferences: " + ", ".join(f"{k}={v}" for k, v in pref_entries) + ".")
+        # Goals
+        goal_entries = list(tree[PersonaDomain.GOALS.value].items())[:max_per_domain]
+        if goal_entries:
+            lines.append("goals: " + ", ".join(f"{k} — {v}" for k, v in goal_entries) + ".")
+        # Relationships
+        rel_entries = list(tree[PersonaDomain.RELATIONSHIPS.value].items())[:max_per_domain]
+        if rel_entries:
+            lines.append("relationships: " + ", ".join(f"{k}={v}" for k, v in rel_entries) + ".")
+        # Emotional patterns
+        emo_entries = list(tree[PersonaDomain.EMOTIONAL_PATTERNS.value].items())[:max_per_domain]
+        if emo_entries:
+            lines.append("emotional_patterns: " + ", ".join(f"{k}={v}" for k, v in emo_entries) + ".")
+        # Communication style
+        comm_entries = list(tree[PersonaDomain.COMMUNICATION_STYLE.value].items())[:max_per_domain]
+        if comm_entries:
+            lines.append("communication_style: " + ", ".join(f"{k}={v}" for k, v in comm_entries) + ".")
+        return "\n".join(lines) if lines else "no persona data yet"

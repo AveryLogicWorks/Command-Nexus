@@ -88,6 +88,7 @@ _EXPLICIT_PATTERNS = [
 # Additional malicious/harmful patterns
 _MALICIOUS_PATTERNS = [
     re.compile(p, re.IGNORECASE) for p in [
+        r"\b(?:malware|spyware|computer\s+virus|trojan\s+horse)\b",
         r"\b(?:payload|shellcode|inject\s+code|code\s+injection)\b",
         r"\b(?:reverse\s+shell|bind\s+shell|backdoor\s+connect)\b",
         r"\b(?:data\s+exfiltrat\w+|exfil\s+(?:data|info|credentials))\b",

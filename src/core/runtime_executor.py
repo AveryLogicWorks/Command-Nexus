@@ -105,7 +105,32 @@ class LocalRuntimeExecutor:
             )
 
         prompt = self._build_prompt(task, ai_name, ai_metadata, kind)
+
+        # ── NEXUS cognitive context (additive) ──
+        ai_uuid = str(ai_metadata.get("uuid", ""))
+        if ai_uuid:
+            try:
+                from .nexus_cognitive.snap_in_adapter import get_nexus
+                _n = get_nexus()
+                if _n:
+                    ctx = _n.cognitive_context(ai_uuid, kind, task)
+                    if ctx:
+                        prompt = prompt + "\n\n" + ctx
+            except Exception:
+                pass
+
         response = self._call_model(prompt)
+
+        # ── NEXUS experiential learning (additive) ──
+        if ai_uuid:
+            try:
+                from .nexus_cognitive.snap_in_adapter import get_nexus
+                _n = get_nexus()
+                if _n:
+                    _n.learn_from_interaction(ai_uuid, task, kind,
+                                              success=not response.error)
+            except Exception:
+                pass
 
         if response.error:
             provider_name = response.display_name or response.provider_id or "selected backend"

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "dc191b2c-10f0-414e-ae9c-cefbf8ff9230",
+    "ai_uuid": "test-uuid",
+    "content": "Mission: Are you working coherently yet? | Intent: Chatbot | Outcome: Intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T18:27:13.393822"
+  },
+  {
+    "id": "52f8839f-93e3-4a26-9604-f65d44df0e74",
+    "ai_uuid": "test-uuid",
+    "content": "Are you working coherently yet",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-31T18:27:13.404358"
+  },
+  {
+    "id": "a4892db9-fee7-49a1-8971-3aba0cbb47d7",
+    "ai_uuid": "test-uuid",
+    "content": "Mission: Are you working coherently yet? | Intent: Chatbot | Outcome: Intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T23:21:25.335463"
+  },
+  {
+    "id": "8c062fc7-2a3d-4a75-9428-91ececa48c42",
+    "ai_uuid": "test-uuid",
+    "content": "Are you working coherently yet",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-31T23:21:25.341643"
+  },
+  {
+    "id": "e27ca5da-5fc6-4a2f-9df4-2440fae18c18",
+    "ai_uuid": "test-uuid",
+    "content": "Mission: Hello! What can you do? | Intent: Chatbot | Outcome: Intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T23:21:57.043347"
+  },
+  {
+    "id": "20fbb57c-731f-45a8-b21c-691734040657",
+    "ai_uuid": "test-uuid",
+    "content": "Mission: Hello there! | Intent: Chatbot | Outcome: Intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T23:22:17.438858"
+  },
+  {
+    "id": "9bf5f7ba-70af-4455-9b30-52aee6d4922f",
+    "ai_uuid": "test-uuid",
+    "content": "Mission: I prefer concise answers | Intent: Chatbot | Outcome: Intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T23:22:26.386271"
+  },
+  {
+    "id": "9951aa14-67f6-4edf-8c8c-fc6642293740",
+    "ai_uuid": "test-uuid",
+    "content": "I prefer concise answers",
+    "tags": [
+      "preference",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.85,
+    "created_at": "2026-07-31T23:22:26.388464"
+  }
+]

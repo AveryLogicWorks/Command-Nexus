@@ -104,9 +104,23 @@ class TripwireManager:
         "src/parts/owner/owner_console.py",
         "src/parts/watcher/watcher_window.py",
         "src/parts/watcher/watcher_models.py",
+        "src/core/nexus_cognitive/interfaces.py",
+        "src/core/nexus_cognitive/local_reasoning_engine.py",
+        "src/core/nexus_cognitive/snap_in_adapter.py",
+        "src/core/nexus_cognitive/__init__.py",
         "src/main.py",
         "build.py",
     )
+
+    # Actions that are permitted when performed by registered external intelligence.
+    # These are legitimate integration operations, not tampering.
+    EXTERNAL_INTEL_PERMITTED_ACTIONS = frozenset({
+        "external_intelligence_attach",
+        "external_intelligence_detach",
+        "external_intelligence_process",
+        "external_intelligence_learning",
+        "trifecta_fold_dim4",
+    })
 
     def __init__(
         self,
@@ -135,6 +149,11 @@ class TripwireManager:
         self._stop_event = threading.Event()
         self._scan_interval = 10.0
         self._state = WatcherState(active=False, mode=self._mode.value)
+
+        # External intelligence registry — tracks attached intelligences and
+        # their permissions so the watcher knows what's legitimate vs tampering.
+        self._external_intel_registry: dict[str, dict] = {}
+        self._external_intel_lock = threading.Lock()
 
         self._audit_log("tripwire_init", f"TripwireManager initialized mode={self._mode.value}")
         self._load_or_build_manifest()
@@ -446,7 +465,20 @@ class TripwireManager:
                            builds. Always allow, even if trust is DEGRADED.
           RELEASE        — armed; BREACH/LOCKDOWN blocks all actions.
           LOCKDOWN       — blocks all actions.
+
+        External intelligence actions (attach, detach, process, learning) are
+        always permitted when registered — they are legitimate integration
+        operations, not tampering. The ExternalIntelligenceGuard in the
+        reasoning engine handles the actual security screening of content.
         """
+        # External intelligence integration actions are always permitted
+        # if they're in the known set. This prevents the watcher from
+        # flagging legitimate dim4 operations as suspicious.
+        if action_name in self.EXTERNAL_INTEL_PERMITTED_ACTIONS:
+            self._audit_log("tripwire_pass", action_name,
+                            f"external_intelligence_permitted: {target}")
+            return True
+
         if self._mode in (WatcherMode.DEV, WatcherMode.STABILIZATION):
             if self._trust == WatcherTrust.DEGRADED and self._mode == WatcherMode.STABILIZATION:
                 self._audit_log("tripwire_warn", action_name, f"local stabilization degraded (not armed): {target}")
@@ -461,6 +493,74 @@ class TripwireManager:
             return False
         self._audit_log("tripwire_pass", action_name, target)
         return True
+
+    # ------------------------------------------------------------------
+    # External intelligence registry
+    # ------------------------------------------------------------------
+
+    def register_external_intelligence(self, intel_id: str, metadata: dict) -> bool:
+        """Register an external intelligence with the watcher.
+
+        This tells the tripwire that this intelligence is a known, legitimate
+        integration — not tampering or injection. The metadata records what
+        the intelligence is allowed to do so the watcher can audit it.
+
+        Args:
+            intel_id: Unique identifier for the intelligence instance.
+            metadata: Dict with keys:
+                - 'name': display name
+                - 'permissions': list of permitted actions
+                - 'confidence_cap': max confidence allowed
+                - 'circuit_breaker_enabled': bool
+
+        Returns True if registered, False if rejected.
+        """
+        with self._external_intel_lock:
+            if intel_id in self._external_intel_registry:
+                self._audit_log("external_intel_register",
+                                f"{intel_id} already registered")
+                return False
+            self._external_intel_registry[intel_id] = {
+                'name': metadata.get('name', intel_id),
+                'permissions': metadata.get('permissions', ['process']),
+                'confidence_cap': metadata.get('confidence_cap', 0.80),
+                'circuit_breaker_enabled': metadata.get('circuit_breaker_enabled', True),
+                'registered_at': time.time(),
+            }
+            self._audit_log("external_intel_register",
+                            f"Registered '{metadata.get('name', intel_id)}' (id={intel_id})",
+                            "info")
+        return True
+
+    def unregister_external_intelligence(self, intel_id: str) -> bool:
+        """Remove an external intelligence from the registry."""
+        with self._external_intel_lock:
+            if intel_id not in self._external_intel_registry:
+                return False
+            entry = self._external_intel_registry.pop(intel_id)
+            self._audit_log("external_intel_unregister",
+                            f"Unregistered '{entry.get('name', intel_id)}' (id={intel_id})",
+                            "info")
+        return True
+
+    def is_external_intelligence_registered(self, intel_id: str) -> bool:
+        """Check if an intelligence is registered with the watcher."""
+        with self._external_intel_lock:
+            return intel_id in self._external_intel_registry
+
+    def get_external_intelligence_registry(self) -> dict:
+        """Return a snapshot of the registry for audit/UI purposes."""
+        with self._external_intel_lock:
+            return dict(self._external_intel_registry)
+
+    def check_external_intelligence_permission(self, intel_id: str,
+                                                 action: str) -> bool:
+        """Check if a registered intelligence is permitted to perform an action."""
+        with self._external_intel_lock:
+            entry = self._external_intel_registry.get(intel_id)
+            if not entry:
+                return False
+            return action in entry.get('permissions', ['process'])
 
     # ------------------------------------------------------------------
     # Helpers

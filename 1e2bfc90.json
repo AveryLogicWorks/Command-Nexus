@@ -1,0 +1,110 @@
+[
+  {
+    "id": "4196d70c-1aaf-4372-b2d0-22f044891455",
+    "ai_uuid": "1e2bfc90",
+    "content": "Mission: What are you capable of | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T17:50:14.822899"
+  },
+  {
+    "id": "1424b2d2-2233-4c0c-a446-69a4b78cd302",
+    "ai_uuid": "1e2bfc90",
+    "content": "What are you capable of",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-31T17:50:14.831722"
+  },
+  {
+    "id": "f30d4c27-f12c-4b32-8eb3-ee45285a0325",
+    "ai_uuid": "1e2bfc90",
+    "content": "Mission: Why are you trying to push a local model | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T17:51:10.427161"
+  },
+  {
+    "id": "e52591b8-172f-447f-a132-76f0577ce18c",
+    "ai_uuid": "1e2bfc90",
+    "content": "Why are you trying to push a local model",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-31T17:51:10.429464"
+  },
+  {
+    "id": "d714c7a7-f1f3-40d7-b146-a08899657f8a",
+    "ai_uuid": "1e2bfc90",
+    "content": "Mission: I asked you an entirely new question why are you trying to push a local model to be added into command Nexus when you should be usable on your own almost as if if not better than a local model in the back end | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T17:52:47.462923"
+  },
+  {
+    "id": "47c6aa30-da8e-4a28-a7e0-2a0414ad826c",
+    "ai_uuid": "1e2bfc90",
+    "content": "Mission: Are you intelligent enough to talk to  me normal | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T17:54:19.811617"
+  },
+  {
+    "id": "93040b9a-d1f6-4033-892f-0bc503dbb4cb",
+    "ai_uuid": "1e2bfc90",
+    "content": "Are you intelligent enough to talk to  me normal",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-31T17:54:19.814668"
+  },
+  {
+    "id": "b0e91b12-2b4a-4efd-84d0-51b69655758a",
+    "ai_uuid": "1e2bfc90",
+    "content": "Mission: Are you working coherently yet | Intent: Chatbot | Outcome: Local intelligence response",
+    "tags": [
+      "chatbot",
+      "mission"
+    ],
+    "source": "mission",
+    "importance": 0.5,
+    "created_at": "2026-07-31T18:06:37.087424"
+  },
+  {
+    "id": "2c4fec34-6670-4848-96df-8c9635e91180",
+    "ai_uuid": "1e2bfc90",
+    "content": "Are you working coherently yet",
+    "tags": [
+      "context",
+      "user_input"
+    ],
+    "source": "intelligent_router",
+    "importance": 0.6,
+    "created_at": "2026-07-31T18:06:37.094715"
+  }
+]

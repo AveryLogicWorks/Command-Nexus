@@ -345,6 +345,19 @@ class CustomerAIWindow(QMainWindow):
             preferred_tone=tone
         )
         
+        # ── NEXUS cognitive learning (additive) ──
+        try:
+            from ...core.nexus_cognitive.snap_in_adapter import get_nexus
+            _n = get_nexus()
+            if _n:
+                _n.learn_from_interaction(
+                    self._current_customer_id, message,
+                    result.get('intent', 'customer_support'),
+                    success=not result.get('escalation_needed', False),
+                )
+        except Exception:
+            pass
+        
         # Add AI response to chat
         self._add_ai_message(result['response'], result['intent'], result['tone'])
         

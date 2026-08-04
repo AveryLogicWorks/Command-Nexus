@@ -63,17 +63,28 @@ class MetaContext:
     known_boundary: str = ""     # non-empty if a proven boundary applies
 
     def to_prompt_block(self) -> str:
-        lines = [
-            f"[metacognition] intent={self.intent}",
-            f"[metacognition] confidence={self.confidence:.2f} risk={self.risk.value} effort={self.effort.value}",
-        ]
+        # Natural language guidance — never expose internal component names
+        lines = ["[metacognition]"]
+        if self.confidence < 0.4:
+            lines.append("You are still learning this type of task. Be cautious and ask clarifying questions.")
+        elif self.confidence < 0.7:
+            lines.append("You have moderate experience with this type of task. Be helpful but verify your understanding.")
+        else:
+            lines.append("You are confident with this type of task. Be direct and helpful.")
+        if self.risk.value == "high":
+            lines.append("This is a sensitive task. Be careful and precise.")
         if self.known_boundary:
-            lines.append(f"[metacognition] boundary: {self.known_boundary}")
-        return "\n".join(lines)
+            lines.append(f"Note: {self.known_boundary}")
+        # Structured metadata for prompt consumers
+        lines.append(f"[confidence={self.confidence:.2f} risk={self.risk.value} effort={self.effort.value}]")
+        return "\n".join(lines) if lines else ""
 
 
 class MetacognitiveEngine:
     """Tracks confidence/risk/effort per AI. Zero external deps."""
+
+    FORGETTING_FACTOR = 0.95   # each new outcome decays old evidence by 5%
+    BOUNDARY_RECOVERY_THRESHOLD = 0.55  # confidence above this removes boundary
 
     def __init__(self):
         # ai_uuid -> intent -> ConfidenceRecord
@@ -86,8 +97,17 @@ class MetacognitiveEngine:
     def record_outcome(self, ai_uuid: str, intent: str, success: bool,
                        weight: float = 1.0) -> float:
         rec = self._confidence.setdefault(ai_uuid, {}).setdefault(intent, ConfidenceRecord())
+        # Forgetting factor: decay old evidence toward the prior (1,1)
+        # so the system can adapt to regime changes instead of being
+        # locked in by ancient outcomes.
+        rec.alpha = 1.0 + (rec.alpha - 1.0) * self.FORGETTING_FACTOR
+        rec.beta = 1.0 + (rec.beta - 1.0) * self.FORGETTING_FACTOR
         if success:
             rec.alpha += weight
+            # Boundary recovery: if confidence rises enough, remove stale boundary
+            if rec.mean > self.BOUNDARY_RECOVERY_THRESHOLD:
+                bounds = self._boundaries.setdefault(ai_uuid, [])
+                self._boundaries[ai_uuid] = [b for b in bounds if intent not in b]
         else:
             rec.beta += weight
             # Repeated failure reveals a capability boundary

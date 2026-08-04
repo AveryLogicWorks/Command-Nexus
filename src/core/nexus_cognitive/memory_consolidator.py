@@ -40,6 +40,9 @@ class MemoryConsolidator:
     _NEG = ("not", "never", "no", "isn't", "doesn't", "don't", "hates", "dislikes")
     _POS = ("is", "always", "loves", "likes", "does")
 
+    IMPORTANCE_DECAY_RATE = 0.02  # per consolidation cycle, importance decays slightly
+    NREM_MAX_KEEPER_LEN = 400     # stop merging into keeper if it's already this long
+
     def __init__(self, store: HierarchicalMemoryStore,
                  base_stability_days: float = 1.0,
                  prune_strength: float = 0.05):
@@ -87,7 +90,7 @@ class MemoryConsolidator:
                 self._store.delete(ai_uuid, e.id)
                 report.merged += 1
                 report.log.append(f"NREM merged '{e.content[:40]}' into '{keeper.content[:40]}'")
-            if merged_parts and len(keeper.content) < 500:
+            if merged_parts and len(keeper.content) < self.NREM_MAX_KEEPER_LEN:
                 keeper.content = keeper.content + " | " + " | ".join(merged_parts)[:200]
 
     # -------------------------------------------------------------- REM pass
@@ -153,11 +156,15 @@ class MemoryConsolidator:
         report.decayed = len(entries)
         for e in entries:
             s = self.strength(e, rehearsals=e.revision, now=now)
-            if prune and s < self._prune_strength and e.level <= MemoryLevel.EPISODIC \
-                    and e.importance < 0.4:
+            # Importance decay: gradual decline unless reinforced
+            e.importance = max(0.0, e.importance - self.IMPORTANCE_DECAY_RATE)
+            # Prune weak memories at ALL levels, not just episodic.
+            # Archival/procedural/semantic memories that have decayed to near-zero
+            # strength and low importance are also pruned — nothing is immortal.
+            if prune and s < self._prune_strength and e.importance < 0.3:
                 self._store.delete(ai_uuid, e.id)
                 report.pruned += 1
-                report.log.append(f"pruned weak memory '{e.content[:40]}' (strength {s:.3f})")
+                report.log.append(f"pruned weak memory '{e.content[:40]}' (strength {s:.3f}, importance {e.importance:.2f})")
         self._nrem_compress(ai_uuid, report)
         self._rem_associate(report_ai := ai_uuid, report)
         self._detect_contradictions(ai_uuid, report)

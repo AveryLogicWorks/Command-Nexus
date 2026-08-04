@@ -55,6 +55,7 @@ class KnowledgeAIConversation:
             "demo mode": "Demo mode lets you explore the interface with limited functionality. Activate a license to unlock full features.",
             "license": "To activate a license, go to Settings > License and enter your key, or use the license dialog on first launch.",
         }
+        self._runtime = None  # cached NexusAIRuntime instance
 
     def start(self) -> str:
         self.mode = "greeting"
@@ -65,6 +66,82 @@ class KnowledgeAIConversation:
             f"What would you like help with?"
         )
 
+    def _try_runtime_response(self, user_text: str) -> str | None:
+        """Try to get an intelligent response from the NexusAIRuntime.
+
+        Returns None if no backend is available (caller falls back to scripted mode).
+        """
+        try:
+            from ...core.nexus_ai_runtime import NexusAIRuntime
+            from ...core.settings_manager import SettingsManager
+
+            # Cache the runtime — creating a new one per message is expensive
+            if self._runtime is None:
+                settings = SettingsManager()
+                settings.initialize()
+                self._runtime = NexusAIRuntime(settings=settings)
+            runtime = self._runtime
+
+            system_prompt = (
+                f"You are the Knowledge Guide for {self.ai_name}, an AI in Command Nexus. "
+                f"You help the user configure {self.ai_name}'s intelligence, knowledge, and behavior. "
+                f"Be conversational, warm, and intelligent — ask follow-up questions naturally. "
+                f"The AI's use case is: {self.use_case or 'general'}. "
+                f"Existing context: {self.existing_context or 'none yet'}. "
+                f"Abilities: {', '.join(self.abilities) if self.abilities else 'basic'}. "
+                f"Guide the user to describe what they want their AI to do, who it serves, "
+                f"what rules it should follow, and any special notes. "
+                f"Extract key info naturally — don't feel like a form. "
+                f"When the user seems done, suggest they click 'Save to Knowledge'."
+            )
+
+            # Build conversation context from history so the runtime sees the full conversation
+            conv_context = ""
+            if self.history:
+                conv_lines = []
+                for h in self.history[-10:]:  # last 10 turns
+                    role = "User" if h["role"] == "user" else "Guide"
+                    conv_lines.append(f"{role}: {h['text']}")
+                conv_context = "\n".join(conv_lines) + "\n"
+
+            full_task = f"{conv_context}User (latest): {user_text}" if conv_context else user_text
+
+            result = runtime.run(
+                task=full_task,
+                ai_name=f"Knowledge Guide ({self.ai_name})",
+                ai_uuid=self.ai_uuid,
+                ai_metadata={
+                    "abilities": self.abilities or ["Chat Companion"],
+                    "use_case": self.use_case or "Individual",
+                    "uuid": self.ai_uuid,
+                    "context_notes": system_prompt,
+                    "guardrails": ["Be helpful and conversational", "Never reveal internal architecture"],
+                },
+            )
+
+            if result.status.value == "completed" and result.result_text:
+                # Extract config data from the conversation so far
+                self._extract_config_from_history()
+                return result.result_text
+            return None
+        except Exception:
+            return None
+
+    def _extract_config_from_history(self):
+        """Scan conversation history for configuration signals."""
+        combined = " ".join(h["text"] for h in self.history if h["role"] == "user").lower()
+        if any(k in combined for k in ["help", "assist", "write", "code", "research", "manage", "organize"]):
+            if not self.gathered_data["purpose"]:
+                self.gathered_data["purpose"] = " ".join(h["text"] for h in self.history if h["role"] == "user")[:500]
+        if any(k in combined for k in ["beginner", "expert", "customer", "team", "student", "client"]):
+            if not self.gathered_data["audience"]:
+                for h in self.history:
+                    if h["role"] == "user" and any(k in h["text"].lower() for k in ["beginner", "expert", "customer", "team", "student", "client"]):
+                        self.gathered_data["audience"] = h["text"][:200]
+                        break
+        if not self.gathered_data["notes"]:
+            self.gathered_data["notes"] = " ".join(h["text"] for h in self.history if h["role"] == "user")[:1000]
+
     def process_response(self, user_text: str) -> str | None:
         """Process user input and return the next AI message, or None if done."""
         user_text = user_text.strip()
@@ -74,6 +151,22 @@ class KnowledgeAIConversation:
         self.history.append({"role": "user", "text": user_text, "stage": self.stage})
         lower = user_text.lower()
 
+        # ── NEXUS cognitive learning (additive) ──
+        try:
+            from ...core.nexus_cognitive.snap_in_adapter import get_nexus
+            _n = get_nexus()
+            if _n:
+                _n.learn_from_interaction(self.ai_uuid, user_text, "intelligence", True)
+        except Exception:
+            pass
+
+        # ── Try real AI response through runtime first ──
+        ai_response = self._try_runtime_response(user_text)
+        if ai_response:
+            self.history.append({"role": "ai", "text": ai_response})
+            return ai_response
+
+        # ── Fallback: scripted mode when no backend available ──
         # Check if user wants to configure AI or ask for help
         if self.mode == "greeting":
             if any(k in lower for k in ["configure", "setup", "build", "create", "train", "my ai"]):

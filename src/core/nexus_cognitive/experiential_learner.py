@@ -56,6 +56,17 @@ class ExperientialLearner:
     def _lesson_hash(self, intent: str, lesson: str) -> str:
         return hashlib.sha256(f"{intent}|{lesson}".encode("utf-8")).hexdigest()[:16]
 
+    def _lesson_key(self, intent: str, task: str, status: str) -> str:
+        """Normalized hash: intent + coarse task pattern + outcome status.
+
+        This prevents oscillation on intermittent APIs where alternating
+        success/failure with different snippets would otherwise create
+        non-reinforcing lesson pairs.  Two failures on similar tasks produce
+        the same key regardless of the specific error message.
+        """
+        task_pattern = task[:80].lower().strip()
+        return hashlib.sha256(f"{intent}|{task_pattern}|{status}".encode("utf-8")).hexdigest()[:16]
+
     def _extract_lesson(self, task: str, intent: str, result: RuntimeResult) -> str:
         status = result.status.value
         snippet = (result.result_text or result.title or "")[:240].strip()
@@ -85,7 +96,7 @@ class ExperientialLearner:
             verdict.reason = f"guardrail rejected lesson: {why}"
             return verdict
 
-        lh = self._lesson_hash(intent, lesson)
+        lh = self._lesson_key(intent, task, result.status.value)
         existing_id = self._known_hashes.get(lh)
         if existing_id is not None:
             for e in self._memory.get_for_ai(ai_uuid):

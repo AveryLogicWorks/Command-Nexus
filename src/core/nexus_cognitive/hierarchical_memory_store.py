@@ -18,6 +18,7 @@ signatures.
 from __future__ import annotations
 
 import math
+import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -111,10 +112,13 @@ class HierarchicalMemoryStore(IMemoryStore):
         Index-driven: candidate set comes from the tag index and level lists,
         never a full scan, keeping lookup near O(log N) for indexed fields.
         """
+        import re
         entries = self._by_ai.get(ai_uuid, {})
         if not entries:
             return []
-        q_tokens = {t for t in query.lower().split() if len(t) > 2}
+        # Strip punctuation so "Python?" matches "python"
+        clean_query = re.sub(r'[^\w\s]', ' ', query.lower())
+        q_tokens = {t for t in clean_query.split() if len(t) > 2}
         if not q_tokens:
             return self.get_recent(ai_uuid, 5)
         # Candidates: tag-index hits first, then everything (ranked).
@@ -129,7 +133,7 @@ class HierarchicalMemoryStore(IMemoryStore):
             e = entries.get(eid)
             if e is None:
                 continue
-            text_tokens = set(e.content.lower().split())
+            text_tokens = set(re.sub(r'[^\w\s]', ' ', e.content.lower()).split())
             overlap = len(q_tokens & text_tokens) + 2 * len(q_tokens & set(e.tags))
             if overlap == 0:
                 continue
@@ -238,3 +242,115 @@ class HierarchicalMemoryStore(IMemoryStore):
         entry.level = new_level
         self._index_entry(entry)
         return True
+
+    def demote(self, ai_uuid: str, entry_id: str, new_level: int) -> bool:
+        """Move an entry back up the hierarchy for re-evaluation.
+
+        Used when contradictory evidence surfaces against an archived or
+        semantic belief — it gets pulled back to episodic/working so the
+        system can re-examine it rather than treating it as settled.
+        """
+        entry = self._by_ai.get(ai_uuid, {}).get(entry_id)
+        if entry is None or new_level == entry.level:
+            return False
+        self._deindex_entry(entry)
+        entry.level = new_level
+        self._index_entry(entry)
+        return True
+
+    # ------------------------------------------------------- deduplication
+
+    def _content_similarity(self, a: str, b: str) -> float:
+        """Jaccard similarity over token sets."""
+        ta = set(a.lower().split())
+        tb = set(b.lower().split())
+        if not ta or not tb:
+            return 0.0
+        return len(ta & tb) / len(ta | tb)
+
+    def find_duplicates(self, ai_uuid: str, content: str,
+                        threshold: float = 0.85) -> list[MemoryEntry]:
+        """Find existing entries that are near-duplicates of the content."""
+        entries = self._by_ai.get(ai_uuid, {})
+        dupes = []
+        for entry in entries.values():
+            sim = self._content_similarity(content, entry.content)
+            if sim >= threshold:
+                dupes.append(entry)
+        return dupes
+
+    def add_dedup(self, ai_uuid: str, content: str,
+                  tags: list[str] | None = None,
+                  source: str = "user", importance: float = 0.5,
+                  level: int = MemoryLevel.EPISODIC,
+                  dedup_threshold: float = 0.55,
+                  contradiction_threshold: float = 0.35) -> tuple[MemoryEntry, str]:
+        """Add with deduplication. Returns (entry, status).
+
+        Status is one of:
+          'new'         — no duplicate found, fresh entry created
+          'exact_dup'   — exact duplicate, original returned unchanged
+          'superseded'  — near-duplicate, old entry preserved as placeholder,
+                          new entry created with SUPERSEDES edge
+          'contradicted'— new info contradicts old, CONTRADICTS edge added,
+                          old entry demoted for re-evaluation
+        """
+        # Check for exact duplicate first
+        for entry in self._by_ai.get(ai_uuid, {}).values():
+            if entry.content.strip().lower() == content.strip().lower():
+                return entry, 'exact_dup'
+
+        # Check for near-duplicates at dedup threshold
+        dupes = self.find_duplicates(ai_uuid, content, dedup_threshold)
+        if dupes:
+            old = dupes[0]
+            # Check for contradiction (polarity markers present in new but not old)
+            contradiction_markers = ["not ", "never", "wrong", "incorrect",
+                                     "false", "actually", "no, ", "but ",
+                                     "however", "on the contrary", "misconception"]
+            is_contradiction = any(m in content.lower() and m not in old.content.lower()
+                                   for m in contradiction_markers)
+
+            if is_contradiction:
+                # New info contradicts old — add CONTRADICTS edge, demote old
+                new_entry = self.add(ai_uuid, content, tags, source, importance, level)
+                self.add_edge(ai_uuid, new_entry.id, EdgeType.CONTRADICTS, old.id)
+                # Demote old entry for re-evaluation
+                if old.level > MemoryLevel.WORKING:
+                    self.demote(ai_uuid, old.id, max(MemoryLevel.WORKING, old.level - 2))
+                return new_entry, 'contradicted'
+            else:
+                # Near-duplicate but not contradiction — supersede with placeholder
+                placeholder = f"[Superseded summary: {old.content[:100]}...]"
+                # Create new entry
+                new_entry = self.add(ai_uuid, content, tags, source, importance, level)
+                # Record supersession
+                self.add_edge(ai_uuid, new_entry.id, EdgeType.SUPERSEDES, old.id)
+                # Preserve old in history with placeholder
+                self._history.setdefault(old.id, []).append(old)
+                # Update old content to placeholder summary (preserves the entry)
+                self._deindex_entry(old)
+                old.content = placeholder
+                old.importance = max(0.1, old.importance * 0.3)  # reduce importance
+                self._index_entry(old)
+                return new_entry, 'superseded'
+
+        # Check for contradictions at a lower threshold (partial overlap + polarity)
+        partial_dupes = self.find_duplicates(ai_uuid, content, contradiction_threshold)
+        if partial_dupes:
+            old = partial_dupes[0]
+            contradiction_markers = ["not ", "never", "wrong", "incorrect",
+                                     "false", "actually", "no, ", "but ",
+                                     "however", "on the contrary", "misconception"]
+            is_contradiction = any(m in content.lower() and m not in old.content.lower()
+                                   for m in contradiction_markers)
+            if is_contradiction:
+                new_entry = self.add(ai_uuid, content, tags, source, importance, level)
+                self.add_edge(ai_uuid, new_entry.id, EdgeType.CONTRADICTS, old.id)
+                if old.level > MemoryLevel.WORKING:
+                    self.demote(ai_uuid, old.id, max(MemoryLevel.WORKING, old.level - 2))
+                return new_entry, 'contradicted'
+
+        # No duplicate — fresh entry
+        entry = self.add(ai_uuid, content, tags, source, importance, level)
+        return entry, 'new'

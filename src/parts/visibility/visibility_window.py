@@ -38,6 +38,97 @@ from PySide6.QtWidgets import (
     QGridLayout, QScrollArea, QListWidget, QListWidgetItem, QLineEdit,
     QDialog, QCheckBox, QInputDialog
 )
+
+
+class PasswordInputDialog(QDialog):
+    """Custom password input dialog with show/hide toggle button."""
+
+    def __init__(self, parent=None, title="Enter Password", label="Enter password:", hint=""):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(400)
+        self._result_text = ""
+        self._ok = False
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        info_label = QLabel(label)
+        info_label.setStyleSheet("font-size: 13px; color: #c9d1d9;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
+        if hint:
+            hint_label = QLabel(hint)
+            hint_label.setStyleSheet("font-size: 11px; color: #8b949e;")
+            layout.addWidget(hint_label)
+
+        pwd_row = QHBoxLayout()
+        self._pwd_input = QLineEdit()
+        self._pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self._pwd_input.setStyleSheet("font-size: 13px; padding: 6px; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;")
+        self._pwd_input.returnPressed.connect(self._on_ok)
+        pwd_row.addWidget(self._pwd_input, stretch=1)
+
+        self._toggle_btn = QPushButton("Show")
+        self._toggle_btn.setCheckable(True)
+        self._toggle_btn.setFixedWidth(60)
+        self._toggle_btn.setStyleSheet("background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; padding: 6px;")
+        self._toggle_btn.toggled.connect(self._on_toggle)
+        pwd_row.addWidget(self._toggle_btn)
+        layout.addLayout(pwd_row)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        ok_btn = QPushButton("OK")
+        ok_btn.setStyleSheet("background: #238636; color: white; border: none; border-radius: 6px; padding: 8px 20px; font-weight: bold;")
+        ok_btn.clicked.connect(self._on_ok)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet("background: #30363d; color: #c9d1d9; border: none; border-radius: 6px; padding: 8px 20px;")
+        cancel_btn.clicked.connect(self._on_cancel)
+        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+
+        self.setStyleSheet("QDialog { background: #0d1117; }")
+
+    def _on_toggle(self, checked):
+        if checked:
+            self._pwd_input.setEchoMode(QLineEdit.EchoMode.Normal)
+            self._toggle_btn.setText("Hide")
+        else:
+            self._pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
+            self._toggle_btn.setText("Show")
+
+    def _on_ok(self):
+        self._result_text = self._pwd_input.text()
+        self._ok = True
+        self.accept()
+
+    def _on_cancel(self):
+        self._ok = False
+        self.reject()
+
+    def get_password(self):
+        return self._result_text, self._ok
+
+
+def _make_pwd_toggle(line_edit, btn_text="Show"):
+    """Create a show/hide toggle button for a password QLineEdit."""
+    btn = QPushButton(btn_text)
+    btn.setCheckable(True)
+    btn.setFixedWidth(60)
+    btn.setStyleSheet("background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; padding: 4px;")
+    def on_toggle(checked):
+        if checked:
+            line_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            btn.setText("Hide")
+        else:
+            line_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            btn.setText("Show")
+    btn.toggled.connect(on_toggle)
+    return btn
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 
 from ...core.governance import GovernanceEngine
@@ -2040,12 +2131,14 @@ Legal Inquiries: legal@averylogicworks.com
 
     def _show_parental_controls(self):
         settings = _load_parental_settings()
-        pwd, ok = QInputDialog.getText(
+        dlg = PasswordInputDialog(
             self,
-            "Parental Controls Locked",
-            "Enter password to access Parental Controls.\nHint: Default is 'Nexus'",
-            QLineEdit.EchoMode.Password,
+            title="Parental Controls Locked",
+            label="Enter password to access Parental Controls.",
+            hint="Hint: Default is 'Nexus'",
         )
+        dlg.exec()
+        pwd, ok = dlg.get_password()
         if not ok:
             return
         if pwd != settings.get("password", "Nexus"):
@@ -2385,17 +2478,26 @@ class ParentalControlsDialog(QDialog):
         self._old_pwd.setPlaceholderText("Current password")
         self._old_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         self._old_pwd.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        old_pwd_row = QHBoxLayout()
+        old_pwd_row.addWidget(self._old_pwd, stretch=1)
+        old_pwd_row.addWidget(_make_pwd_toggle(self._old_pwd))
         self._new_pwd = QLineEdit()
         self._new_pwd.setPlaceholderText("New password")
         self._new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         self._new_pwd.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
+        new_pwd_row = QHBoxLayout()
+        new_pwd_row.addWidget(self._new_pwd, stretch=1)
+        new_pwd_row.addWidget(_make_pwd_toggle(self._new_pwd))
         self._confirm_pwd = QLineEdit()
         self._confirm_pwd.setPlaceholderText("Confirm new password")
         self._confirm_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         self._confirm_pwd.setStyleSheet("color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 10px;")
-        pwd_layout.addWidget(self._old_pwd)
-        pwd_layout.addWidget(self._new_pwd)
-        pwd_layout.addWidget(self._confirm_pwd)
+        confirm_pwd_row = QHBoxLayout()
+        confirm_pwd_row.addWidget(self._confirm_pwd, stretch=1)
+        confirm_pwd_row.addWidget(_make_pwd_toggle(self._confirm_pwd))
+        pwd_layout.addLayout(old_pwd_row)
+        pwd_layout.addLayout(new_pwd_row)
+        pwd_layout.addLayout(confirm_pwd_row)
         btn_change = QPushButton("UPDATE PASSWORD")
         btn_change.setStyleSheet("background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;")
         btn_change.clicked.connect(self._on_change_password)
@@ -2662,6 +2764,7 @@ class BackendConfigDialog(QDialog):
         self._openai_key.setEchoMode(QLineEdit.EchoMode.Password)
         self._openai_key.setPlaceholderText("sk-...")
         key_row.addWidget(self._openai_key, stretch=1)
+        key_row.addWidget(_make_pwd_toggle(self._openai_key))
         layout.addLayout(key_row)
 
         openai_model_row = QHBoxLayout()
@@ -2677,6 +2780,7 @@ class BackendConfigDialog(QDialog):
         self._brave_key.setEchoMode(QLineEdit.EchoMode.Password)
         self._brave_key.setPlaceholderText("Optional web search API")
         brave_row.addWidget(self._brave_key, stretch=1)
+        brave_row.addWidget(_make_pwd_toggle(self._brave_key))
         layout.addLayout(brave_row)
 
         # Advanced mode / custom provider
@@ -2698,6 +2802,7 @@ class BackendConfigDialog(QDialog):
         self._custom_key = QLineEdit(s.custom_api_key)
         self._custom_key.setEchoMode(QLineEdit.EchoMode.Password)
         custom_key_row.addWidget(self._custom_key, stretch=1)
+        custom_key_row.addWidget(_make_pwd_toggle(self._custom_key))
         advanced_layout.addLayout(custom_key_row)
 
         custom_model_row = QHBoxLayout()
@@ -3315,7 +3420,8 @@ class UsagePolicyDialog(QDialog):
             row.addWidget(QLabel(label_text))
             le = QLineEdit()
             le.setEchoMode(QLineEdit.EchoMode.Password)
-            row.addWidget(le)
+            row.addWidget(le, stretch=1)
+            row.addWidget(_make_pwd_toggle(le))
             setattr(self, attr, le)
             pwd_layout.addLayout(row)
         change_pwd_btn = QPushButton("Change Password")

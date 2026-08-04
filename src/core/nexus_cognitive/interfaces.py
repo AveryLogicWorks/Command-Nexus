@@ -145,3 +145,44 @@ class IGuardrailScreener(ABC):
 
     @abstractmethod
     def screen(self, content: str) -> tuple[bool, str]: ...
+
+
+class IExternalIntelligence(ABC):
+    """Contract for plugging a custom-made intelligence into the Trifecta Fold.
+
+    Implementations receive the query, conversation history, and contextual
+    metadata from the three internal dimensions. They return content parts,
+    a confidence score, and optional inferred facts. The result is fused
+    alongside the three native dimensions via Reciprocal Rank Fusion.
+
+    This allows any external AI system (local LLM, custom model, remote API)
+    to participate as a fourth cognitive dimension in the Trifecta Fold.
+    """
+
+    @abstractmethod
+    def process(
+        self,
+        query: str,
+        conversation_history: list[dict] | None,
+        context: dict,
+    ) -> dict:
+        """Process a query and return a signal dict.
+
+        Args:
+            query: The effective query (may include follow-up context).
+            conversation_history: Recent conversation turns.
+            context: Metadata from the three native dimensions:
+                - 'lexical_semantic': list of content parts from dim1
+                - 'relational_graph': list of content parts from dim2
+                - 'experiential_meta': list of content parts from dim3
+                - 'ai_uuid': the AI's UUID
+                - 'intent': the detected intent
+
+        Returns:
+            dict with keys:
+                - 'content_parts': list[str] — text segments to fuse
+                - 'confidence': float (0.0–1.0)
+                - 'inferred': list[str] (optional) — inferred facts
+                - 'sources': list[str] (optional) — source identifiers
+        """
+        ...

@@ -949,17 +949,20 @@ class GovernanceRulesDialog(QDialog):
     def _open_parental_controls(self):
         """Prompt for password then open ParentalControlsDialog."""
         try:
-            from src.parts.visibility.visibility_window import _load_parental_settings
+            from src.parts.visibility.visibility_window import _load_parental_settings, PasswordInputDialog
             settings = _load_parental_settings()
         except Exception as e:
             QMessageBox.warning(self, "Import Error", f"Failed to load parental settings: {e}")
             return
         
-        pwd, ok = QInputDialog.getText(
-            self, "Parental Controls Locked",
-            "Enter password to access Parental Controls.\nHint: Default is 'Nexus'",
-            QLineEdit.EchoMode.Password,
+        pwd_dlg = PasswordInputDialog(
+            self,
+            title="Parental Controls Locked",
+            label="Enter password to access Parental Controls.",
+            hint="Hint: Default is 'Nexus'",
         )
+        pwd_dlg.exec()
+        pwd, ok = pwd_dlg.get_password()
         if not ok:
             return
         # Use hashed password verification
@@ -989,16 +992,20 @@ class GovernanceRulesDialog(QDialog):
         """Prompt for password then open UsagePolicyDialog."""
         try:
             from src.core.usage_policy import load_policy_settings, verify_password
+            from src.parts.visibility.visibility_window import PasswordInputDialog
             settings = load_policy_settings()
         except Exception as e:
             QMessageBox.warning(self, "Import Error", f"Failed to load usage policy: {e}")
             return
 
-        pwd, ok = QInputDialog.getText(
-            self, "Usage Policy Locked",
-            "Enter password to access Usage Policy settings.\nHint: Default is 'Nexus'",
-            QLineEdit.EchoMode.Password,
+        pwd_dlg = PasswordInputDialog(
+            self,
+            title="Usage Policy Locked",
+            label="Enter password to access Usage Policy settings.",
+            hint="Hint: Default is 'Nexus'",
         )
+        pwd_dlg.exec()
+        pwd, ok = pwd_dlg.get_password()
         if not ok:
             return
         if not verify_password(pwd, settings):
