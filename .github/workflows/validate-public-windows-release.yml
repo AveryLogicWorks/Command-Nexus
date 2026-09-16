@@ -1,0 +1,119 @@
+name: Validate public Windows download
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  public-download-launch:
+    name: Downloaded EXE reaches customer UI
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+    steps:
+      - name: Download public release assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $base = "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG"
+          Invoke-WebRequest -Uri "$base/CommandNexus.exe" -OutFile "$env:RUNNER_TEMP\CommandNexus.exe"
+          Invoke-WebRequest -Uri "$base/SHA256SUMS.txt" -OutFile "$env:RUNNER_TEMP\SHA256SUMS.txt"
+
+      - name: Verify published checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $expected = ((Get-Content "$env:RUNNER_TEMP\SHA256SUMS.txt" -Raw).Trim() -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash "$env:RUNNER_TEMP\CommandNexus.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Public asset checksum mismatch: expected $expected, got $actual"
+          }
+          "sha256=$actual" | Out-File "$env:RUNNER_TEMP\public-validation.txt" -Encoding ascii
+          Write-Host "Published checksum verified: $actual"
+
+      - name: Launch downloaded EXE from a clean profile
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "$env:RUNNER_TEMP\CommandNexus.exe"
+          $cleanRoot = Join-Path $env:RUNNER_TEMP ("public-clean-start-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Force -Path $cleanRoot | Out-Null
+          $env:APPDATA = Join-Path $cleanRoot "AppData\Roaming"
+          $env:LOCALAPPDATA = Join-Path $cleanRoot "AppData\Local"
+          $env:USERPROFILE = Join-Path $cleanRoot "User"
+          $env:HOME = $env:USERPROFILE
+          New-Item -ItemType Directory -Force -Path $env:APPDATA, $env:LOCALAPPDATA, $env:USERPROFILE | Out-Null
+
+          $automation = New-Object -ComObject WScript.Shell
+          $started = $null
+          try {
+            $started = Start-Process -FilePath $exe -WorkingDirectory $cleanRoot -PassThru
+            $deadline = (Get-Date).AddSeconds(240)
+            $ready = $null
+            $lastAcknowledgedTitle = ""
+
+            while ((Get-Date) -lt $deadline) {
+              Start-Sleep -Seconds 2
+              $candidates = @(Get-Process -Name "CommandNexus" -ErrorAction SilentlyContinue)
+              if ($candidates.Count -eq 0 -and $started.HasExited) {
+                throw "Downloaded EXE exited before customer UI (exit code $($started.ExitCode))."
+              }
+
+              foreach ($candidate in $candidates) {
+                $candidate.Refresh()
+                if ($candidate.MainWindowHandle -eq 0) { continue }
+                $title = $candidate.MainWindowTitle
+                Write-Host "Observed public-build window: '$title'"
+
+                if ($title -match "(?i)(failed to execute|traceback|initialization error|server error|window error|system error)") {
+                  throw "Downloaded EXE displayed fatal startup window: '$title'."
+                }
+                if ($title -match "(?i)(license activation|visibility window)") {
+                  $ready = $candidate
+                  break
+                }
+                if ($title -match "(?i)(warning|notice|security alert)" -and $title -ne $lastAcknowledgedTitle) {
+                  $null = $automation.AppActivate($candidate.Id)
+                  Start-Sleep -Milliseconds 500
+                  $automation.SendKeys("{ENTER}")
+                  $lastAcknowledgedTitle = $title
+                }
+              }
+              if ($null -ne $ready) { break }
+            }
+
+            if ($null -eq $ready) {
+              throw "Downloaded EXE did not reach its activation or main product window."
+            }
+
+            Start-Sleep -Seconds 8
+            if (@(Get-Process -Name "CommandNexus" -ErrorAction SilentlyContinue).Count -eq 0) {
+              throw "Downloaded EXE reached customer UI and then crashed."
+            }
+
+            "window=$($ready.MainWindowTitle)" | Out-File "$env:RUNNER_TEMP\public-validation.txt" -Append -Encoding utf8
+            "PUBLIC_WINDOWS_DOWNLOAD_PASS tag=$env:RELEASE_TAG" | Tee-Object -FilePath "$env:RUNNER_TEMP\public-validation.txt" -Append
+          }
+          finally {
+            Get-Process -Name "CommandNexus" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Remove-Item $cleanRoot -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload public validation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-windows-validation-${{ env.RELEASE_TAG }}
+          path: ${{ runner.temp }}\public-validation.txt
+          if-no-files-found: error
+          retention-days: 30
