@@ -1,0 +1,142 @@
+name: Publish verified Command Nexus beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-verified-command-nexus.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish-and-prove:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      RELEASE_TAG: v1.1.0-beta.22
+      EXPECTED_SHA256: f11dc45212c61698d6c147daf0c6048e79122e156545e51106443813037d82ce
+      TRANSFER_URL: 'https://sdmntprwestus3.oaiusercontent.com/files/00000000-d974-81fd-8af2-7ab07dc0e18d/raw?se=2026-09-16T05%3A11%3A46Z&sp=r&sv=2026-02-06&sr=b&scid=7d437780-eadd-4d44-84aa-69d6f1bd77e1&skoid=2d2fbb03-9efb-4ad0-a91c-1db2f5a47997&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-15T19%3A16%3A41Z&ske=2026-09-16T19%3A16%3A41Z&sks=b&skv=2026-02-06&sig=tOAjrmKhg%2Bdkb2Mr8ayjMjnOWVu7hVkUhv2A2gKCTM8%3D'
+
+    steps:
+      - name: Receive exact private-build artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = Join-Path $env:RUNNER_TEMP "CommandNexus-validated.zip"
+          $releaseDir = Join-Path $env:RUNNER_TEMP "release"
+          Invoke-WebRequest -Uri $env:TRANSFER_URL -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $releaseDir -Force
+
+          $exe = Join-Path $releaseDir "CommandNexus.exe"
+          $sum = Join-Path $releaseDir "SHA256SUMS.txt"
+          $actual = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $declared = ((Get-Content $sum -Raw).Trim() -split "\s+")[0].ToLowerInvariant()
+          if ($actual -ne $env:EXPECTED_SHA256 -or $declared -ne $env:EXPECTED_SHA256) {
+            throw "Refusing publication: transferred artifact hash does not match the validated build."
+          }
+          Write-Host "Validated transfer hash: $actual"
+
+      - name: Publish Windows beta
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Command Nexus 1.1.0 Beta
+          prerelease: true
+          make_latest: false
+          body: |
+            Windows beta repaired and validated on a clean Windows runner.
+
+            This build corrects first-launch packaging, Windows-safe protected storage,
+            license verification, and release gating. The downloadable executable is
+            published only after it reaches the real license-activation window without
+            startup protection warnings or a crash.
+          files: |
+            ${{ runner.temp }}/release/CommandNexus.exe
+            ${{ runner.temp }}/release/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-download exact public assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $publicDir = Join-Path $env:RUNNER_TEMP "public-download"
+          New-Item -ItemType Directory -Force -Path $publicDir | Out-Null
+          $base = "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG"
+          Invoke-WebRequest -Uri "$base/CommandNexus.exe" -OutFile (Join-Path $publicDir "CommandNexus.exe")
+          Invoke-WebRequest -Uri "$base/SHA256SUMS.txt" -OutFile (Join-Path $publicDir "SHA256SUMS.txt")
+
+          $actual = (Get-FileHash (Join-Path $publicDir "CommandNexus.exe") -Algorithm SHA256).Hash.ToLowerInvariant()
+          $declared = ((Get-Content (Join-Path $publicDir "SHA256SUMS.txt") -Raw).Trim() -split "\s+")[0].ToLowerInvariant()
+          if ($actual -ne $env:EXPECTED_SHA256 -or $declared -ne $env:EXPECTED_SHA256) {
+            throw "Public download hash mismatch."
+          }
+          "tag=$env:RELEASE_TAG" | Out-File "$env:RUNNER_TEMP\public-validation.txt" -Encoding ascii
+          "sha256=$actual" | Out-File "$env:RUNNER_TEMP\public-validation.txt" -Append -Encoding ascii
+
+      - name: Prove public EXE reaches customer UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = Join-Path $env:RUNNER_TEMP "public-download\CommandNexus.exe"
+          $cleanRoot = Join-Path $env:RUNNER_TEMP ("public-clean-start-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Force -Path $cleanRoot | Out-Null
+          $env:APPDATA = Join-Path $cleanRoot "AppData\Roaming"
+          $env:LOCALAPPDATA = Join-Path $cleanRoot "AppData\Local"
+          $env:USERPROFILE = Join-Path $cleanRoot "User"
+          $env:HOME = $env:USERPROFILE
+          New-Item -ItemType Directory -Force -Path $env:APPDATA, $env:LOCALAPPDATA, $env:USERPROFILE | Out-Null
+
+          $automation = New-Object -ComObject WScript.Shell
+          $started = $null
+          try {
+            $started = Start-Process -FilePath $exe -WorkingDirectory $cleanRoot -PassThru
+            $deadline = (Get-Date).AddSeconds(240)
+            $ready = $null
+
+            while ((Get-Date) -lt $deadline) {
+              Start-Sleep -Seconds 2
+              $candidates = @(Get-Process -Name "CommandNexus" -ErrorAction SilentlyContinue)
+              if ($candidates.Count -eq 0 -and $started.HasExited) {
+                throw "Public EXE exited before customer UI (exit code $($started.ExitCode))."
+              }
+              foreach ($candidate in $candidates) {
+                $candidate.Refresh()
+                if ($candidate.MainWindowHandle -eq 0) { continue }
+                $title = $candidate.MainWindowTitle
+                Write-Host "Observed public window: '$title'"
+                if ($title -match "(?i)(failed to execute|traceback|initialization error|server error|window error|system error|structural integrity|protection system|security alert|license system warning)") {
+                  throw "Public EXE displayed an unacceptable startup window: '$title'."
+                }
+                if ($title -match "(?i)(license activation|visibility window)") {
+                  $ready = $candidate
+                  break
+                }
+              }
+              if ($null -ne $ready) { break }
+            }
+
+            if ($null -eq $ready) {
+              throw "Public EXE did not reach its activation or main product window."
+            }
+            Start-Sleep -Seconds 8
+            if (@(Get-Process -Name "CommandNexus" -ErrorAction SilentlyContinue).Count -eq 0) {
+              throw "Public EXE reached customer UI and then crashed."
+            }
+            "window=$($ready.MainWindowTitle)" | Out-File "$env:RUNNER_TEMP\public-validation.txt" -Append -Encoding utf8
+            "PUBLIC_WINDOWS_DOWNLOAD_PASS" | Out-File "$env:RUNNER_TEMP\public-validation.txt" -Append -Encoding ascii
+          }
+          finally {
+            Get-Process -Name "CommandNexus" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Remove-Item $cleanRoot -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Preserve public validation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-windows-validation-${{ env.RELEASE_TAG }}
+          path: ${{ runner.temp }}/public-validation.txt
+          if-no-files-found: error
+          retention-days: 30
