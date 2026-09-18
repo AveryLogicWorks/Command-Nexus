@@ -14,9 +14,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_TAG: v1.1.0-beta.22
-      EXPECTED_SHA256: f11dc45212c61698d6c147daf0c6048e79122e156545e51106443813037d82ce
-      TRANSFER_URL: 'https://sdmntprwestus3.oaiusercontent.com/files/00000000-d974-81fd-8af2-7ab07dc0e18d/raw?se=2026-09-16T05%3A11%3A46Z&sp=r&sv=2026-02-06&sr=b&scid=7d437780-eadd-4d44-84aa-69d6f1bd77e1&skoid=2d2fbb03-9efb-4ad0-a91c-1db2f5a47997&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-15T19%3A16%3A41Z&ske=2026-09-16T19%3A16%3A41Z&sks=b&skv=2026-02-06&sig=tOAjrmKhg%2Bdkb2Mr8ayjMjnOWVu7hVkUhv2A2gKCTM8%3D'
+      RELEASE_TAG: v1.1.0-beta.28
+      EXPECTED_SHA256: ac6da3d52733dc18fd1f9dc6c6c945da69c9de252d56506e690b5617debaf032
+      TRANSFER_URL: 'https://sdmntprwestus3.oaiusercontent.com/files/00000000-6fac-81fd-90ae-2a6f3a7de32c/raw?se=2026-09-18T00%3A33%3A03Z&sp=r&sv=2026-02-06&sr=b&scid=d3c3826d-9b3e-419c-9ff2-ae9df2448fec&skoid=2d2fbb03-9efb-4ad0-a91c-1db2f5a47997&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-17T18%3A11%3A24Z&ske=2026-09-18T18%3A11%3A24Z&sks=b&skv=2026-02-06&sig=nkgcN4EyA196EczZd/F/uQ/hXbDnsLIDqUploPUrQ1M%3D'
 
     steps:
       - name: Receive exact private-build artifact
@@ -46,12 +46,17 @@ jobs:
           prerelease: true
           make_latest: false
           body: |
-            Windows beta repaired and validated on a clean Windows runner.
+            Repaired Windows beta with signed trial activation.
 
-            This build corrects first-launch packaging, Windows-safe protected storage,
-            license verification, and release gating. The downloadable executable is
-            published only after it reaches the real license-activation window without
-            startup protection warnings or a crash.
+            This exact executable passed Windows checks for invalid-key rejection,
+            signed trial activation, main-window access, AI Forge opening,
+            access to the create-new-AI form, and restart without reactivation.
+            Evidence: https://github.com/AveryLogicWorks/command-Nexus-v1.1/actions/runs/35256929289
+
+            Publisher signing remains pending. Windows may show Unknown publisher.
+            These checks do not certify every application feature.
+
+            SHA256: ac6da3d52733dc18fd1f9dc6c6c945da69c9de252d56506e690b5617debaf032
           files: |
             ${{ runner.temp }}/release/CommandNexus.exe
             ${{ runner.temp }}/release/SHA256SUMS.txt
@@ -86,7 +91,6 @@ jobs:
           $env:APPDATA = Join-Path $cleanRoot "AppData\Roaming"
           $env:LOCALAPPDATA = Join-Path $cleanRoot "AppData\Local"
           $env:USERPROFILE = Join-Path $cleanRoot "User"
-          $env:HOME = $env:USERPROFILE
           New-Item -ItemType Directory -Force -Path $env:APPDATA, $env:LOCALAPPDATA, $env:USERPROFILE | Out-Null
 
           $automation = New-Object -ComObject WScript.Shell
